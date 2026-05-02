@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { signIn } from "next-auth/react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 
@@ -99,7 +100,10 @@ export default function LoginPage() {
           <hr className="flex-1 border-gray-300" />
         </div>
 
-        <button className="w-full border border-gray-300 rounded-full py-3 flex items-center justify-center gap-3 hover:bg-gray-50 transition mb-3">
+        <button
+          onClick={() => signIn("google", { callbackUrl: "/" })}
+          className="w-full border border-gray-300 rounded-full py-3 flex items-center justify-center gap-3 hover:bg-gray-50 transition mb-3"
+        >
           <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
           <span className="text-gray-700 font-medium">Continue with Google</span>
         </button>
