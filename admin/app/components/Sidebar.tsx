@@ -5,11 +5,12 @@ import Link from "next/link";
 
 const navItems = [
   { label: "Dashboard", href: "/admin" },
-  { label: "Users", href: "/users" },
-  { label: "Products", href: "/products" },
-  { label: "Orders", href: "/orders" },
-  { label: "Categories", href: "/categories" },
-  { label: "Settings", href: "/settings" },
+  { label: "Merchants",  href: "/merchants" },  // add this
+  { label: "Users",     href: "/users" },
+  { label: "Products",  href: "/products" },
+  { label: "Orders",    href: "/orders" },
+  { label: "Categories",href: "/categories" },
+  { label: "Settings",  href: "/settings" },
 ];
 
 export default function Sidebar() {
