@@ -1,132 +1,170 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, Bell, Home, Store, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { ShoppingCart, Bell, Home, Store, Menu, X, Leaf } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const navLinks = [
+    { href: "/", label: "Home", icon: <Home size={15} /> },
+    { href: "/shop", label: "Shop", icon: <Store size={15} /> },
+    { href: "/cart", label: "Cart", icon: <ShoppingCart size={15} /> },
+    { href: "/notifications", label: "Notifications", icon: <Bell size={15} /> },
+  ];
 
   return (
-    <nav className="navbar">
-      {/* Logo */}
-      <div className="navbar-logo">
-        <span className="logo-leaf">🌿</span>
-        <span className="logo-text">LocalVeg</span>
-      </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-      {/* Desktop Nav Links */}
-      <ul className="nav-links">
-        <li><Link href="/" className="nav-link active"><Home size={16} /> Home</Link></li>
-        <li><Link href="/shop" className="nav-link"><Store size={16} /> Shop</Link></li>
-        <li><Link href="/cart" className="nav-link"><ShoppingCart size={16} /> Cart</Link></li>
-        <li><Link href="/notifications" className="nav-link"><Bell size={16} /> Notification</Link></li>
-      </ul>
-
-      {/* Mobile Hamburger */}
-      <button className="menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
-        {menuOpen ? <X size={22} /> : <Menu size={22} />}
-      </button>
-
-      {/* Mobile Dropdown */}
-      {menuOpen && (
-        <div className="mobile-menu">
-          <Link href="/" className="mobile-link" onClick={() => setMenuOpen(false)}><Home size={16} /> Home</Link>
-          <Link href="/shop" className="mobile-link" onClick={() => setMenuOpen(false)}><Store size={16} /> Shop</Link>
-          <Link href="/cart" className="mobile-link" onClick={() => setMenuOpen(false)}><ShoppingCart size={16} /> Cart</Link>
-          <Link href="/notifications" className="mobile-link" onClick={() => setMenuOpen(false)}><Bell size={16} /> Notification</Link>
-        </div>
-      )}
-
-      <style jsx>{`
-        .navbar {
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          display: flex;
-          align-items: center;
+        .nav-root {
+          position: sticky; top: 0; z-index: 200;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          transition: all 0.3s ease;
+        }
+        .nav-root.scrolled {
+          box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+        .nav-inner {
+          display: flex; align-items: center;
           justify-content: space-between;
-          padding: 0 2rem;
-          height: 64px;
-          background: #1a3d2b;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+          padding: 0 6%; height: 68px;
+          background: rgba(255,255,255,0.85);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(0,0,0,0.06);
         }
-        .navbar-logo {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+        .nav-logo {
+          display: flex; align-items: center; gap: 10px;
+          text-decoration: none;
         }
-        .logo-leaf { font-size: 22px; }
-        .logo-text {
-          font-family: 'Georgia', serif;
-          font-size: 20px;
-          font-weight: 700;
-          color: #a8e063;
-          letter-spacing: 0.5px;
+        .nav-logo-icon {
+          width: 36px; height: 36px;
+          background: linear-gradient(135deg, #0DB30D, #a8e063);
+          border-radius: 10px;
+          display: flex; align-items: center; justify-content: center;
         }
+        .nav-logo-text {
+          font-size: 19px; font-weight: 800;
+          color: #0A490A; letter-spacing: -0.5px;
+        }
+        .nav-logo-text span { color: #0DB30D; }
         .nav-links {
-          display: flex;
-          list-style: none;
-          gap: 2rem;
-          margin: 0;
-          padding: 0;
+          display: flex; align-items: center; gap: 4px;
+          list-style: none; margin: 0; padding: 0;
         }
         .nav-link {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          color: #c8e6c9;
-          text-decoration: none;
-          font-size: 15px;
-          font-weight: 500;
-          padding: 6px 10px;
-          border-radius: 8px;
+          display: flex; align-items: center; gap: 6px;
+          padding: 8px 14px; border-radius: 10px;
+          color: #555; text-decoration: none;
+          font-size: 14px; font-weight: 600;
           transition: all 0.2s;
         }
-        .nav-link:hover, .nav-link.active {
-          color: #a8e063;
-          background: rgba(168, 224, 99, 0.1);
+        .nav-link:hover {
+          color: #0A490A;
+          background: rgba(10,73,10,0.06);
         }
         .nav-link.active {
-          border-bottom: 2px solid #a8e063;
-          border-radius: 0;
-          background: none;
+          color: #0A490A;
+          background: rgba(13,179,13,0.1);
+        }
+        .nav-cta {
+          display: flex; align-items: center; gap: 8px;
+          padding: 9px 20px; border-radius: 10px;
+          background: #0A490A; color: #fff;
+          font-size: 14px; font-weight: 700;
+          text-decoration: none;
+          transition: all 0.2s;
+          border: none; cursor: pointer;
+        }
+        .nav-cta:hover {
+          background: #0DB30D;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(13,179,13,0.35);
         }
         .menu-btn {
-          display: none;
-          background: none;
-          border: none;
-          color: #c8e6c9;
-          cursor: pointer;
-          padding: 4px;
+          display: none; background: none; border: none;
+          color: #0A490A; cursor: pointer; padding: 6px;
+          border-radius: 8px;
         }
+        .menu-btn:hover { background: rgba(10,73,10,0.06); }
         .mobile-menu {
-          position: absolute;
-          top: 64px;
-          left: 0;
-          right: 0;
-          background: #1a3d2b;
-          display: flex;
-          flex-direction: column;
-          padding: 1rem 2rem;
-          gap: 0.5rem;
-          border-top: 1px solid rgba(168,224,99,0.2);
+          background: rgba(255,255,255,0.95);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-top: 1px solid rgba(0,0,0,0.06);
+          padding: 12px 6%;
+          display: flex; flex-direction: column; gap: 4px;
         }
         .mobile-link {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: #c8e6c9;
-          text-decoration: none;
-          padding: 10px 0;
-          font-size: 15px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
+          display: flex; align-items: center; gap: 10px;
+          color: #555; text-decoration: none;
+          padding: 12px 14px; border-radius: 10px;
+          font-size: 15px; font-weight: 600;
+          transition: all 0.2s;
         }
-        @media (max-width: 640px) {
+        .mobile-link:hover {
+          background: rgba(10,73,10,0.05); color: #0A490A;
+        }
+        @media (max-width: 768px) {
           .nav-links { display: none; }
-          .menu-btn { display: block; }
+          .nav-cta { display: none; }
+          .menu-btn { display: flex; align-items: center; justify-content: center; }
         }
       `}</style>
-    </nav>
+
+      <nav className={`nav-root${scrolled ? " scrolled" : ""}`}>
+        <div className="nav-inner">
+          {/* Logo */}
+          <Link href="/" className="nav-logo">
+            <div className="nav-logo-icon">
+              <Leaf size={18} color="#0A490A" strokeWidth={2.5} />
+            </div>
+            <span className="nav-logo-text">Local<span>Veg</span></span>
+          </Link>
+
+          {/* Desktop links */}
+          <ul className="nav-links">
+            {navLinks.map(({ href, label, icon }) => (
+              <li key={href}>
+                <Link href={href} className="nav-link">
+                  {icon} {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* CTA */}
+          <Link href="/shop" className="nav-cta">
+            <ShoppingCart size={15} /> Shop Now
+          </Link>
+
+          {/* Mobile burger */}
+          <button className="menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+
+        {/* Mobile menu */}
+        {menuOpen && (
+          <div className="mobile-menu">
+            {navLinks.map(({ href, label, icon }) => (
+              <Link key={href} href={href} className="mobile-link" onClick={() => setMenuOpen(false)}>
+                {icon} {label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </nav>
+    </>
   );
 }
