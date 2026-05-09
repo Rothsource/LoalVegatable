@@ -5,7 +5,6 @@ import { createServerClient } from '@supabase/ssr'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // these pages are always public
   const publicPaths = [
     '/auth/login',
     '/auth/register',
@@ -16,19 +15,20 @@ export async function middleware(request: NextRequest) {
     '/shop',
   ]
 
-  // allow public paths and shop listing pages
   if (
     publicPaths.includes(pathname) ||
     pathname.startsWith('/auth/')
   ) return NextResponse.next()
 
-  // block shop/[id] and cart unless logged in
   const protectedPaths = ['/shop/', '/cart', '/checkout', '/profile', '/orders']
   const isProtected = protectedPaths.some(p => pathname.startsWith(p))
-
   if (!isProtected) return NextResponse.next()
 
-  const response = NextResponse.next()
+  // ✅ Create response ONCE and always pass it through so
+  //    Supabase can write refreshed session cookies onto it.
+  const response = NextResponse.next({
+    request: { headers: request.headers },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,22 +36,23 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
-        setAll: (cookies) => cookies.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options))
-      }
+        // ✅ Write onto the SAME response object we'll return
+        setAll: (cookies) =>
+          cookies.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)),
+      },
     }
   )
 
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    // save where they were going so we can redirect back after login
     const redirectUrl = new URL('/auth/login', request.url)
     redirectUrl.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
-  return response
+  return response // ✅ Returns with any refreshed cookies attached
 }
 
 export const config = {

@@ -22,7 +22,10 @@ export default function RegisterPage() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role: 'user' } }
+      options: {
+        data: { role: 'user' },
+        emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=/shop`, // ✅
+      }
     });
     if (error) { setError(error.message); setLoading(false); return; }
     setSuccess(true);

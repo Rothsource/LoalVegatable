@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, use } from 'react';
 import { Heart, ShoppingCart, Star, Leaf, Info, X, Trash2, HeartOff, Filter, Plus, ChevronLeft, MapPin, ShieldCheck, Package, Calendar, Box } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface Product {
   id: number;
@@ -260,7 +261,17 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           </div>
           {type === 'cart' && items.length > 0 && (
             <div style={{ paddingTop: '20px', paddingBottom: '10px' }}>
-              <button style={{ width: '100%', padding: '16px', backgroundColor: brandGreen, color: 'white', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', fontSize: '15px' }}>
+              <button
+                style={{ width: '100%', padding: '16px', backgroundColor: brandGreen, color: 'white', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', fontSize: '15px' }}
+                onClick={async () => {
+                  const { data: { user } } = await supabase.auth.getUser()
+                  if (!user) {
+                    window.location.href = '/auth/login?redirectTo=/shop'
+                  } else {
+                    window.location.href = '/checkout'
+                  }
+                }}
+              >
                 Checkout ({items.reduce((sum: number, i: any) => sum + i.price, 0).toLocaleString()} KHR)
               </button>
             </div>
