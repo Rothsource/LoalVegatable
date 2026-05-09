@@ -8,20 +8,20 @@ on:
 jobs:
   deploy-customer:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_CUSTOMER_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g vercel
-      - run: vercel deploy --prod --yes --cwd customer --token=${{ secrets.vcp_53gto32A2GsPA8Zx0lsoOc5hmtzsZLnV0Bbp4jmwEt1ettTdgH3oHvB6 }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.team_vLG8AdnT9wwHCzgEqMUfOgfG }}
-          VERCEL_PROJECT_ID: ${{ secrets.prj_PKZoATBEbDYGTZ2ghn90vJEfvEf5 }}
+      - run: vercel deploy --prod --yes --cwd customer --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-merchant:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MERCHANT_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g vercel
-      - run: vercel deploy --prod --yes --cwd merchant --token=${{ secrets.vcp_53gto32A2GsPA8Zx0lsoOc5hmtzsZLnV0Bbp4jmwEt1ettTdgH3oHvB6 }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.team_vLG8AdnT9wwHCzgEqMUfOgfG }}
-          VERCEL_PROJECT_ID: ${{ secrets.prj_qBYw0XgEXjlyqN9jNTA410AAwcZ1 }}
+      - run: vercel deploy --prod --yes --cwd merchant --token=${{ secrets.VERCEL_TOKEN }}
