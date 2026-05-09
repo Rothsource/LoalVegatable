@@ -11,17 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g vercel
-      - run: vercel deploy --prod --yes --cwd customer --token=${{ secrets.VERCEL_TOKEN }} --scope=rothsources-projects
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_CUSTOMER_PROJECT_ID }}
+      - run: vercel deploy --prod --yes --cwd customer --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-merchant:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g vercel
-      - run: vercel deploy --prod --yes --cwd merchant --token=${{ secrets.VERCEL_TOKEN }} --scope=rothsources-projects
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MERCHANT_PROJECT_ID }}
+      - run: vercel deploy --prod --yes --cwd merchant --token=${{ secrets.VERCEL_TOKEN }}
