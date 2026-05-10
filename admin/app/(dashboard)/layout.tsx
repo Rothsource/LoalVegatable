@@ -56,6 +56,18 @@ export default function DashboardLayout({
           >
             Settings
           </a>
+          <a
+            href="/merchants"
+            className="block rounded-lg px-4 py-3 text-gray-300 hover:bg-gray-800"
+          >
+            Merchants
+           </a>
+           <a
+            href="/products"
+            className="block rounded-lg px-4 py-3 text-gray-300 hover:bg-gray-800"
+            >
+            Products
+            </a>
         </nav>
       </aside>
 

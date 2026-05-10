@@ -5,20 +5,38 @@ export default function AdminPage() {
       <p className="mt-2 text-gray-600">Overview of your admin portal.</p>
 
       <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h3 className="text-gray-500">Total Users</h3>
-          <p className="mt-3 text-3xl font-bold text-gray-900">12</p>
-        </div>
+        <a
+          href="/merchants"
+          className="rounded-2xl bg-white p-6 shadow hover:shadow-lg"
+        >
+          <div className="text-4xl">🏪</div>
+          <h3 className="mt-4 text-xl font-bold text-gray-900">Merchants</h3>
+          <p className="mt-2 text-gray-600">
+            View, approve, decline, and manage merchants.
+          </p>
+        </a>
 
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h3 className="text-gray-500">Projects</h3>
-          <p className="mt-3 text-3xl font-bold text-gray-900">5</p>
-        </div>
+        <a
+          href="/users"
+          className="rounded-2xl bg-white p-6 shadow hover:shadow-lg"
+        >
+          <div className="text-4xl">👥</div>
+          <h3 className="mt-4 text-xl font-bold text-gray-900">Users</h3>
+          <p className="mt-2 text-gray-600">
+            View and manage platform users.
+          </p>
+        </a>
 
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h3 className="text-gray-500">System Status</h3>
-          <p className="mt-3 text-3xl font-bold text-green-600">Active</p>
-        </div>
+        <a
+          href="/products"
+          className="rounded-2xl bg-white p-6 shadow hover:shadow-lg"
+        >
+          <div className="text-4xl">📦</div>
+          <h3 className="mt-4 text-xl font-bold text-gray-900">Products</h3>
+          <p className="mt-2 text-gray-600">
+            View and manage product information.
+          </p>
+        </a>
       </div>
     </>
   );
