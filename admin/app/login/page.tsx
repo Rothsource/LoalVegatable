@@ -12,7 +12,7 @@ export default function LoginPage() {
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
-    if (email === "admin@gmail.com" && password === "admin123") {
+  if (email === "vectorpeach@gmail.com" && password === "123456789") {
       localStorage.setItem("isLoggedIn", "true");
       router.push("/admin");
     } else {
