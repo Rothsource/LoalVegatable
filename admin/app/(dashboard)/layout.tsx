@@ -42,14 +42,6 @@ export default function DashboardLayout({
           >
             Users
           </a>
-
-          <a
-            href="/projects"
-            className="block rounded-lg px-4 py-3 text-gray-300 hover:bg-gray-800"
-          >
-            Projects
-          </a>
-
           <a
             href="/settings"
             className="block rounded-lg px-4 py-3 text-gray-300 hover:bg-gray-800"

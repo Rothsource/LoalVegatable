@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-const users = [
+type User = {
+  name: string;
+  email: string;
+  status: "Active" | "Blocked";
+};
+
+const initialUsers: User[] = [
   {
     name: "Sok Dara",
     email: "sokdara@gmail.com",
@@ -21,8 +27,43 @@ const users = [
 ];
 
 export default function UsersPage() {
+  const [users, setUsers] = useState<User[]>(initialUsers);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All Users");
+
+  const [showForm, setShowForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newStatus, setNewStatus] = useState<"Active" | "Blocked">("Active");
+
+  function addUser(e: React.FormEvent) {
+    e.preventDefault();
+
+    const newUser: User = {
+      name: newName,
+      email: newEmail,
+      status: newStatus,
+    };
+
+    setUsers([...users, newUser]);
+    setNewName("");
+    setNewEmail("");
+    setNewStatus("Active");
+    setShowForm(false);
+  }
+
+  function toggleUserStatus(email: string) {
+    setUsers((currentUsers) =>
+      currentUsers.map((user) =>
+        user.email === email
+          ? {
+              ...user,
+              status: user.status === "Active" ? "Blocked" : "Active",
+            }
+          : user
+      )
+    );
+  }
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -64,6 +105,13 @@ export default function UsersPage() {
               <option>Active</option>
               <option>Blocked</option>
             </select>
+
+            <button
+              onClick={() => setShowForm(true)}
+              className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+            >
+              Add User
+            </button>
           </div>
         </div>
 
@@ -97,10 +145,14 @@ export default function UsersPage() {
 
                 <td className="py-4">
                   <button
-                    onClick={() => alert(`Managing ${user.name}`)}
-                    className="rounded-lg bg-gray-700 px-3 py-2 text-sm font-semibold text-white"
+                    onClick={() => toggleUserStatus(user.email)}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${
+                      user.status === "Active"
+                        ? "bg-red-500"
+                        : "bg-green-500"
+                    }`}
                   >
-                    Manage
+                    {user.status === "Active" ? "Block" : "Activate"}
                   </button>
                 </td>
               </tr>
@@ -112,6 +164,63 @@ export default function UsersPage() {
           <p className="mt-6 text-center text-gray-500">No users found.</p>
         )}
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
+          <form
+            onSubmit={addUser}
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+          >
+            <h3 className="text-xl font-bold text-gray-900">Add User</h3>
+
+            <input
+              type="text"
+              placeholder="User name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900"
+              required
+            />
+
+            <input
+              type="email"
+              placeholder="User email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900"
+              required
+            />
+
+            <select
+              value={newStatus}
+              onChange={(e) =>
+                setNewStatus(e.target.value as "Active" | "Blocked")
+              }
+              className="mt-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900"
+            >
+              <option>Active</option>
+              <option>Blocked</option>
+            </select>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white"
+              >
+                Add
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   );
 }

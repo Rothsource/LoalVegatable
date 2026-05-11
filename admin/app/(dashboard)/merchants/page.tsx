@@ -31,6 +31,10 @@ export default function MerchantsPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All Merchants");
 
+  const [showForm, setShowForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+
   function updateMerchantStatus(
     email: string,
     newStatus: "Approved" | "Declined"
@@ -42,6 +46,21 @@ export default function MerchantsPage() {
           : merchant
       )
     );
+  }
+
+  function addMerchant(e: React.FormEvent) {
+    e.preventDefault();
+
+    const newMerchant: Merchant = {
+      name: newName,
+      email: newEmail,
+      status: "Pending",
+    };
+
+    setMerchants([...merchants, newMerchant]);
+    setNewName("");
+    setNewEmail("");
+    setShowForm(false);
   }
 
   const filteredMerchants = merchants.filter((merchant) => {
@@ -86,6 +105,13 @@ export default function MerchantsPage() {
               <option>Approved</option>
               <option>Declined</option>
             </select>
+
+            <button
+              onClick={() => setShowForm(true)}
+              className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+            >
+              Add Merchant
+            </button>
           </div>
         </div>
 
@@ -163,6 +189,52 @@ export default function MerchantsPage() {
           </p>
         )}
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
+          <form
+            onSubmit={addMerchant}
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+          >
+            <h3 className="text-xl font-bold text-gray-900">Add Merchant</h3>
+
+            <input
+              type="text"
+              placeholder="Merchant name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900"
+              required
+            />
+
+            <input
+              type="email"
+              placeholder="Merchant email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900"
+              required
+            />
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white"
+              >
+                Add
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   );
 }
