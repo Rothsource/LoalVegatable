@@ -21,7 +21,10 @@ export default function RegisterPage() {
     const { error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: { data: { role: "merchant", full_name: form.name } },
+      options: {
+        data: { role: "merchant", full_name: form.name },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      },
     });
 
     if (error) { setError(error.message); setLoading(false); return; }
@@ -57,7 +60,6 @@ export default function RegisterPage() {
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Only 3 fields now */}
           {[
             { label: "Full Name",  name: "name",     type: "text",     placeholder: "Dara Chan" },
             { label: "Email",      name: "email",    type: "email",    placeholder: "you@gmail.com" },
