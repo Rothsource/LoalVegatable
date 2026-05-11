@@ -22,7 +22,10 @@ export default function RegisterPage() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role: 'user' } }
+      options: {
+        data: { role: 'user' },
+        emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=/shop`,
+      }
     });
     if (error) { setError(error.message); setLoading(false); return; }
     setSuccess(true);
@@ -37,11 +40,49 @@ export default function RegisterPage() {
     if (error) setError(error.message);
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px 16px',
+    borderRadius: '10px',
+    border: '1px solid #e0e0e0',
+    outline: 'none',
+    fontSize: '15px',
+    boxSizing: 'border-box',
+  };
+
+  const btnPrimaryStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: '10px',
+    backgroundColor: '#2e7d32',
+    color: '#fff',
+    border: 'none',
+    fontWeight: '600',
+    fontSize: '16px',
+    cursor: 'pointer',
+    boxSizing: 'border-box',
+  };
+
+  const btnGoogleStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: '10px',
+    border: '1px solid #e0e0e0',
+    backgroundColor: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    fontSize: '15px',
+    boxSizing: 'border-box',
+  };
+
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: 'Inter, sans-serif', backgroundColor: '#fdfdfb' }}>
       <div style={{ width: '50%', padding: '0 8%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ maxWidth: '420px', width: '100%', margin: '0 auto' }}>
-
           {success ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>📬</div>
@@ -61,12 +102,12 @@ export default function RegisterPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', color: '#444', fontWeight: '600', fontSize: '14px' }}>Email address</label>
-                  <input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid #e0e0e0', outline: 'none', fontSize: '15px' }} />
+                  <input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', color: '#444', fontWeight: '600', fontSize: '14px' }}>Password</label>
                   <div style={{ position: 'relative' }}>
-                    <input type={showPassword ? 'text' : 'password'} placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid #e0e0e0', outline: 'none', fontSize: '15px' }} />
+                    <input type={showPassword ? 'text' : 'password'} placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
                     <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '16px', top: '14px', cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>
                       {showPassword ? <><EyeOff size={18} /> Hide</> : <><Eye size={18} /> Show</>}
                     </div>
@@ -75,13 +116,14 @@ export default function RegisterPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#666', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} style={{ accentColor: '#2e7d32' }} /> I agree to the <span style={{ textDecoration: 'underline', color: '#000' }}>Terms of Service</span> and <span style={{ textDecoration: 'underline', color: '#000' }}>Privacy Policy</span>
+                    <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} style={{ accentColor: '#2e7d32' }} />
+                    I agree to the <Link href="#" style={{ textDecoration: 'underline', color: '#000' }}>Terms of Service</Link> and <Link href="#" style={{ textDecoration: 'underline', color: '#000' }}>Privacy Policy</Link>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#666', cursor: 'pointer' }}>
                     <input type="checkbox" checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} style={{ accentColor: '#2e7d32' }} /> Subscribe to our newsletter
                   </label>
                 </div>
-                <button onClick={handleRegister} disabled={loading} style={{ width: '100%', padding: '14px', borderRadius: '10px', backgroundColor: '#2e7d32', color: '#fff', border: 'none', fontWeight: '600', fontSize: '16px', cursor: 'pointer', marginTop: '10px', opacity: loading ? 0.7 : 1 }}>
+                <button onClick={handleRegister} disabled={loading} style={{ ...btnPrimaryStyle, opacity: loading ? 0.7 : 1 }}>
                   {loading ? 'Creating account...' : 'Create account'}
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', margin: '15px 0' }}>
@@ -89,7 +131,7 @@ export default function RegisterPage() {
                   <span style={{ padding: '0 15px', color: '#bbb', fontSize: '12px', fontWeight: '600' }}>OR CONTINUE WITH</span>
                   <div style={{ flex: 1, height: '1px', backgroundColor: '#eee' }}></div>
                 </div>
-                <button onClick={handleGoogleSignUp} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
+                <button onClick={handleGoogleSignUp} style={btnGoogleStyle}>
                   <img src="https://authjs.dev/img/providers/google.svg" width="18" alt="Google" /> Continue with Google
                 </button>
                 <p style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: '20px' }}>
@@ -98,7 +140,6 @@ export default function RegisterPage() {
               </div>
             </>
           )}
-
         </div>
       </div>
       <div style={{ width: '50%', backgroundImage: "url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200')", backgroundSize: 'cover', backgroundPosition: 'center', borderLeft: '1px solid #eee' }} />
