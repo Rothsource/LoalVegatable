@@ -16,6 +16,7 @@ import { Icons } from "@/components/products/ProductIcons";
 export default function ProductsPage() {
   const { toasts, toast, remove } = useToast();
 
+  const [merchantName, setMerchantName] = useState("Merchant");
   const [products, setProducts]         = useState<Product[]>([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState("");
@@ -27,10 +28,21 @@ export default function ProductsPage() {
   const [formErrors, setFormErrors]     = useState<Partial<Record<keyof FormState, string>>>({});
   const [selected, setSelected]         = useState<Set<string>>(new Set());
 
-  // ── Fetch products from Supabase ─────────────────────────────────────────
   useEffect(() => {
     fetchProducts();
+    fetchMerchant();
   }, []);
+
+  async function fetchMerchant() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("profile_merchants")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+    if (data?.full_name) setMerchantName(data.full_name);
+  }
 
   async function fetchProducts() {
     setLoading(true);
@@ -61,7 +73,6 @@ export default function ProductsPage() {
     setLoading(false);
   }
 
-  // ── Filtered list ────────────────────────────────────────────────────────
   const filtered = useMemo(
     () => products.filter(
       (p) =>
@@ -75,7 +86,6 @@ export default function ProductsPage() {
     .filter((p) => p.quantity <= 10)
     .map((p) => ({ name: p.name, stock: p.quantity }));
 
-  // ── Select helpers ───────────────────────────────────────────────────────
   const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
 
   function toggleSelectAll() {
@@ -89,7 +99,6 @@ export default function ProductsPage() {
     });
   }
 
-  // ── Bulk actions ─────────────────────────────────────────────────────────
   async function bulkDelete() {
     const count = selected.size;
     const ids = Array.from(selected);
@@ -112,13 +121,13 @@ export default function ProductsPage() {
     toast(`Hidden ${count} product${count > 1 ? "s" : ""}`, "warning");
   }
 
-  // ── Modal helpers ────────────────────────────────────────────────────────
   function openAdd() {
     setEditProduct(null);
     setForm({ ...EMPTY_FORM, backgroundPicUrls: ["", "", ""] });
     setFormErrors({});
     setShowModal(true);
   }
+
   function openEdit(p: Product) {
     setEditProduct(p);
     setForm({
@@ -142,13 +151,13 @@ export default function ProductsPage() {
     if (formErrors[key])
       setFormErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
   }
+
   function setBgPic(i: number, url: string) {
     const updated = [...form.backgroundPicUrls];
     updated[i] = url;
     setForm((f) => ({ ...f, backgroundPicUrls: updated }));
   }
 
-  // ── Save ─────────────────────────────────────────────────────────────────
   async function handleSave() {
     const errors = validateForm(form);
     if (Object.keys(errors).length > 0) {
@@ -194,7 +203,6 @@ export default function ProductsPage() {
     setShowModal(false);
   }
 
-  // ── Delete ───────────────────────────────────────────────────────────────
   async function handleDelete() {
     if (!deleteTarget) return;
     const { error } = await supabase.from("products").delete().eq("id", deleteTarget.id);
@@ -205,7 +213,6 @@ export default function ProductsPage() {
     setDeleteTarget(null);
   }
 
-  // ── Toggle active ────────────────────────────────────────────────────────
   async function toggleActive(p: Product) {
     const { error } = await supabase
       .from("products")
@@ -221,20 +228,18 @@ export default function ProductsPage() {
     );
   }
 
-  // ── Stats ────────────────────────────────────────────────────────────────
   const stats = [
-    { label: "Total",        value: products.length,                               color: "text-gray-900"  },
-    { label: "Active",       value: products.filter((p) => p.active).length,       color: "text-green-600" },
+    { label: "Total",        value: products.length,                                color: "text-gray-900"  },
+    { label: "Active",       value: products.filter((p) => p.active).length,        color: "text-green-600" },
     { label: "Low / Out",    value: products.filter((p) => p.quantity <= 10).length, color: "text-amber-500" },
     { label: "Out of stock", value: products.filter((p) => p.quantity === 0).length, color: "text-red-500"   },
   ];
 
-  // ────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f5f9f3] text-gray-900"
       style={{ fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
       <ToastContainer toasts={toasts} onRemove={remove} />
-      <Header lowStock={lowStock} activePath="/product" merchantName="Dara" />
+      <Header lowStock={lowStock} activePath="/product" merchantName={merchantName} />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-5 pb-24">
         <div className="flex items-center justify-between flex-wrap gap-3">

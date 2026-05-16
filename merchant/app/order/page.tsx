@@ -1,6 +1,7 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Header from "@/components/Header";
+import { supabase } from "@/lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Status = "Pending" | "Preparing" | "Ready" | "Delivered" | "Cancelled";
@@ -191,7 +192,6 @@ function DenyModal({
         className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* header */}
         <div className="px-6 pt-6 pb-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -209,7 +209,6 @@ function DenyModal({
           </div>
         </div>
 
-        {/* body */}
         <div className="px-6 py-5 space-y-3">
           <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Select a reason</p>
 
@@ -265,7 +264,6 @@ function DenyModal({
           )}
         </div>
 
-        {/* footer */}
         <div className="px-6 pb-6 flex gap-3">
           <button onClick={onClose}
             className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition">
@@ -306,7 +304,6 @@ function OrderModal({
         className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
           <div>
             <div className="flex items-center gap-2.5">
@@ -320,10 +317,7 @@ function OrderModal({
           <CloseButton onClick={onClose} />
         </div>
 
-        {/* body */}
         <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
-
-          {/* customer */}
           <div>
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Customer</p>
             <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
@@ -356,7 +350,6 @@ function OrderModal({
             </div>
           </div>
 
-          {/* order items */}
           <div>
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Order items</p>
             <div className="bg-gray-50 rounded-2xl overflow-hidden">
@@ -391,7 +384,6 @@ function OrderModal({
             </div>
           </div>
 
-          {/* progress timeline */}
           <div>
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Progress</p>
             <div className="flex items-center gap-1">
@@ -440,7 +432,6 @@ function OrderModal({
           </div>
         </div>
 
-        {/* footer actions */}
         {(order.status === "Pending" || order.status === "Preparing" || order.status === "Ready") && (
           <div className="px-6 pb-6 flex gap-3 border-t border-gray-100 pt-4">
             {order.status === "Pending" && (
@@ -472,6 +463,22 @@ export default function OrdersPage() {
   const [tab, setTab]                     = useState<Status | "All">("All");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [denyTarget, setDenyTarget]       = useState<Order | null>(null);
+  const [merchantName, setMerchantName]   = useState("Merchant");
+
+  useEffect(() => {
+    fetchMerchant();
+  }, []);
+
+  async function fetchMerchant() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("profile_merchants")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+    if (data?.full_name) setMerchantName(data.full_name);
+  }
 
   const filtered     = tab === "All" ? orders : orders.filter((o) => o.status === tab);
   const pendingCount = orders.filter((o) => o.status === "Pending").length;
@@ -496,12 +503,9 @@ export default function OrdersPage() {
       className="min-h-screen bg-[#f5f9f3]"
       style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif" }}
     >
-      {/* HEADER — replaces the old inline navbar */}
-      <Header lowStock={[]} activePath="/order" merchantName="Dara" />
+      <Header lowStock={[]} activePath="/order" merchantName={merchantName} />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5 pb-20">
-
-        {/* PAGE HEADER */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-black text-gray-900">Orders</h1>
@@ -519,7 +523,6 @@ export default function OrdersPage() {
           )}
         </div>
 
-        {/* STATUS TABS */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {STATUS_TABS.map((t) => {
             const count = t.value === "All"
@@ -543,7 +546,6 @@ export default function OrdersPage() {
           })}
         </div>
 
-        {/* ORDER LIST */}
         {filtered.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-16 flex flex-col items-center text-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center">
@@ -600,7 +602,6 @@ export default function OrdersPage() {
                     </svg>
                   </div>
 
-                  {/* quick actions for pending */}
                   {isPending && (
                     <div className="px-5 pb-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <button
@@ -624,7 +625,6 @@ export default function OrdersPage() {
         )}
       </main>
 
-      {/* ORDER DETAIL MODAL */}
       {selectedOrder && (
         <OrderModal
           order={orders.find((o) => o.id === selectedOrder.id) ?? selectedOrder}
@@ -634,7 +634,6 @@ export default function OrdersPage() {
         />
       )}
 
-      {/* DENY MODAL */}
       {denyTarget && (
         <DenyModal
           order={denyTarget}
