@@ -5,19 +5,33 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  if (email === "vectorpeach@gmail.com" && password === "123456789") {
-      localStorage.setItem("isLoggedIn", "true");
-      router.push("/admin");
-    } else {
-      alert("Invalid login");
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+    setLoading(false);
+
+    if (!res.ok) {
+      setError(data.error || "Login failed");
+      return;
     }
+
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("adminInfo", JSON.stringify(data));
+    router.push("/admin");
   }
 
   return (
@@ -26,19 +40,21 @@ export default function LoginPage() {
         onSubmit={handleLogin}
         className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl"
       >
-        <h1 className="mb-2 text-3xl font-bold text-gray-900">
-          Admin Login
-        </h1>
+        <h1 className="mb-2 text-3xl font-bold text-gray-900">Admin Login</h1>
+        <p className="mb-6 text-gray-600">Sign in to access your admin portal.</p>
 
-        <p className="mb-6 text-gray-600">
-          Sign in to access your admin portal.
-        </p>
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
 
         <input
           type="email"
-          placeholder="Gmail / Email"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
           className="mb-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900"
         />
 
@@ -47,11 +63,16 @@ export default function LoginPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
           className="mb-6 w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900"
         />
 
-        <button className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white">
-          Login
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white disabled:opacity-60"
+        >
+          {loading ? "Signing in..." : "Login"}
         </button>
       </form>
     </main>
