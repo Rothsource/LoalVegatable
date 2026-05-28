@@ -1,16 +1,14 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 
 const navItems = [
   { label: "Dashboard", href: "/admin" },
-  { label: "Merchants",  href: "/merchants" },  // add this
-  { label: "Users",     href: "/users" },
-  { label: "Products",  href: "/products" },
-  { label: "Orders",    href: "/orders" },
-  { label: "Categories",href: "/categories" },
-  { label: "Settings",  href: "/settings" },
+  { label: "Merchants", href: "/merchants" },
+  { label: "Users", href: "/users" },
+  { label: "Products", href: "/products" },
+  { label: "Orders", href: "/orders" },
 ];
 
 export default function Sidebar() {
@@ -24,14 +22,15 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-col bg-gray-900 text-white sticky top-0">
-      {/* Logo */}
-      <div className="p-6 text-2xl font-bold">Admin Portal</div>
+    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col bg-gray-900 text-white">
+      <div className="flex h-16 items-center px-6 text-2xl font-bold">
+        Admin Portal
+      </div>
 
-      {/* Nav links */}
-      <nav className="flex-1 space-y-1 px-4">
+      <nav className="flex-1 space-y-1 px-4 py-4">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
+
           return (
             <Link
               key={item.href}
@@ -48,11 +47,10 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Logout at bottom */}
       <div className="p-4">
         <button
           onClick={logout}
-          className="w-full rounded-lg bg-red-500 px-4 py-2 font-semibold text-white hover:bg-red-600 transition-colors"
+          className="w-full rounded-lg bg-red-500 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-600"
         >
           Logout
         </button>

@@ -3,36 +3,32 @@
 import { useState } from "react";
 
 type Order = {
-  id: string;
+  id: number;
   customer: string;
   product: string;
-  quantity: number;
   total: number;
   status: "Pending" | "Completed" | "Cancelled";
 };
 
 const initialOrders: Order[] = [
   {
-    id: "ORD-1001",
+    id: 1001,
     customer: "Sok Dara",
     product: "Fresh Apple",
-    quantity: 2,
     total: 25,
     status: "Pending",
   },
   {
-    id: "ORD-1002",
+    id: 1002,
     customer: "Chan Lina",
     product: "Organic Tomato",
-    quantity: 4,
     total: 40,
     status: "Completed",
   },
   {
-    id: "ORD-1003",
+    id: 1003,
     customer: "Meng Hong",
     product: "Carrot",
-    quantity: 3,
     total: 15,
     status: "Cancelled",
   },
@@ -44,7 +40,7 @@ export default function OrdersPage() {
   const [filter, setFilter] = useState("All Orders");
 
   function updateStatus(
-    id: string,
+    id: number,
     status: "Pending" | "Completed" | "Cancelled"
   ) {
     setOrders((currentOrders) =>
@@ -56,12 +52,11 @@ export default function OrdersPage() {
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
-      order.id.toLowerCase().includes(search.toLowerCase()) ||
+      String(order.id).includes(search) ||
       order.customer.toLowerCase().includes(search.toLowerCase()) ||
       order.product.toLowerCase().includes(search.toLowerCase());
 
-    const matchesFilter =
-      filter === "All Orders" || order.status === filter;
+    const matchesFilter = filter === "All Orders" || order.status === filter;
 
     return matchesSearch && matchesFilter;
   });
@@ -102,13 +97,12 @@ export default function OrdersPage() {
           <table className="w-full table-fixed text-left">
             <thead>
               <tr className="border-b text-sm text-gray-600">
-                <th className="w-[15%] py-3 font-medium">Order ID</th>
+                <th className="w-[16%] py-3 font-medium">Order ID</th>
                 <th className="w-[18%] py-3 font-medium">Customer</th>
                 <th className="w-[22%] py-3 font-medium">Product</th>
-                <th className="w-[8%] py-3 font-medium">Qty</th>
                 <th className="w-[10%] py-3 font-medium">Total</th>
-                <th className="w-[12%] py-3 font-medium">Status</th>
-                <th className="w-[15%] py-3 font-medium">Action</th>
+                <th className="w-[14%] py-3 font-medium">Status</th>
+                <th className="w-[20%] py-3 font-medium">Action</th>
               </tr>
             </thead>
 
@@ -116,7 +110,7 @@ export default function OrdersPage() {
               {filteredOrders.map((order) => (
                 <tr key={order.id} className="border-b last:border-b-0">
                   <td className="truncate py-4 font-medium text-gray-900">
-                    {order.id}
+                    #{order.id}
                   </td>
 
                   <td className="truncate py-4 text-gray-700">
@@ -126,8 +120,6 @@ export default function OrdersPage() {
                   <td className="truncate py-4 text-gray-700">
                     {order.product}
                   </td>
-
-                  <td className="py-4 text-gray-700">{order.quantity}</td>
 
                   <td className="py-4 text-gray-700">${order.total}</td>
 

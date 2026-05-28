@@ -9,7 +9,7 @@ export default function AdminPage() {
           href="/merchants"
           className="rounded-2xl bg-white p-6 shadow hover:shadow-lg"
         >
-          <div className="text-4xl">🏪</div>
+          <div className="text-4xl"></div>
           <h3 className="mt-4 text-xl font-bold text-gray-900">Merchants</h3>
           <p className="mt-2 text-gray-600">
             View, approve, decline, and manage merchants.
@@ -20,7 +20,7 @@ export default function AdminPage() {
           href="/users"
           className="rounded-2xl bg-white p-6 shadow hover:shadow-lg"
         >
-          <div className="text-4xl">👥</div>
+          <div className="text-4xl"></div>
           <h3 className="mt-4 text-xl font-bold text-gray-900">Users</h3>
           <p className="mt-2 text-gray-600">
             View and manage platform users.
@@ -31,7 +31,7 @@ export default function AdminPage() {
           href="/products"
           className="rounded-2xl bg-white p-6 shadow hover:shadow-lg"
         >
-          <div className="text-4xl">📦</div>
+          <div className="text-4xl"></div>
           <h3 className="mt-4 text-xl font-bold text-gray-900">Products</h3>
           <p className="mt-2 text-gray-600">
             View and manage product information.
