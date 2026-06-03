@@ -392,8 +392,32 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     setDraftMinPrice(''); setDraftMaxPrice(''); setDraftHarvest('All Time');
   };
 
-  const toggleFavorite = (fid: number) =>
-    setFavorites(prev => prev.includes(fid) ? prev.filter(f => f !== fid) : [...prev, fid]);
+  const toggleFavorite = (fid: number) => {
+  setFavorites(prev => {
+    const isAlready = prev.includes(fid);
+    const updated = isAlready ? prev.filter(f => f !== fid) : [...prev, fid];
+    try {
+      const product = shop.products.find(p => p.id === fid);
+      const stored: any[] = JSON.parse(localStorage.getItem('fav-products') || '[]');
+      if (isAlready) {
+        // remove all copies of this product
+        localStorage.setItem('fav-products', JSON.stringify(stored.filter(p => p.id !== fid)));
+      } else if (product) {
+        // only add if not already in the list
+        const alreadyStored = stored.some(p => p.id === fid);
+        if (!alreadyStored) {
+          localStorage.setItem('fav-products', JSON.stringify([...stored, {
+            ...product,
+            shopName: shop.name,
+            shopSlug: shop.slug,
+            shopAvatar: shop.avatarImg,
+          }]));
+        }
+      }
+    } catch (e) {}
+    return updated;
+  });
+};
 
   const addToCart = (product: Product, qty: number) => {
     setCartItems(prev => {
@@ -514,7 +538,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: '800', fontSize: '15px', color: deepGreen }}>{shop.name}</span>
-                      {shop.isVerified && <span style={{ display: 'flex', alignItems: 'center', gap: '3px', backgroundColor: '#eff6ef', color: brandGreen, fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '100px' }}><ShieldCheck size={10} /> Verified</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#888', fontSize: '13px', marginTop: '3px' }}>
                       <MapPin size={12} /><span>{shop.location} · by {shop.owner}</span>
@@ -728,7 +751,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           <div style={{ padding: '24px 40px 36px 40px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
               <h2 style={{ margin: 0, fontSize: '26px', fontWeight: '800', color: deepGreen }}>{shop.name}</h2>
-              {shop.isVerified && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#eff6ef', color: brandGreen, fontSize: '12px', fontWeight: '700', padding: '4px 10px', borderRadius: '100px' }}><ShieldCheck size={13} /> Verified</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', fontSize: '14px', marginBottom: '16px' }}>
               <MapPin size={14} /><span>{shop.location}</span><span style={{ marginLeft: '8px', color: '#ccc' }}>·</span><span style={{ marginLeft: '8px' }}>by {shop.owner}</span>

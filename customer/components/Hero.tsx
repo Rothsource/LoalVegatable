@@ -188,7 +188,7 @@ export default function Hero() {
           </h1>
 
           <p className="hero-sub">
-            Join our digital marketplace connecting Cambodian farmers directly with you. Fair prices, guaranteed freshness, delivered fast.
+            Join our digital marketplace connecting Cambodian farmers directly with you. Fair prices, Guaranteed freshness, Quick delivery.
           </p>
 
           <div className="hero-actions">
@@ -212,7 +212,7 @@ export default function Hero() {
             </div>
             <div className="hero-divider" />
             <div className="hero-stat">
-              <strong>Free</strong>
+              <strong>Fast</strong>
               <span>Delivery</span>
             </div>
           </div>
@@ -244,7 +244,7 @@ export default function Hero() {
             </div>
             <div>
               <div className="hero-float-card-label">Delivery</div>
-              <div className="hero-float-card-value">Free & Fast 🚚</div>
+              <div className="hero-float-card-value">Right to your door🚚</div>
             </div>
           </div>
         </div>

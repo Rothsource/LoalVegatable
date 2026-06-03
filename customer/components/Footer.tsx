@@ -130,7 +130,7 @@ export default function Footer() {
             <div className="footer-brand-icon">
               <Leaf size={18} color="#0A490A" strokeWidth={2.5} />
             </div>
-            <span className="footer-brand-name">Local<span>Veg</span></span>
+            <span className="footer-brand-name">Local<span>Vegetable</span></span>
           </a>
           <p className="footer-tagline">
             Empowering local Cambodian farmers through fair digital trade. Fresh vegetables, straight to your door.
