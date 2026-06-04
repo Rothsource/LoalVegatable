@@ -5,59 +5,34 @@ import { Search, Star, Heart, ShoppingBasket, Store, ChevronDown, SlidersHorizon
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { useAuth } from '@/lib/useAuth';
+import { supabase } from '@/lib/supabase';
 
 const brandGreen = '#0DB30D';
 const deepGreen = '#0A490A';
 
 interface Product {
-  id: number; name: string; category: string; price: number; unit: string;
-  benefit: string; description: string; popularity: number; rating: number;
-  isAvailable: boolean; img: string; quantity: number;
-  harvestDate: string; sellByDate: string;
-  shopSlug: string; shopName: string; shopAvatar: string; shopLocation: string;
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  unit: string;
+  benefit: string;
+  description: string;
+  popularity: number;
+  rating: number;
+  isAvailable: boolean;
+  img: string;
+  quantity: number;
+  harvestDate: string;
+  sellByDate: string;
+  shopSlug: string;
+  shopName: string;
+  shopAvatar: string;
+  shopLocation: string;
 }
 
-// ── All products from all shops flat ─────────────────────────────────────────
-const allProducts: Product[] = [
-  // Srey's Organic Farm
-  { id: 101, name: 'Organic Carrots', category: 'Root Vegetables', price: 7000, unit: '1 kg', benefit: 'Rich in Beta-carotene for sharp eyesight', description: 'Grown in nutrient-rich soil without synthetic pesticides. Harvested at peak ripeness for maximum crunch and vitamin content.', popularity: 95, rating: 4.9, isAvailable: true, img: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?auto=format&fit=crop&w=500&q=80', quantity: 50, harvestDate: 'May 05, 2026', sellByDate: 'May 10, 2026', shopSlug: 'srey-farm', shopName: "Srey's Organic Farm", shopAvatar: 'https://i.pravatar.cc/100?img=47', shopLocation: 'Kandal Province' },
-  { id: 102, name: 'Morning Glory', category: 'Leafy Greens', price: 2500, unit: '1 kg', benefit: 'Rich in Iron & boosts your energy', description: 'Traditional Tra-kuon sourced from local water farms. High in fiber and essential minerals, perfect for your daily stir-fry.', popularity: 90, rating: 4.5, isAvailable: true, img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=500&q=80', quantity: 80, harvestDate: 'May 06, 2026', sellByDate: 'May 09, 2026', shopSlug: 'srey-farm', shopName: "Srey's Organic Farm", shopAvatar: 'https://i.pravatar.cc/100?img=47', shopLocation: 'Kandal Province' },
-  { id: 103, name: 'Fresh Spinach', category: 'Leafy Greens', price: 3500, unit: '500 g', benefit: 'High in iron & folate for healthy blood', description: 'Tender baby spinach leaves harvested early morning. Ideal for salads, smoothies, or a quick sauté with garlic.', popularity: 80, rating: 4.7, isAvailable: true, img: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=500&q=80', quantity: 40, harvestDate: 'May 06, 2026', sellByDate: 'May 10, 2026', shopSlug: 'srey-farm', shopName: "Srey's Organic Farm", shopAvatar: 'https://i.pravatar.cc/100?img=47', shopLocation: 'Kandal Province' },
-  { id: 104, name: 'Sweet Potatoes', category: 'Root Vegetables', price: 5500, unit: '1 kg', benefit: 'Rich in Vitamin A & natural energy', description: 'Orange-fleshed sweet potatoes packed with antioxidants.', popularity: 75, rating: 4.6, isAvailable: true, img: 'https://images.unsplash.com/photo-1570586437263-ab629fccc818?auto=format&fit=crop&w=500&q=80', quantity: 60, harvestDate: 'May 04, 2026', sellByDate: 'May 14, 2026', shopSlug: 'srey-farm', shopName: "Srey's Organic Farm", shopAvatar: 'https://i.pravatar.cc/100?img=47', shopLocation: 'Kandal Province' },
-  { id: 105, name: 'Red Tomatoes', category: 'Fruit Vegetables', price: 4000, unit: '500 g', benefit: 'Packed with Vitamin C for strong immunity', description: 'Sun-ripened tomatoes rich in Lycopene.', popularity: 70, rating: 4.2, isAvailable: false, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=500&q=80', quantity: 0, harvestDate: 'May 01, 2026', sellByDate: 'May 07, 2026', shopSlug: 'srey-farm', shopName: "Srey's Organic Farm", shopAvatar: 'https://i.pravatar.cc/100?img=47', shopLocation: 'Kandal Province' },
-  { id: 106, name: 'Fresh Cucumber', category: 'Fruit Vegetables', price: 3000, unit: '1 kg', benefit: 'High hydration & great for glowing skin', description: '95% water and packed with electrolytes.', popularity: 85, rating: 4.8, isAvailable: true, img: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&w=500&q=80', quantity: 70, harvestDate: 'May 06, 2026', sellByDate: 'May 11, 2026', shopSlug: 'srey-farm', shopName: "Srey's Organic Farm", shopAvatar: 'https://i.pravatar.cc/100?img=47', shopLocation: 'Kandal Province' },
-  // Sokha Leafy Greens
-  { id: 201, name: 'Morning Glory', category: 'Leafy Greens', price: 2000, unit: '1 kg', benefit: 'Iron-rich for daily energy boost', description: 'Freshly picked water spinach from Kampong Cham.', popularity: 95, rating: 4.8, isAvailable: true, img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=500&q=80', quantity: 100, harvestDate: 'May 06, 2026', sellByDate: 'May 09, 2026', shopSlug: 'sokha-leafy', shopName: 'Sokha Leafy Greens', shopAvatar: 'https://i.pravatar.cc/100?img=32', shopLocation: 'Kampong Cham' },
-  { id: 202, name: 'Chinese Kale', category: 'Leafy Greens', price: 3000, unit: '500 g', benefit: 'Calcium & Vitamin K for strong bones', description: 'Crisp Chinese broccoli with tender stems.', popularity: 88, rating: 4.6, isAvailable: true, img: 'https://media.istockphoto.com/id/1358217289/photo/chinese-kale-vegetable-on-white-background.jpg?s=612x612&w=0&k=20&c=tcoaKxfOx2w0Q7QhXLWmO59wy4yPyVSAB2IwxEPjP_k=', quantity: 45, harvestDate: 'May 05, 2026', sellByDate: 'May 10, 2026', shopSlug: 'sokha-leafy', shopName: 'Sokha Leafy Greens', shopAvatar: 'https://i.pravatar.cc/100?img=32', shopLocation: 'Kampong Cham' },
-  { id: 204, name: 'Fresh Spinach', category: 'Leafy Greens', price: 3500, unit: '500 g', benefit: 'Iron & folate for healthy blood', description: 'Tender baby spinach harvested at dawn.', popularity: 80, rating: 4.5, isAvailable: false, img: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=500&q=80', quantity: 0, harvestDate: 'May 03, 2026', sellByDate: 'May 08, 2026', shopSlug: 'sokha-leafy', shopName: 'Sokha Leafy Greens', shopAvatar: 'https://i.pravatar.cc/100?img=32', shopLocation: 'Kampong Cham' },
-  // Dara's Green Garden
-  { id: 301, name: 'Red Tomatoes', category: 'Fruit Vegetables', price: 4500, unit: '500 g', benefit: 'Lycopene-rich for heart health', description: 'Bold, sun-ripened Siem Reap tomatoes.', popularity: 90, rating: 4.7, isAvailable: true, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=500&q=80', quantity: 55, harvestDate: 'May 05, 2026', sellByDate: 'May 10, 2026', shopSlug: 'dara-greens', shopName: "Dara's Green Garden", shopAvatar: 'https://i.pravatar.cc/100?img=21', shopLocation: 'Siem Reap' },
-  { id: 302, name: 'Fresh Cucumber', category: 'Fruit Vegetables', price: 2800, unit: '1 kg', benefit: 'Hydrating & refreshing for hot days', description: 'Cool, crisp cucumbers from our well-irrigated garden.', popularity: 85, rating: 4.6, isAvailable: true, img: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&w=500&q=80', quantity: 90, harvestDate: 'May 06, 2026', sellByDate: 'May 12, 2026', shopSlug: 'dara-greens', shopName: "Dara's Green Garden", shopAvatar: 'https://i.pravatar.cc/100?img=21', shopLocation: 'Siem Reap' },
-  { id: 303, name: 'Long Beans', category: 'Fruit Vegetables', price: 3200, unit: '500 g', benefit: 'High protein & fiber for digestion', description: 'Yard-long beans that are a staple of Khmer cooking.', popularity: 78, rating: 4.5, isAvailable: true, img: 'https://images.unsplash.com/photo-1587411768638-ec71f8e33b78?auto=format&fit=crop&w=500&q=80', quantity: 35, harvestDate: 'May 05, 2026', sellByDate: 'May 09, 2026', shopSlug: 'dara-greens', shopName: "Dara's Green Garden", shopAvatar: 'https://i.pravatar.cc/100?img=21', shopLocation: 'Siem Reap' },
-  // Vanna's Fresh Harvest
-  { id: 401, name: 'Pumpkin', category: 'Fruit Vegetables', price: 5000, unit: '1 kg', benefit: 'Beta-carotene & Vitamin A for immunity', description: 'Dense, sweet Battambang pumpkins.', popularity: 92, rating: 4.8, isAvailable: true, img: 'https://images.unsplash.com/photo-1570586437263-ab629fccc818?auto=format&fit=crop&w=500&q=80', quantity: 30, harvestDate: 'May 04, 2026', sellByDate: 'May 18, 2026', shopSlug: 'vanna-harvest', shopName: "Vanna's Fresh Harvest", shopAvatar: 'https://i.pravatar.cc/100?img=54', shopLocation: 'Battambang' },
-  { id: 402, name: 'Cherry Tomatoes', category: 'Fruit Vegetables', price: 6000, unit: '500 g', benefit: 'High Vitamin C & antioxidants', description: 'Tiny, sweet bursts of flavour. Sun-grown in open fields.', popularity: 85, rating: 4.6, isAvailable: true, img: 'https://images.unsplash.com/photo-1561136594-7f68413baa99?auto=format&fit=crop&w=500&q=80', quantity: 25, harvestDate: 'May 06, 2026', sellByDate: 'May 10, 2026', shopSlug: 'vanna-harvest', shopName: "Vanna's Fresh Harvest", shopAvatar: 'https://i.pravatar.cc/100?img=54', shopLocation: 'Battambang' },
-  { id: 403, name: 'Eggplant', category: 'Fruit Vegetables', price: 3500, unit: '500 g', benefit: 'Nasunin antioxidant for brain health', description: 'Tender purple eggplants with a mild, creamy flesh.', popularity: 72, rating: 4.3, isAvailable: false, img: 'https://images.pexels.com/photos/321551/pexels-photo-321551.jpeg', quantity: 0, harvestDate: 'May 02, 2026', sellByDate: 'May 07, 2026', shopSlug: 'vanna-harvest', shopName: "Vanna's Fresh Harvest", shopAvatar: 'https://i.pravatar.cc/100?img=54', shopLocation: 'Battambang' },
-  // Bopha Root Veggies
-  { id: 501, name: 'Organic Carrots', category: 'Root Vegetables', price: 6500, unit: '1 kg', benefit: 'Beta-carotene for sharp eyesight', description: 'Crunchy urban-grown carrots with vibrant colour.', popularity: 93, rating: 4.9, isAvailable: true, img: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?auto=format&fit=crop&w=500&q=80', quantity: 65, harvestDate: 'May 06, 2026', sellByDate: 'May 11, 2026', shopSlug: 'bopha-roots', shopName: 'Bopha Root Veggies', shopAvatar: 'https://i.pravatar.cc/100?img=16', shopLocation: 'Phnom Penh' },
-  { id: 502, name: 'White Radish', category: 'Root Vegetables', price: 3000, unit: '1 kg', benefit: 'Digestive enzymes & Vitamin C', description: 'Crisp daikon-style radish great for pickling or soups.', popularity: 75, rating: 4.4, isAvailable: true, img: 'https://growhoss.com/cdn/shop/products/white-icicle-radish.jpg?v=1691781923', quantity: 40, harvestDate: 'May 05, 2026', sellByDate: 'May 12, 2026', shopSlug: 'bopha-roots', shopName: 'Bopha Root Veggies', shopAvatar: 'https://i.pravatar.cc/100?img=16', shopLocation: 'Phnom Penh' },
-  { id: 503, name: 'Sweet Potatoes', category: 'Root Vegetables', price: 5500, unit: '1 kg', benefit: 'Rich in Vitamin A & slow-release energy', description: 'Creamy orange flesh with natural sweetness.', popularity: 80, rating: 4.6, isAvailable: true, img: 'https://images.unsplash.com/photo-1570586437263-ab629fccc818?auto=format&fit=crop&w=500&q=80', quantity: 50, harvestDate: 'May 04, 2026', sellByDate: 'May 14, 2026', shopSlug: 'bopha-roots', shopName: 'Bopha Root Veggies', shopAvatar: 'https://i.pravatar.cc/100?img=16', shopLocation: 'Phnom Penh' },
-  // Rith Urban Farm
-  { id: 601, name: 'Hydroponic Lettuce', category: 'Leafy Greens', price: 8000, unit: '300 g', benefit: 'Zero pesticides, maximum nutrition', description: 'Grown in our controlled indoor hydroponic system.', popularity: 88, rating: 4.8, isAvailable: true, img: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?auto=format&fit=crop&w=500&q=80', quantity: 20, harvestDate: 'May 06, 2026', sellByDate: 'May 10, 2026', shopSlug: 'rith-urban', shopName: 'Rith Urban Farm', shopAvatar: 'https://i.pravatar.cc/100?img=8', shopLocation: 'Phnom Penh' },
-  { id: 603, name: 'Baby Bok Choy', category: 'Leafy Greens', price: 6500, unit: '400 g', benefit: 'Calcium & Vitamin C for bone health', description: 'Miniature bok choy with tender stalks and mild, sweet leaves.', popularity: 76, rating: 4.5, isAvailable: false, img: 'https://images.squarespace-cdn.com/content/v1/5d96d524052c897425394aaf/1736951245568-2RF8M9E0PYIJQBT3IQQX/bok-choy-vs-baby-bok-choy.jpeg?format=1500w', quantity: 0, harvestDate: 'May 03, 2026', sellByDate: 'May 08, 2026', shopSlug: 'rith-urban', shopName: 'Rith Urban Farm', shopAvatar: 'https://i.pravatar.cc/100?img=8', shopLocation: 'Phnom Penh' },
-];
-
-// ── Shop meta (for modal "Sold By" section) ──────────────────────────────────
-// ← NEW: lightweight lookup so the modal can show shop rating/sales/customers
-const shopMeta: Record<string, { rating: number; sales: number; customers: number }> = {
-  'srey-farm':     { rating: 4.9, sales: 1240, customers: 320 },
-  'sokha-leafy':   { rating: 4.5, sales: 1100, customers: 290 },
-  'dara-greens':   { rating: 4.7, sales: 980,  customers: 210 },
-  'vanna-harvest': { rating: 4.6, sales: 860,  customers: 195 },
-  'bopha-roots':   { rating: 4.5, sales: 750,  customers: 180 },
-  'rith-urban':    { rating: 4.3, sales: 520,  customers: 130 },
-};
-
+// ── Module-level constants (no hooks here) ────────────────────────────────────
 const categories = ['All', 'Root Vegetables', 'Leafy Greens', 'Fruit Vegetables'];
 
 const sortOptions = [
@@ -106,7 +81,6 @@ function QtyStepper({ value, onChange, max }: { value: number; onChange: (v: num
   );
 }
 
-// ── Modal Qty Stepper (larger) ─────────────────────────────────────────────── ← NEW
 function QtyStepperLg({ value, onChange, max }: { value: number; onChange: (v: number) => void; max: number }) {
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', border: '2px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', height: '46px' }}>
@@ -123,7 +97,89 @@ function QtyStepperLg({ value, onChange, max }: { value: number; onChange: (v: n
   );
 }
 
+// ── Single, correct ShopPage component ───────────────────────────────────────
 export default function ShopPage() {
+  const { requireAuth } = useAuth();
+
+  // ── Data fetching state ─────────────────────────────────────────────────
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id, name, slug, description, price, stock_quantity, unit,
+          image_urls, is_active, harvest_date, expire_date, is_organic,
+          merchant_id, category_id,
+          categories ( name )
+        `)
+        .eq('is_active', true);
+
+      if (error) { console.error(error); setLoading(false); return; }
+
+      // Fetch merchants separately
+      const merchantIds = [...new Set((data ?? []).map((p: any) => p.merchant_id).filter(Boolean))];
+      const { data: merchants } = await supabase
+        .from('profile_merchants')
+        .select('id, full_name, community_name, province, profile_url')
+        .in('id', merchantIds);
+
+      const merchantMap: Record<string, any> = {};
+      (merchants ?? []).forEach(m => { merchantMap[m.id] = m; });
+
+      // Fetch reviews
+      const { data: reviews } = await supabase
+        .from('reviews')
+        .select('product_id, rating');
+
+      const ratingMap: Record<string, number> = {};
+      if (reviews) {
+        const grouped: Record<string, number[]> = {};
+        reviews.forEach(r => {
+          if (!grouped[r.product_id]) grouped[r.product_id] = [];
+          grouped[r.product_id].push(r.rating);
+        });
+        Object.entries(grouped).forEach(([pid, ratings]) => {
+          ratingMap[pid] = parseFloat((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1));
+        });
+      }
+
+      const mapped: Product[] = (data ?? []).map((p: any) => {
+        const merchant = merchantMap[p.merchant_id] ?? {};
+        return {
+          id: p.id,
+          name: p.name,
+          category: p.categories?.name ?? 'Uncategorized',
+          price: Number(p.price),
+          unit: p.unit ?? '',
+          benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
+          description: p.description ?? '',
+          popularity: p.stock_quantity ?? 0,
+          rating: ratingMap[p.id] ?? 0,
+          isAvailable: p.is_active && p.stock_quantity > 0,
+          img: p.image_urls?.[0] ?? '',
+          quantity: p.stock_quantity ?? 0,
+          harvestDate: p.harvest_date ?? '',
+          sellByDate: p.expire_date ?? '',
+          shopSlug: p.merchant_id ?? '',
+          shopName: merchant.full_name ?? '',
+          shopAvatar: merchant.profile_url ?? '',
+          shopLocation: merchant.province ?? '',
+        };
+      });
+
+      setAllProducts(mapped);
+      setLoading(false);
+    }
+
+    fetchProducts();
+  }, []);
+
+  // ── UI state ────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Most Popular');
@@ -144,11 +200,11 @@ export default function ShopPage() {
   const handleDraftMax = useCallback((v: string) => setDraftMaxPrice(v), []);
 
   // Cart & favorites
-  const [cartItems, setCartItems] = useState<Record<number, { qty: number }>>({});
-  const [pendingQty, setPendingQty] = useState<Record<number, number>>({});
-  const [favorites, setFavorites] = useState<number[]>([]);
+  const [cartItems, setCartItems] = useState<Record<string, { qty: number }>>({});
+  const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
+  const [favorites, setFavorites] = useState<string[]>([]);
 
-  // ← NEW: product detail modal state
+  // Product detail modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalQty, setModalQty] = useState(1);
 
@@ -160,7 +216,7 @@ export default function ShopPage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // ← NEW: close modal on Escape key
+  // Close modal on Escape key
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedProduct(null); };
     document.addEventListener('keydown', handleKey);
@@ -172,8 +228,8 @@ export default function ShopPage() {
     try {
       const cart = JSON.parse(localStorage.getItem('cart-products') || '{}');
       if (!Array.isArray(cart)) {
-        const simplified: Record<number, { qty: number }> = {};
-        Object.entries(cart).forEach(([k, v]: any) => { simplified[Number(k)] = { qty: v.qty ?? 1 }; });
+        const simplified: Record<string, { qty: number }> = {};
+        Object.entries(cart).forEach(([k, v]: any) => { simplified[k] = { qty: v.qty ?? 1 }; });
         setCartItems(simplified);
       }
       const favs = JSON.parse(localStorage.getItem('fav-products') || '[]');
@@ -196,6 +252,7 @@ export default function ShopPage() {
   const resetDraft = () => { setDraftCategory('All'); setDraftMinPrice(''); setDraftMaxPrice(''); setDraftAvailable(false); };
 
   const toggleFavorite = (product: Product) => {
+    if (!requireAuth()) return;
     const isAlready = favorites.includes(product.id);
     const updated = isAlready ? favorites.filter(f => f !== product.id) : [...favorites, product.id];
     setFavorites(updated);
@@ -213,6 +270,7 @@ export default function ShopPage() {
   };
 
   const addToCart = (product: Product, qty: number) => {
+    if (!requireAuth()) return;
     const existing = cartItems[product.id]?.qty ?? 0;
     const newQty = Math.min(existing + qty, product.quantity);
     setCartItems(prev => ({ ...prev, [product.id]: { qty: newQty } }));
@@ -237,7 +295,14 @@ export default function ShopPage() {
       case 'Top Rated': return list.sort((a, b) => b.rating - a.rating);
       default: return list.sort((a, b) => b.popularity - a.popularity);
     }
-  }, [search, selectedCategory, sortBy, showOnlyAvailable, minPrice, maxPrice]);
+  }, [allProducts, search, selectedCategory, sortBy, showOnlyAvailable, minPrice, maxPrice]);
+
+  // ── Loading state ───────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Plus Jakarta Sans', sans-serif", color: deepGreen, fontWeight: '700', fontSize: '16px' }}>
+      Loading products…
+    </div>
+  );
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fafafa', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -247,7 +312,7 @@ export default function ShopPage() {
         @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
       `}</style>
 
-      {/* ── NEW: Product Detail Modal ─────────────────────────────────────── */}
+      {/* ── Product Detail Modal ──────────────────────────────────────────── */}
       {selectedProduct && (
         <div
           onClick={() => setSelectedProduct(null)}
@@ -331,9 +396,9 @@ export default function ShopPage() {
                       <span>{selectedProduct.shopLocation}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '14px', marginTop: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '12px', color: '#666' }}>⭐ {shopMeta[selectedProduct.shopSlug]?.rating ?? selectedProduct.rating}</span>
-                      <span style={{ fontSize: '12px', color: '#666' }}>📦 {(shopMeta[selectedProduct.shopSlug]?.sales ?? 0).toLocaleString()} sales</span>
-                      <span style={{ fontSize: '12px', color: '#666' }}>👥 {shopMeta[selectedProduct.shopSlug]?.customers ?? 0} customers</span>
+                      <span style={{ fontSize: '12px', color: '#666' }}>
+                        ⭐ {selectedProduct.rating > 0 ? selectedProduct.rating : 'No reviews yet'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -357,13 +422,13 @@ export default function ShopPage() {
               </div>
 
               {/* View Shop button */}
-              <Link href={`/shop/${selectedProduct.shopSlug}`}
-                onClick={() => setSelectedProduct(null)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '10px', padding: '13px', borderRadius: '12px', border: '2px solid #e5e7eb', color: deepGreen, fontWeight: '700', fontSize: '14px', textDecoration: 'none', backgroundColor: '#fff', transition: 'all 0.2s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = brandGreen; (e.currentTarget as HTMLAnchorElement).style.background = '#f0fdf0'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLAnchorElement).style.background = '#fff'; }}>
+              <button
+                onClick={() => { setSelectedProduct(null); if (requireAuth()) window.location.href = `/shop/${selectedProduct!.shopSlug}`; }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '10px', padding: '13px', borderRadius: '12px', border: '2px solid #e5e7eb', color: deepGreen, fontWeight: '700', fontSize: '14px', backgroundColor: '#fff', transition: 'all 0.2s', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = brandGreen; (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf0'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLButtonElement).style.background = '#fff'; }}>
                 <Store size={15} /> View Shop
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -504,7 +569,6 @@ export default function ShopPage() {
               const pQty = pendingQty[product.id] ?? 1;
               const isFav = favorites.includes(product.id);
               return (
-                // ← NEW: card is now clickable to open modal
                 <div key={product.id}
                   onClick={() => { setSelectedProduct(product); setModalQty(1); }}
                   style={{ backgroundColor: '#fff', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', position: 'relative', transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'pointer' }}
@@ -520,7 +584,7 @@ export default function ShopPage() {
                     <div style={{ position: 'absolute', top: '14px', left: '14px', zIndex: 10, backgroundColor: deepGreen, color: '#fff', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '100px' }}>{inCart.qty} in basket</div>
                   )}
                   {/* Favorite button */}
-                  <button onClick={e => { e.stopPropagation(); toggleFavorite(product); }} // ← stopPropagation so click doesn't open modal
+                  <button onClick={e => { e.stopPropagation(); toggleFavorite(product); }}
                     style={{ position: 'absolute', top: '14px', right: '14px', zIndex: 10, backgroundColor: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
                     <Heart size={16} fill={isFav ? "#ef4444" : "none"} color={isFav ? "#ef4444" : "#999"} />
                   </button>
@@ -555,7 +619,7 @@ export default function ShopPage() {
                       <span style={{ fontSize: '11px', fontWeight: '600', color: '#555' }}>{product.benefit}</span>
                     </div>
 
-                    {/* Buttons — stopPropagation so clicks don't open modal */}
+                    {/* Buttons */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={e => e.stopPropagation()}>
                       {/* Row 1: Qty + Add to Basket */}
                       {product.isAvailable ? (
@@ -572,12 +636,13 @@ export default function ShopPage() {
                         </button>
                       )}
                       {/* Row 2: View Shop */}
-                      <Link href={`/shop/${product.shopSlug}`}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', borderRadius: '10px', border: '2px solid #e5e7eb', color: deepGreen, fontWeight: '700', fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s', backgroundColor: '#fff' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = brandGreen; (e.currentTarget as HTMLAnchorElement).style.background = '#f0fdf0'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLAnchorElement).style.background = '#fff'; }}>
+                      <button
+                        onClick={() => { if (requireAuth()) window.location.href = `/shop/${product.shopSlug}`; }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', borderRadius: '10px', border: '2px solid #e5e7eb', color: deepGreen, fontWeight: '700', fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s', backgroundColor: '#fff', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = brandGreen; (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf0'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLButtonElement).style.background = '#fff'; }}>
                         <Store size={13} /> View Shop
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </div>
