@@ -7,7 +7,6 @@ import Footer from '@/components/Footer';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 interface Product {
   id: string;
   name: string;
@@ -29,7 +28,6 @@ interface CartItem extends Product {
   qty: number;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const brandGreen = '#0DB30D';
 const deepGreen = '#0A490A';
 const surfaceWhite = '#ffffff';
@@ -37,7 +35,6 @@ const categories = ['All', 'Root Vegetables', 'Leafy Greens', 'Fruit Vegetables'
 const harvestOptions = ['All Time', 'Today', 'This Week', 'This Month'] as const;
 type HarvestFilter = typeof harvestOptions[number];
 
-// ── CSS ───────────────────────────────────────────────────────────────────────
 const fontStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   body { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; background-color: #fafafa; color: #1a1a1a; }
@@ -67,7 +64,6 @@ const fontStyles = `
   .info-modal-content { background: white; max-width: 560px; width: 100%; border-radius: 32px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto; }
   .product-card { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
   .product-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -4px rgba(0,0,0,0.12) !important; }
-  .tag-pill { padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 700; background: #eff6ef; color: #0A490A; }
   .qty-stepper { display: inline-flex; align-items: center; border: 2px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
   .qty-btn { display: flex; align-items: center; justify-content: center; background: #f9fafb; border: none; cursor: pointer; transition: background 0.15s; flex-shrink: 0; }
   .qty-btn:hover:not(:disabled) { background: #eff6ef; }
@@ -75,7 +71,6 @@ const fontStyles = `
   .qty-val { font-weight: 800; color: #111; text-align: center; border-left: 1.5px solid #e5e7eb; border-right: 1.5px solid #e5e7eb; display: flex; align-items: center; justify-content: center; }
 `;
 
-// ── Helper functions ──────────────────────────────────────────────────────────
 function parseDate(str: string): Date { return new Date(str); }
 function isToday(d: Date): boolean {
   const n = new Date();
@@ -92,7 +87,6 @@ function isThisMonth(d: Date): boolean {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth();
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
 function QtyStepper({ value, onChange, max, size = 'md' }: {
   value: number; onChange: (v: number) => void; max: number; size?: 'sm' | 'md';
 }) {
@@ -131,34 +125,26 @@ const MaxPriceInput = React.memo(({ value, onChange }: { value: string; onChange
 ));
 MaxPriceInput.displayName = 'MaxPriceInput';
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function ShopPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { requireAuth } = useAuth();
+
+  // Data state
   const [shop, setShop] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const { requireAuth } = useAuth();
 
-  // ── Data state ──────────────────────────────────────────────────────────────
-
-  }, [id]);
-
-  // ── UI state ────────────────────────────────────────────────────────────────
+  // UI state
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [harvestFilter, setHarvestFilter] = useState<HarvestFilter>('All Time');
-
   const [draftCategory, setDraftCategory] = useState('All');
   const [draftAvailable, setDraftAvailable] = useState(false);
   const [draftMinPrice, setDraftMinPrice] = useState('');
   const [draftMaxPrice, setDraftMaxPrice] = useState('');
   const [draftHarvest, setDraftHarvest] = useState<HarvestFilter>('All Time');
-
-  const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
-  const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
-
   const [filterOpen, setFilterOpen] = useState(false);
   const [cartItems, setCartItems] = useState<Record<string, CartItem>>({});
   const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
@@ -167,21 +153,11 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isFavOpen, setIsFavOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  useEffect(() => {
-    async function loadFavorites() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
-      const { data } = await supabase
-        .from('favourite_vegetables')
-        .select('product_id')
-        .eq('user_id', user.id);
+  const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
+  const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
 
-      if (data) setFavorites(data.map(f => f.product_id));
-    }
-    loadFavorites();
-  }, []);
-
+  // Fetch shop + products
   useEffect(() => {
     async function fetchShopData() {
       const { data: merchant } = await supabase
@@ -212,32 +188,64 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
             grouped[r.product_id].push(r.rating);
           });
           Object.entries(grouped).forEach(([pid, ratings]) => {
-            ratingMap[pid] = parseFloat((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1));
+            ratingMap[pid] = parseFloat(
+              (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+            );
           });
         }
       }
 
       setShop(merchant);
-      setProducts((prods ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        category: p.categories?.name ?? 'Uncategorized',
-        price: Number(p.price),
-        unit: p.unit ?? '',
-        benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
-        description: p.description ?? '',
-        popularity: p.stock_quantity ?? 0,
-        rating: ratingMap[p.id] ?? 0,
-        isAvailable: p.is_active && p.stock_quantity > 0,
-        img: p.image_urls?.[0] ?? 'https://placehold.co/400x300?text=No+Image',
-        quantity: p.stock_quantity ?? 0,
-        harvestDate: p.harvest_date ?? '',
-        sellByDate: p.expire_date ?? '',
-      })));
+      setProducts(
+        (prods ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          category: p.categories?.name ?? 'Uncategorized',
+          price: Number(p.price),
+          unit: p.unit ?? '',
+          benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
+          description: p.description ?? '',
+          popularity: p.stock_quantity ?? 0,
+          rating: ratingMap[p.id] ?? 0,
+          isAvailable: p.is_active && p.stock_quantity > 0,
+          img: p.image_urls?.[0] ?? 'https://placehold.co/400x300?text=No+Image',
+          quantity: p.stock_quantity ?? 0,
+          harvestDate: p.harvest_date ?? '',
+          sellByDate: p.expire_date ?? '',
+        }))
+      );
       setLoading(false);
     }
     fetchShopData();
+  }, [id]);
 
+  // Load favorites
+  useEffect(() => {
+    async function loadFavorites() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('favourite_vegetables')
+        .select('product_id')
+        .eq('user_id', user.id);
+      if (data) setFavorites(data.map((f: any) => f.product_id));
+    }
+    loadFavorites();
+  }, []);
+
+  // Load cart from localStorage
+  useEffect(() => {
+    try {
+      const cart = JSON.parse(localStorage.getItem('cart-products') || '{}');
+      if (!Array.isArray(cart)) {
+        const simplified: Record<string, CartItem> = {};
+        Object.entries(cart).forEach(([k, v]: any) => { simplified[k] = v; });
+        setCartItems(simplified);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Derived values
   const cartList = Object.values(cartItems);
   const cartTotalQty = cartList.reduce((s, i) => s + i.qty, 0);
   const cartTotalPrice = cartList.reduce((s, i) => s + i.price * i.qty, 0);
@@ -252,40 +260,29 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     setDraftMinPrice(minPrice); setDraftMaxPrice(maxPrice); setDraftHarvest(harvestFilter);
     setFilterOpen(true);
   };
+
   const applyFilters = () => {
     setSelectedCategory(draftCategory); setShowOnlyAvailable(draftAvailable);
     setMinPrice(draftMinPrice); setMaxPrice(draftMaxPrice); setHarvestFilter(draftHarvest);
     setFilterOpen(false);
   };
+
   const resetDraft = () => {
     setDraftCategory('All'); setDraftAvailable(false);
     setDraftMinPrice(''); setDraftMaxPrice(''); setDraftHarvest('All Time');
   };
 
-  const toggleFavorite = async (product: Product) => {
+  const toggleFavorite = async (fid: string) => {
     if (!requireAuth()) return;
-    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    const isFav = favorites.includes(product.id);
-
-    if (isFav) {
-      // Remove from Supabase
-      await supabase
-        .from('favourite_vegetables')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('product_id', product.id);
-
-      setFavorites(prev => prev.filter(id => id !== product.id));
+    const isAlready = favorites.includes(fid);
+    if (isAlready) {
+      await supabase.from('favourite_vegetables').delete().eq('user_id', user.id).eq('product_id', fid);
+      setFavorites(prev => prev.filter(f => f !== fid));
     } else {
-      // Add to Supabase
-      await supabase
-        .from('favourite_vegetables')
-        .insert({ user_id: user.id, product_id: product.id });
-
-      setFavorites(prev => [...prev, product.id]);
+      await supabase.from('favourite_vegetables').insert({ user_id: user.id, product_id: fid });
+      setFavorites(prev => [...prev, fid]);
     }
   };
 
@@ -341,10 +338,9 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const favProducts = products.filter(p => favorites.includes(p.id));
   const getPendingQty = (pid: string) => pendingQty[pid] ?? 1;
 
-  // ── Loading / not found ─────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Plus Jakarta Sans', sans-serif", color: deepGreen, fontWeight: '700', fontSize: '16px' }}>
-      Loading shop…
+      Loading shop...
     </div>
   );
 
@@ -354,7 +350,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     </div>
   );
 
-  // Merchant field aliases
   const shopName = shop.community_name ?? shop.full_name ?? 'Unknown Shop';
   const shopOwner = shop.full_name ?? '';
   const shopLocation = shop.province ?? '';
@@ -366,7 +361,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     <div style={{ minHeight: '100vh' }}>
       <style>{fontStyles}</style>
 
-      {/* ── Product Detail Modal ────────────────────────────────────────────── */}
       {selectedProduct && (
         <div className="info-modal-overlay" onClick={() => setSelectedProduct(null)}>
           <div className="info-modal-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -389,17 +383,15 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
               </div>
               {modalQty > 1 && (
                 <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#9ca3af', fontWeight: '600' }}>
-                  {modalQty} × {selectedProduct.price.toLocaleString()} =&nbsp;
-                  <span style={{ color: deepGreen, fontWeight: '800' }}>{(selectedProduct.price * modalQty).toLocaleString()} KHR</span>
+                  {modalQty} x {selectedProduct.price.toLocaleString()} = <span style={{ color: deepGreen, fontWeight: '800' }}>{(selectedProduct.price * modalQty).toLocaleString()} KHR</span>
                 </p>
               )}
               <p style={{ color: '#666', lineHeight: '1.6', fontSize: '14px', marginBottom: '18px', marginTop: modalQty <= 1 ? '12px' : 0 }}>{selectedProduct.description}</p>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '18px' }}>
                 {[
                   { icon: <Box size={15} color={brandGreen} />, label: 'In Stock', value: selectedProduct.isAvailable ? `${selectedProduct.quantity} units` : 'Out of Stock', red: false },
-                  { icon: <Calendar size={15} color={brandGreen} />, label: 'Harvested', value: selectedProduct.harvestDate || '—', red: false },
-                  { icon: <Calendar size={15} color="#ef4444" />, label: 'Sell By', value: selectedProduct.sellByDate || '—', red: true },
+                  { icon: <Calendar size={15} color={brandGreen} />, label: 'Harvested', value: selectedProduct.harvestDate || '-', red: false },
+                  { icon: <Calendar size={15} color="#ef4444" />, label: 'Sell By', value: selectedProduct.sellByDate || '-', red: true },
                 ].map((info, i) => (
                   <div key={i} style={{ backgroundColor: info.red ? '#fff5f5' : '#f9fafb', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>{info.icon}</div>
@@ -408,7 +400,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                   </div>
                 ))}
               </div>
-
               <div style={{ backgroundColor: '#eff6ef', padding: '14px 18px', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                 <Leaf color={brandGreen} size={18} />
                 <div>
@@ -416,7 +407,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                   <span style={{ fontSize: '13px', color: '#444' }}>{selectedProduct.benefit}</span>
                 </div>
               </div>
-
               <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '18px', marginBottom: '20px' }}>
                 <p style={{ fontSize: '11px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px 0' }}>Sold by</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -428,14 +418,13 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                       {shopVerified && <ShieldCheck size={15} color={brandGreen} />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#888', fontSize: '13px', marginTop: '3px' }}>
-                      <MapPin size={12} /><span>{shopLocation}{shopOwner ? ` · by ${shopOwner}` : ''}</span>
+                      <MapPin size={12} /><span>{shopLocation}{shopOwner ? ` - by ${shopOwner}` : ''}</span>
                     </div>
                   </div>
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <button onClick={e => { e.stopPropagation(); toggleFavorite(selectedProduct); }}
+                <button onClick={() => toggleFavorite(selectedProduct.id)}
                   style={{ padding: '10px 12px', borderRadius: '12px', border: '2px solid #f0f0f0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Heart size={20} fill={favorites.includes(selectedProduct.id) ? "#ef4444" : "none"} color={favorites.includes(selectedProduct.id) ? "#ef4444" : "#333"} />
                 </button>
@@ -453,7 +442,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
-      {/* ── Cart Sidebar ─────────────────────────────────────────────────────── */}
       {isCartOpen && (
         <div className="sidebar-overlay" onClick={() => setIsCartOpen(false)}>
           <div className="sidebar-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -501,7 +489,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
-      {/* ── Favourites Sidebar ───────────────────────────────────────────────── */}
       {isFavOpen && (
         <div className="sidebar-overlay" onClick={() => setIsFavOpen(false)}>
           <div className="sidebar-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -519,7 +506,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                     <h5 style={{ margin: '0 0 3px', fontSize: '14px', fontWeight: '700' }}>{item.name}</h5>
                     <p style={{ margin: 0, color: brandGreen, fontWeight: '700', fontSize: '13px' }}>{item.price.toLocaleString()} KHR</p>
                   </div>
-                  <HeartOff size={17} color="#ef4444" style={{ cursor: 'pointer', opacity: 0.75, flexShrink: 0 }} onClick={e => { e.stopPropagation(); toggleFavorite(item); }} />
+                  <HeartOff size={17} color="#ef4444" style={{ cursor: 'pointer', opacity: 0.75, flexShrink: 0 }} onClick={() => toggleFavorite(item.id)} />
                 </div>
               ))}
             </div>
@@ -527,7 +514,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
-      {/* ── Filter Panel ─────────────────────────────────────────────────────── */}
       {filterOpen && (
         <div className="filter-overlay" onClick={() => setFilterOpen(false)}>
           <div className="filter-panel" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -551,7 +537,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                 <p className="filter-section-title">Price Range</p>
                 <div className="price-row">
                   <MinPriceInput value={draftMinPrice} onChange={handleDraftMinChange} />
-                  <span className="price-dash">—</span>
+                  <span className="price-dash">-</span>
                   <MaxPriceInput value={draftMaxPrice} onChange={handleDraftMaxChange} />
                 </div>
               </div>
@@ -596,7 +582,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           <ChevronLeft size={16} /> Back to Shops
         </a>
 
-        {/* Shop Header */}
         <div style={{ borderRadius: '32px', backgroundColor: surfaceWhite, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '50px', overflow: 'hidden' }}>
           <div style={{ position: 'relative', height: '280px' }}>
             <img src={shopCover} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt=""
@@ -630,7 +615,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
 
-        {/* Product Controls */}
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
@@ -650,7 +634,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           {activeFilterCount > 0 && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
               {selectedCategory !== 'All' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '100px', backgroundColor: '#eff6ef', color: deepGreen, fontSize: '12px', fontWeight: '700' }}>{selectedCategory}<X size={12} style={{ cursor: 'pointer' }} onClick={() => setSelectedCategory('All')} /></span>}
-              {(minPrice !== '' || maxPrice !== '') && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '100px', backgroundColor: '#eff6ef', color: deepGreen, fontSize: '12px', fontWeight: '700' }}>{minPrice || '0'} – {maxPrice || '∞'} KHR<X size={12} style={{ cursor: 'pointer' }} onClick={() => { setMinPrice(''); setMaxPrice(''); }} /></span>}
+              {(minPrice !== '' || maxPrice !== '') && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '100px', backgroundColor: '#eff6ef', color: deepGreen, fontSize: '12px', fontWeight: '700' }}>{minPrice || '0'} - {maxPrice || 'any'} KHR<X size={12} style={{ cursor: 'pointer' }} onClick={() => { setMinPrice(''); setMaxPrice(''); }} /></span>}
               {harvestFilter !== 'All Time' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '100px', backgroundColor: '#eff6ef', color: deepGreen, fontSize: '12px', fontWeight: '700' }}>{harvestFilter}<X size={12} style={{ cursor: 'pointer' }} onClick={() => setHarvestFilter('All Time')} /></span>}
               {showOnlyAvailable && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '100px', backgroundColor: '#eff6ef', color: deepGreen, fontSize: '12px', fontWeight: '700' }}>In Stock Only<X size={12} style={{ cursor: 'pointer' }} onClick={() => setShowOnlyAvailable(false)} /></span>}
             </div>
@@ -664,7 +648,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
 
-        {/* Product Grid */}
         {processedProducts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#999' }}>
             <p style={{ fontSize: '18px', fontWeight: '600' }}>No products match your filters.</p>
@@ -681,21 +664,17 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
               return (
                 <div key={veg.id} className="product-card" onClick={() => { setSelectedProduct(veg); setModalQty(1); }}
                   style={{ borderRadius: '24px', backgroundColor: surfaceWhite, position: 'relative', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-
-                  <button onClick={e => { e.stopPropagation(); toggleFavorite(veg); }}
+                  <button onClick={e => { e.stopPropagation(); toggleFavorite(veg.id); }}
                     style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10, backgroundColor: surfaceWhite, border: 'none', borderRadius: '50%', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <Heart size={18} fill={favorites.includes(veg.id) ? "#ef4444" : "none"} color={favorites.includes(veg.id) ? "#ef4444" : "#333"} />
                   </button>
-
                   {!veg.isAvailable && (
                     <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, backgroundColor: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '100px' }}>Out of Stock</div>
                   )}
                   {veg.isAvailable && inCart && (
                     <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, backgroundColor: deepGreen, color: '#fff', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '100px' }}>{inCart.qty} in basket</div>
                   )}
-
                   <img src={veg.img} style={{ width: '100%', height: '190px', objectFit: 'cover', opacity: veg.isAvailable ? 1 : 0.55 }} alt={veg.name} />
-
                   <div style={{ padding: '18px' }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: brandGreen }}>{veg.category}</span>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 6px' }}>
@@ -705,31 +684,27 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                         <span style={{ fontSize: '11px', fontWeight: '700', color: '#92400e' }}>{veg.rating || 'N/A'}</span>
                       </div>
                     </div>
-
                     <div style={{ color: deepGreen, fontWeight: '800', fontSize: '17px', marginBottom: '12px' }}>
                       {veg.price.toLocaleString()} KHR <span style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '400' }}>/ {veg.unit}</span>
                     </div>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '12px' }}>
                       <div style={{ backgroundColor: '#f9fafb', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', marginBottom: '3px' }}>QTY</div>
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: deepGreen }}>{veg.isAvailable ? veg.quantity : '—'}</div>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: deepGreen }}>{veg.isAvailable ? veg.quantity : '-'}</div>
                       </div>
                       <div style={{ backgroundColor: '#f9fafb', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', marginBottom: '3px' }}>HARVESTED</div>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: deepGreen }}>{veg.harvestDate || '—'}</div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: deepGreen }}>{veg.harvestDate || '-'}</div>
                       </div>
                       <div style={{ backgroundColor: '#fff5f5', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', marginBottom: '3px' }}>SELL BY</div>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#ef4444' }}>{veg.sellByDate || '—'}</div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#ef4444' }}>{veg.sellByDate || '-'}</div>
                       </div>
                     </div>
-
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '14px' }}>
                       <Leaf size={12} color={brandGreen} />
                       <span style={{ fontSize: '12px', fontWeight: '700', color: deepGreen }}>{veg.benefit}</span>
                     </div>
-
                     {veg.isAvailable ? (
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                         <QtyStepper value={pQty} onChange={v => setPendingQty(prev => ({ ...prev, [veg.id]: v }))} max={veg.quantity} size="sm" />
