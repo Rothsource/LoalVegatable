@@ -134,12 +134,53 @@ MaxPriceInput.displayName = 'MaxPriceInput';
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ShopPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { requireAuth } = useAuth();
-
-  // ── Data state ──────────────────────────────────────────────────────────────
   const [shop, setShop] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { requireAuth } = useAuth();
+
+  // ── Data state ──────────────────────────────────────────────────────────────
+
+  }, [id]);
+
+  // ── UI state ────────────────────────────────────────────────────────────────
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [harvestFilter, setHarvestFilter] = useState<HarvestFilter>('All Time');
+
+  const [draftCategory, setDraftCategory] = useState('All');
+  const [draftAvailable, setDraftAvailable] = useState(false);
+  const [draftMinPrice, setDraftMinPrice] = useState('');
+  const [draftMaxPrice, setDraftMaxPrice] = useState('');
+  const [draftHarvest, setDraftHarvest] = useState<HarvestFilter>('All Time');
+
+  const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
+  const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
+
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [cartItems, setCartItems] = useState<Record<string, CartItem>>({});
+  const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
+  const [modalQty, setModalQty] = useState(1);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isFavOpen, setIsFavOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  useEffect(() => {
+    async function loadFavorites() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('favourite_vegetables')
+        .select('product_id')
+        .eq('user_id', user.id);
+
+      if (data) setFavorites(data.map(f => f.product_id));
+    }
+    loadFavorites();
+  }, []);
 
   useEffect(() => {
     async function fetchShopData() {
@@ -196,32 +237,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
       setLoading(false);
     }
     fetchShopData();
-  }, [id]);
-
-  // ── UI state ────────────────────────────────────────────────────────────────
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [harvestFilter, setHarvestFilter] = useState<HarvestFilter>('All Time');
-
-  const [draftCategory, setDraftCategory] = useState('All');
-  const [draftAvailable, setDraftAvailable] = useState(false);
-  const [draftMinPrice, setDraftMinPrice] = useState('');
-  const [draftMaxPrice, setDraftMaxPrice] = useState('');
-  const [draftHarvest, setDraftHarvest] = useState<HarvestFilter>('All Time');
-
-  const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
-  const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
-
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<Record<string, CartItem>>({});
-  const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
-  const [modalQty, setModalQty] = useState(1);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isFavOpen, setIsFavOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const cartList = Object.values(cartItems);
   const cartTotalQty = cartList.reduce((s, i) => s + i.qty, 0);
@@ -247,28 +262,31 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     setDraftMinPrice(''); setDraftMaxPrice(''); setDraftHarvest('All Time');
   };
 
-  const toggleFavorite = (fid: string) => {
+  const toggleFavorite = async (product: Product) => {
     if (!requireAuth()) return;
-    const isAlready = favorites.includes(fid);
-    const updated = isAlready ? favorites.filter(f => f !== fid) : [...favorites, fid];
-    setFavorites(updated);
-    try {
-      const product = products.find(p => p.id === fid);
-      const stored: any[] = JSON.parse(localStorage.getItem('fav-products') || '[]');
-      if (isAlready) {
-        localStorage.setItem('fav-products', JSON.stringify(stored.filter(p => p.id !== fid)));
-      } else if (product) {
-        const alreadyStored = stored.some(p => p.id === fid);
-        if (!alreadyStored) {
-          localStorage.setItem('fav-products', JSON.stringify([...stored, {
-            ...product,
-            shopName: shop?.community_name ?? '',
-            shopSlug: shop?.id ?? '',
-            shopAvatar: shop?.profile_url ?? '',
-          }]));
-        }
-      }
-    } catch (e) {}
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const isFav = favorites.includes(product.id);
+
+    if (isFav) {
+      // Remove from Supabase
+      await supabase
+        .from('favourite_vegetables')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('product_id', product.id);
+
+      setFavorites(prev => prev.filter(id => id !== product.id));
+    } else {
+      // Add to Supabase
+      await supabase
+        .from('favourite_vegetables')
+        .insert({ user_id: user.id, product_id: product.id });
+
+      setFavorites(prev => [...prev, product.id]);
+    }
   };
 
   const addToCart = (product: Product, qty: number) => {
@@ -417,7 +435,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
               </div>
 
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <button onClick={() => toggleFavorite(selectedProduct.id)}
+                <button onClick={e => { e.stopPropagation(); toggleFavorite(selectedProduct); }}
                   style={{ padding: '10px 12px', borderRadius: '12px', border: '2px solid #f0f0f0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Heart size={20} fill={favorites.includes(selectedProduct.id) ? "#ef4444" : "none"} color={favorites.includes(selectedProduct.id) ? "#ef4444" : "#333"} />
                 </button>
@@ -501,7 +519,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                     <h5 style={{ margin: '0 0 3px', fontSize: '14px', fontWeight: '700' }}>{item.name}</h5>
                     <p style={{ margin: 0, color: brandGreen, fontWeight: '700', fontSize: '13px' }}>{item.price.toLocaleString()} KHR</p>
                   </div>
-                  <HeartOff size={17} color="#ef4444" style={{ cursor: 'pointer', opacity: 0.75, flexShrink: 0 }} onClick={() => toggleFavorite(item.id)} />
+                  <HeartOff size={17} color="#ef4444" style={{ cursor: 'pointer', opacity: 0.75, flexShrink: 0 }} onClick={e => { e.stopPropagation(); toggleFavorite(item); }} />
                 </div>
               ))}
             </div>
@@ -664,7 +682,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                 <div key={veg.id} className="product-card" onClick={() => { setSelectedProduct(veg); setModalQty(1); }}
                   style={{ borderRadius: '24px', backgroundColor: surfaceWhite, position: 'relative', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
 
-                  <button onClick={e => { e.stopPropagation(); toggleFavorite(veg.id); }}
+                  <button onClick={e => { e.stopPropagation(); toggleFavorite(veg); }}
                     style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10, backgroundColor: surfaceWhite, border: 'none', borderRadius: '50%', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <Heart size={18} fill={favorites.includes(veg.id) ? "#ef4444" : "none"} color={favorites.includes(veg.id) ? "#ef4444" : "#333"} />
                   </button>

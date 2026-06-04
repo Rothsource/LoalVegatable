@@ -204,6 +204,19 @@ export default function ShopPage() {
   const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
 
+  useEffect(() => {
+    async function loadFavorites() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('favourite_vegetables')
+        .select('product_id')
+        .eq('user_id', user.id);
+      if (data) setFavorites(data.map((f: any) => f.product_id));
+    }
+    loadFavorites();
+  }, []);
+
   // Product detail modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalQty, setModalQty] = useState(1);
@@ -232,8 +245,6 @@ export default function ShopPage() {
         Object.entries(cart).forEach(([k, v]: any) => { simplified[k] = { qty: v.qty ?? 1 }; });
         setCartItems(simplified);
       }
-      const favs = JSON.parse(localStorage.getItem('fav-products') || '[]');
-      setFavorites(favs.map((p: any) => p.id));
     } catch (e) {}
   }, []);
 
@@ -251,22 +262,18 @@ export default function ShopPage() {
   };
   const resetDraft = () => { setDraftCategory('All'); setDraftMinPrice(''); setDraftMaxPrice(''); setDraftAvailable(false); };
 
-  const toggleFavorite = (product: Product) => {
+  const toggleFavorite = async (product: Product) => {
     if (!requireAuth()) return;
-    const isAlready = favorites.includes(product.id);
-    const updated = isAlready ? favorites.filter(f => f !== product.id) : [...favorites, product.id];
-    setFavorites(updated);
-    try {
-      const stored: any[] = JSON.parse(localStorage.getItem('fav-products') || '[]');
-      if (isAlready) {
-        localStorage.setItem('fav-products', JSON.stringify(stored.filter(p => p.id !== product.id)));
-      } else {
-        const alreadyStored = stored.some(p => p.id === product.id);
-        if (!alreadyStored) {
-          localStorage.setItem('fav-products', JSON.stringify([...stored, product]));
-        }
-      }
-    } catch (e) {}
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const isFav = favorites.includes(product.id);
+    if (isFav) {
+      await supabase.from('favourite_vegetables').delete().eq('user_id', user.id).eq('product_id', product.id);
+      setFavorites(prev => prev.filter(id => id !== product.id));
+    } else {
+      await supabase.from('favourite_vegetables').insert({ user_id: user.id, product_id: product.id });
+      setFavorites(prev => [...prev, product.id]);
+    }
   };
 
   const addToCart = (product: Product, qty: number) => {
