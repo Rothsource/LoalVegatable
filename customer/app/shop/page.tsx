@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Search, Star, Heart, ShoppingBasket, Store, ChevronDown, SlidersHorizontal, X, RotateCcw, Plus, Minus, Leaf, Box, Calendar, MapPin } from 'lucide-react';
+import { Search, Star, Heart, ShoppingBasket, Store, ChevronDown, SlidersHorizontal, X, RotateCcw, Plus, Minus, Leaf, Box, Calendar, MapPin, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -30,6 +30,10 @@ interface Product {
   shopName: string;
   shopAvatar: string;
   shopLocation: string;
+}
+
+interface CartItem extends Product {
+  qty: number;
 }
 
 // ── Module-level constants (no hooks here) ────────────────────────────────────
@@ -81,6 +85,22 @@ function QtyStepper({ value, onChange, max }: { value: number; onChange: (v: num
   );
 }
 
+function QtyStepperSm({ value, onChange, max }: { value: number; onChange: (v: number) => void; max: number }) {
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', border: '2px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden', height: '32px' }}>
+      <button disabled={value <= 1} onClick={e => { e.stopPropagation(); onChange(Math.max(1, value - 1)); }}
+        style={{ width: '30px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', border: 'none', cursor: value <= 1 ? 'not-allowed' : 'pointer', opacity: value <= 1 ? 0.35 : 1 }}>
+        <Minus size={11} color="#555" />
+      </button>
+      <span style={{ width: '30px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', color: '#111', borderLeft: '1.5px solid #e5e7eb', borderRight: '1.5px solid #e5e7eb' }}>{value}</span>
+      <button disabled={value >= max} onClick={e => { e.stopPropagation(); onChange(Math.min(max, value + 1)); }}
+        style={{ width: '30px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', border: 'none', cursor: value >= max ? 'not-allowed' : 'pointer', opacity: value >= max ? 0.35 : 1 }}>
+        <Plus size={11} color="#555" />
+      </button>
+    </div>
+  );
+}
+
 function QtyStepperLg({ value, onChange, max }: { value: number; onChange: (v: number) => void; max: number }) {
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', border: '2px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', height: '46px' }}>
@@ -97,11 +117,11 @@ function QtyStepperLg({ value, onChange, max }: { value: number; onChange: (v: n
   );
 }
 
-// ── Single, correct ShopPage component ───────────────────────────────────────
+// ── Main ShopPage component ───────────────────────────────────────────────────
 export default function ShopPage() {
   const { requireAuth } = useAuth();
 
-  // ── Data fetching state ─────────────────────────────────────────────────
+  // ── Data fetching state — UNCHANGED ────────────────────────────────────
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -199,11 +219,25 @@ export default function ShopPage() {
   const handleDraftMin = useCallback((v: string) => setDraftMinPrice(v), []);
   const handleDraftMax = useCallback((v: string) => setDraftMaxPrice(v), []);
 
-  // Cart & favorites
-  const [cartItems, setCartItems] = useState<Record<string, { qty: number }>>({});
+  // Cart, favorites, cart panel
+  const [cartItems, setCartItems] = useState<Record<string, CartItem>>({});
   const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
+      if (!Array.isArray(stored)) {
+        const simplified: Record<string, CartItem> = {};
+        Object.entries(stored).forEach(([k, v]: any) => { simplified[k] = v; });
+        setCartItems(simplified);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Load favorites — UNCHANGED
   useEffect(() => {
     async function loadFavorites() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -229,24 +263,17 @@ export default function ShopPage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Close modal on Escape key
+  // Close modal on Escape key — UNCHANGED
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedProduct(null); };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelectedProduct(null); setIsCartOpen(false); } };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, []);
 
-  // Load cart & favorites from localStorage on mount
-  useEffect(() => {
-    try {
-      const cart = JSON.parse(localStorage.getItem('cart-products') || '{}');
-      if (!Array.isArray(cart)) {
-        const simplified: Record<string, { qty: number }> = {};
-        Object.entries(cart).forEach(([k, v]: any) => { simplified[k] = { qty: v.qty ?? 1 }; });
-        setCartItems(simplified);
-      }
-    } catch (e) {}
-  }, []);
+  // Derived cart values
+  const cartList = Object.values(cartItems);
+  const cartTotalQty = cartList.reduce((s, i) => s + i.qty, 0);
+  const cartTotalPrice = cartList.reduce((s, i) => s + i.price * i.qty, 0);
 
   const activeFilterCount = [selectedCategory !== 'All', minPrice !== '', maxPrice !== '', showOnlyAvailable].filter(Boolean).length;
 
@@ -262,6 +289,7 @@ export default function ShopPage() {
   };
   const resetDraft = () => { setDraftCategory('All'); setDraftMinPrice(''); setDraftMaxPrice(''); setDraftAvailable(false); };
 
+  // toggleFavorite — UNCHANGED
   const toggleFavorite = async (product: Product) => {
     if (!requireAuth()) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -276,11 +304,12 @@ export default function ShopPage() {
     }
   };
 
+  // addToCart — UNCHANGED
   const addToCart = (product: Product, qty: number) => {
     if (!requireAuth()) return;
     const existing = cartItems[product.id]?.qty ?? 0;
     const newQty = Math.min(existing + qty, product.quantity);
-    setCartItems(prev => ({ ...prev, [product.id]: { qty: newQty } }));
+    setCartItems(prev => ({ ...prev, [product.id]: { ...product, qty: newQty } }));
     setPendingQty(prev => ({ ...prev, [product.id]: 1 }));
     try {
       const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
@@ -289,6 +318,27 @@ export default function ShopPage() {
     } catch (e) {}
   };
 
+  const updateCartQty = (productId: string, newQty: number) => {
+    if (newQty <= 0) { removeFromCart(productId); return; }
+    const item = cartItems[productId];
+    if (!item) return;
+    setCartItems(prev => ({ ...prev, [productId]: { ...prev[productId], qty: newQty } }));
+    try {
+      const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
+      if (stored[productId]) { stored[productId].qty = newQty; localStorage.setItem('cart-products', JSON.stringify(stored)); }
+    } catch (e) {}
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCartItems(prev => { const n = { ...prev }; delete n[productId]; return n; });
+    try {
+      const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
+      delete stored[productId];
+      localStorage.setItem('cart-products', JSON.stringify(stored));
+    } catch (e) {}
+  };
+
+  // processedProducts — UNCHANGED
   const processed = useMemo(() => {
     let list = [...allProducts];
     if (selectedCategory !== 'All') list = list.filter(p => p.category === selectedCategory);
@@ -304,7 +354,7 @@ export default function ShopPage() {
     }
   }, [allProducts, search, selectedCategory, sortBy, showOnlyAvailable, minPrice, maxPrice]);
 
-  // ── Loading state ───────────────────────────────────────────────────────
+  // ── Loading state — UNCHANGED ───────────────────────────────────────────
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Plus Jakarta Sans', sans-serif", color: deepGreen, fontWeight: '700', fontSize: '16px' }}>
       Loading products…
@@ -317,9 +367,17 @@ export default function ShopPage() {
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes floatPulse { 0%, 100% { box-shadow: 0 8px 32px rgba(13,179,13,0.45); } 50% { box-shadow: 0 8px 40px rgba(13,179,13,0.65); } }
+        @keyframes badgePop { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
+        .float-cart-btn { position: fixed; bottom: 32px; right: 32px; z-index: 900; width: 62px; height: 62px; background: linear-gradient(135deg, #0DB30D, #0A490A); border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(13,179,13,0.45); transition: transform 0.2s ease, box-shadow 0.2s ease; animation: floatPulse 3s ease-in-out infinite; font-family: inherit; }
+        .float-cart-btn:hover { transform: scale(1.08) translateY(-2px); box-shadow: 0 12px 40px rgba(13,179,13,0.6); animation: none; }
+        .float-cart-btn:active { transform: scale(0.96); }
+        .float-cart-badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; min-width: 22px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #fff; animation: badgePop 0.3s cubic-bezier(0.16,1,0.3,1); font-family: inherit; }
+        .cart-panel-scroll::-webkit-scrollbar { width: 4px; }
+        .cart-panel-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
       `}</style>
 
-      {/* ── Product Detail Modal ──────────────────────────────────────────── */}
+      {/* ── Product Detail Modal — UNCHANGED ── */}
       {selectedProduct && (
         <div
           onClick={() => setSelectedProduct(null)}
@@ -329,18 +387,13 @@ export default function ShopPage() {
             onClick={e => e.stopPropagation()}
             style={{ background: '#fff', maxWidth: '560px', width: '100%', borderRadius: '32px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', maxHeight: '90vh', overflowY: 'auto', animation: 'modalIn 0.25s cubic-bezier(0.16,1,0.3,1)' }}
           >
-            {/* Hero image */}
             <img src={selectedProduct.img} alt={selectedProduct.name}
               style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }} />
-
-            {/* Close button */}
             <button onClick={() => setSelectedProduct(null)}
               style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <X size={18} color="#fff" />
             </button>
-
             <div style={{ padding: '28px' }}>
-              {/* Category + name + rating */}
               <span style={{ color: brandGreen, fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>{selectedProduct.category}</span>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', margin: '6px 0 4px' }}>
                 <h3 style={{ fontSize: '26px', fontWeight: '800', color: deepGreen, margin: 0 }}>{selectedProduct.name}</h3>
@@ -349,8 +402,6 @@ export default function ShopPage() {
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#92400e' }}>{selectedProduct.rating}</span>
                 </div>
               </div>
-
-              {/* Price */}
               <div style={{ fontSize: '24px', fontWeight: '800', color: deepGreen, marginBottom: '4px' }}>
                 {selectedProduct.price.toLocaleString()} KHR
                 <span style={{ fontSize: '14px', color: '#9ca3af', fontWeight: '400' }}> / {selectedProduct.unit}</span>
@@ -361,11 +412,7 @@ export default function ShopPage() {
                   <span style={{ color: deepGreen, fontWeight: '800' }}>{(selectedProduct.price * modalQty).toLocaleString()} KHR</span>
                 </p>
               )}
-
-              {/* Description */}
               <p style={{ color: '#666', lineHeight: '1.65', fontSize: '14px', margin: `${modalQty > 1 ? '0' : '12px'} 0 20px` }}>{selectedProduct.description}</p>
-
-              {/* Info tiles */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '18px' }}>
                 {[
                   { icon: <Box size={15} color={brandGreen} />, label: 'In Stock', value: selectedProduct.isAvailable ? `${selectedProduct.quantity} units` : 'Out of Stock', red: false },
@@ -379,8 +426,6 @@ export default function ShopPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Health highlight */}
               <div style={{ backgroundColor: '#eff6ef', padding: '14px 18px', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                 <Leaf color={brandGreen} size={18} />
                 <div>
@@ -388,8 +433,6 @@ export default function ShopPage() {
                   <span style={{ fontSize: '13px', color: '#444' }}>{selectedProduct.benefit}</span>
                 </div>
               </div>
-
-              {/* Sold by */}
               <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '18px', marginBottom: '22px' }}>
                 <p style={{ fontSize: '11px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px' }}>Sold By</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -410,8 +453,6 @@ export default function ShopPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Actions: fav + qty + add to basket */}
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <button onClick={() => toggleFavorite(selectedProduct)}
                   style={{ padding: '10px 13px', borderRadius: '12px', border: '2px solid #f0f0f0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -427,8 +468,6 @@ export default function ShopPage() {
                   {selectedProduct.isAvailable ? `Add${modalQty > 1 ? ` ${modalQty}` : ''} to Basket` : 'Out of Stock'}
                 </button>
               </div>
-
-              {/* View Shop button */}
               <button
                 onClick={() => { setSelectedProduct(null); if (requireAuth()) window.location.href = `/shop/${selectedProduct!.shopSlug}`; }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '10px', padding: '13px', borderRadius: '12px', border: '2px solid #e5e7eb', color: deepGreen, fontWeight: '700', fontSize: '14px', backgroundColor: '#fff', transition: 'all 0.2s', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
@@ -440,9 +479,77 @@ export default function ShopPage() {
           </div>
         </div>
       )}
-      {/* ── END Modal ─────────────────────────────────────────────────────── */}
 
-      {/* Filter Panel */}
+      {/* ── Cart Slide-out Panel (NEW) ── */}
+      {isCartOpen && (
+        <div
+          onClick={() => setIsCartOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', width: '420px', maxWidth: '95vw', height: '100%', padding: '30px', boxShadow: '-10px 0 30px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', animation: 'slideIn 0.28s cubic-bezier(0.16,1,0.3,1)' }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '800', color: deepGreen }}>Your Basket</h3>
+              <button onClick={() => setIsCartOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={22} color="#9ca3af" />
+              </button>
+            </div>
+            <p style={{ margin: '0 0 22px', fontSize: '13px', color: '#9ca3af', fontWeight: '600' }}>
+              {cartTotalQty} item{cartTotalQty !== 1 ? 's' : ''}
+            </p>
+
+            {/* Cart items */}
+            <div className="cart-panel-scroll" style={{ flex: 1, overflowY: 'auto' }}>
+              {cartList.length === 0 ? (
+                <div style={{ textAlign: 'center', marginTop: '80px' }}>
+                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                    <ShoppingBasket size={28} color="#d1d5db" />
+                  </div>
+                  <p style={{ color: '#bbb', fontWeight: '700', fontSize: '15px', margin: '0 0 6px' }}>Your basket is empty</p>
+                  <p style={{ color: '#d1d5db', fontWeight: '500', fontSize: '13px', margin: 0 }}>Add some fresh veggies to get started!</p>
+                </div>
+              ) : cartList.map(item => (
+                <div key={item.id} style={{ display: 'flex', gap: '12px', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' }}>
+                  <img src={item.img} style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} alt=""
+                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=eff6ef&color=0A490A&size=60`; }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h5 style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: '700', color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</h5>
+                    <p style={{ margin: '0 0 8px', color: '#9ca3af', fontSize: '12px' }}>{item.price.toLocaleString()} KHR / {item.unit}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <QtyStepperSm value={item.qty} onChange={v => updateCartQty(item.id, v)} max={item.quantity} />
+                      <span style={{ fontWeight: '800', fontSize: '14px', color: deepGreen }}>{(item.price * item.qty).toLocaleString()} KHR</span>
+                    </div>
+                  </div>
+                  <button onClick={() => removeFromCart(item.id)}
+                    style={{ border: 'none', background: '#fff0f0', borderRadius: '8px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginTop: '2px' }}>
+                    <Trash2 size={13} color="#ef4444" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer: total + checkout */}
+            {cartList.length > 0 && (
+              <div style={{ paddingTop: '16px', borderTop: '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 16px', backgroundColor: '#f9fafb', borderRadius: '12px', marginBottom: '14px' }}>
+                  <span style={{ fontWeight: '700', color: '#555', fontSize: '14px' }}>Total</span>
+                  <span style={{ fontWeight: '800', color: deepGreen, fontSize: '16px' }}>{cartTotalPrice.toLocaleString()} KHR</span>
+                </div>
+                <button
+                  onClick={() => { setIsCartOpen(false); if (requireAuth()) window.location.href = '/cart'; }}
+                  style={{ width: '100%', padding: '15px', backgroundColor: brandGreen, color: 'white', border: 'none', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', fontSize: '15px', fontFamily: 'inherit' }}>
+                  Checkout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Filter Panel — UNCHANGED ── */}
       {filterOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setFilterOpen(false)}>
           <div style={{ background: '#fff', width: '420px', maxWidth: '95vw', height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 60px rgba(0,0,0,0.15)', animation: 'slideIn 0.28s cubic-bezier(0.16,1,0.3,1)' }} onClick={e => e.stopPropagation()}>
@@ -454,7 +561,6 @@ export default function ShopPage() {
               <X size={22} style={{ cursor: 'pointer', color: '#9ca3af' }} onClick={() => setFilterOpen(false)} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 28px 28px' }}>
-              {/* Product Type */}
               <div style={{ padding: '24px 0', borderBottom: '1px solid #f3f4f6' }}>
                 <p style={{ fontSize: '13px', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 14px' }}>Product Type</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -466,7 +572,6 @@ export default function ShopPage() {
                   ))}
                 </div>
               </div>
-              {/* Price Range */}
               <div style={{ padding: '24px 0', borderBottom: '1px solid #f3f4f6' }}>
                 <p style={{ fontSize: '13px', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 14px' }}>Price Range</p>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -475,7 +580,6 @@ export default function ShopPage() {
                   <MaxPriceInput value={draftMaxPrice} onChange={handleDraftMax} />
                 </div>
               </div>
-              {/* Availability */}
               <div style={{ padding: '24px 0' }}>
                 <p style={{ fontSize: '13px', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 14px' }}>Availability</p>
                 <div onClick={() => setDraftAvailable(!draftAvailable)}
@@ -504,22 +608,34 @@ export default function ShopPage() {
 
       <Navbar />
 
+      {/* ── FLOATING CART BUTTON (NEW) ── */}
+      <button
+        className="float-cart-btn"
+        onClick={() => setIsCartOpen(true)}
+        aria-label={`Open basket, ${cartTotalQty} items`}
+      >
+        <ShoppingBasket size={26} color="#fff" strokeWidth={2.2} />
+        {cartTotalQty > 0 && (
+          <span className="float-cart-badge">
+            {cartTotalQty > 99 ? '99+' : cartTotalQty}
+          </span>
+        )}
+      </button>
+
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '50px 5%' }}>
-        {/* Header */}
+        {/* ── Header — UNCHANGED ── */}
         <div style={{ marginBottom: '36px' }}>
           <span style={{ color: brandGreen, fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '2px' }}>Fresh From The Farm</span>
           <h2 style={{ fontSize: '40px', fontWeight: '800', color: deepGreen, margin: '8px 0 10px' }}>All Products</h2>
           <p style={{ color: '#666', fontSize: '16px' }}>Browse fresh vegetables from all local farms in one place.</p>
         </div>
 
-        {/* Search + Sort + Filter */}
+        {/* ── Search + Sort + Filter — UNCHANGED ── */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: 1, minWidth: '200px', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '12px', padding: '11px 16px' }}>
             <Search size={16} color="#999" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products or farms..." style={{ border: 'none', outline: 'none', fontSize: '14px', width: '100%', fontFamily: 'inherit', color: '#333', background: 'transparent' }} />
           </div>
-
-          {/* Sort dropdown */}
           <div style={{ position: 'relative' }} ref={sortRef}>
             <button onClick={() => setSortOpen(!sortOpen)}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '12px', padding: '11px 16px', fontFamily: 'inherit', fontSize: '14px', fontWeight: '700', color: '#333', cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -536,8 +652,6 @@ export default function ShopPage() {
               </div>
             )}
           </div>
-
-          {/* Filter button */}
           <button onClick={openFilter}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 18px', border: `2px solid ${activeFilterCount > 0 ? brandGreen : '#e5e7eb'}`, borderRadius: '12px', background: activeFilterCount > 0 ? '#f0fdf0' : '#fff', color: activeFilterCount > 0 ? deepGreen : '#444', fontWeight: '700', fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>
             <SlidersHorizontal size={15} /> Filters
@@ -545,7 +659,7 @@ export default function ShopPage() {
           </button>
         </div>
 
-        {/* Category pills */}
+        {/* ── Category pills — UNCHANGED ── */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '32px', flexWrap: 'wrap' }}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setSelectedCategory(cat)}
@@ -555,12 +669,11 @@ export default function ShopPage() {
           ))}
         </div>
 
-        {/* Results count */}
         <p style={{ color: '#888', fontSize: '14px', fontWeight: '600', marginBottom: '24px' }}>
           Showing <span style={{ color: deepGreen, fontWeight: '800' }}>{processed.length}</span> of {allProducts.length} products
         </p>
 
-        {/* Product Grid */}
+        {/* ── Product Grid — UNCHANGED ── */}
         {processed.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#999' }}>
             <p style={{ fontSize: '18px', fontWeight: '600' }}>No products match your filters.</p>
@@ -582,15 +695,12 @@ export default function ShopPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 6px rgba(0,0,0,0.05)'; }}
                 >
-                  {/* Out of stock badge */}
                   {!product.isAvailable && (
                     <div style={{ position: 'absolute', top: '14px', left: '14px', zIndex: 10, backgroundColor: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '100px' }}>Out of Stock</div>
                   )}
-                  {/* In cart badge */}
                   {product.isAvailable && inCart && (
                     <div style={{ position: 'absolute', top: '14px', left: '14px', zIndex: 10, backgroundColor: deepGreen, color: '#fff', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '100px' }}>{inCart.qty} in basket</div>
                   )}
-                  {/* Favorite button */}
                   <button onClick={e => { e.stopPropagation(); toggleFavorite(product); }}
                     style={{ position: 'absolute', top: '14px', right: '14px', zIndex: 10, backgroundColor: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
                     <Heart size={16} fill={isFav ? "#ef4444" : "none"} color={isFav ? "#ef4444" : "#999"} />
@@ -612,7 +722,6 @@ export default function ShopPage() {
                       {product.price.toLocaleString()} KHR <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '400' }}>/ {product.unit}</span>
                     </div>
 
-                    {/* Shop info */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px', padding: '8px 10px', backgroundColor: '#f9fafb', borderRadius: '10px' }}>
                       <img src={product.shopAvatar} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" />
                       <div style={{ minWidth: 0 }}>
@@ -626,9 +735,7 @@ export default function ShopPage() {
                       <span style={{ fontSize: '11px', fontWeight: '600', color: '#555' }}>{product.benefit}</span>
                     </div>
 
-                    {/* Buttons */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={e => e.stopPropagation()}>
-                      {/* Row 1: Qty + Add to Basket */}
                       {product.isAvailable ? (
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <QtyStepper value={pQty} onChange={v => setPendingQty(prev => ({ ...prev, [product.id]: v }))} max={product.quantity} />
@@ -642,10 +749,9 @@ export default function ShopPage() {
                           Out of Stock
                         </button>
                       )}
-                      {/* Row 2: View Shop */}
                       <button
                         onClick={() => { if (requireAuth()) window.location.href = `/shop/${product.shopSlug}`; }}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', borderRadius: '10px', border: '2px solid #e5e7eb', color: deepGreen, fontWeight: '700', fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s', backgroundColor: '#fff', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', borderRadius: '10px', border: '2px solid #e5e7eb', color: deepGreen, fontWeight: '700', fontSize: '12px', transition: 'all 0.2s', backgroundColor: '#fff', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = brandGreen; (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf0'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLButtonElement).style.background = '#fff'; }}>
                         <Store size={13} /> View Shop

@@ -41,6 +41,9 @@ const fontStyles = `
   .filter-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); z-index: 1000; display: flex; justify-content: flex-end; }
   .filter-panel { background: #fff; width: 420px; max-width: 95vw; height: 100%; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,0.15); animation: slideIn 0.28s cubic-bezier(0.16,1,0.3,1); }
   @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes slideInCart { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes floatPulse { 0%, 100% { box-shadow: 0 8px 32px rgba(13,179,13,0.45); } 50% { box-shadow: 0 8px 40px rgba(13,179,13,0.65); } }
+  @keyframes badgePop { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
   .filter-scroll { flex: 1; overflow-y: auto; padding: 0 28px 28px; }
   .filter-scroll::-webkit-scrollbar { width: 4px; }
   .filter-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
@@ -59,7 +62,7 @@ const fontStyles = `
   .toggle-track { width: 44px; height: 24px; border-radius: 100px; cursor: pointer; transition: background 0.2s; position: relative; flex-shrink: 0; }
   .toggle-thumb { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 3px; transition: left 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
   .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(4px); z-index: 1000; display: flex; justify-content: flex-end; }
-  .sidebar-content { background: white; width: 420px; height: 100%; padding: 30px; box-shadow: -10px 0 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; box-sizing: border-box; }
+  .sidebar-content { background: white; width: 420px; height: 100%; padding: 30px; box-shadow: -10px 0 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; box-sizing: border-box; animation: slideInCart 0.28s cubic-bezier(0.16,1,0.3,1); }
   .info-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .info-modal-content { background: white; max-width: 560px; width: 100%; border-radius: 32px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto; }
   .product-card { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
@@ -69,6 +72,10 @@ const fontStyles = `
   .qty-btn:hover:not(:disabled) { background: #eff6ef; }
   .qty-btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .qty-val { font-weight: 800; color: #111; text-align: center; border-left: 1.5px solid #e5e7eb; border-right: 1.5px solid #e5e7eb; display: flex; align-items: center; justify-content: center; }
+  .float-cart-btn { position: fixed; bottom: 32px; right: 32px; z-index: 900; width: 62px; height: 62px; background: linear-gradient(135deg, #0DB30D, #0A490A); border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(13,179,13,0.45); transition: transform 0.2s ease, box-shadow 0.2s ease; animation: floatPulse 3s ease-in-out infinite; font-family: inherit; }
+  .float-cart-btn:hover { transform: scale(1.08) translateY(-2px); box-shadow: 0 12px 40px rgba(13,179,13,0.6); animation: none; }
+  .float-cart-btn:active { transform: scale(0.96); }
+  .float-cart-badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; min-width: 22px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #fff; animation: badgePop 0.3s cubic-bezier(0.16,1,0.3,1); font-family: inherit; }
 `;
 
 function parseDate(str: string): Date { return new Date(str); }
@@ -157,7 +164,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
   const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
 
-  // Fetch shop + products
+  // Fetch shop + products — UNCHANGED
   useEffect(() => {
     async function fetchShopData() {
       const { data: merchant } = await supabase
@@ -219,7 +226,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     fetchShopData();
   }, [id]);
 
-  // Load favorites
+  // Load favorites — UNCHANGED
   useEffect(() => {
     async function loadFavorites() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -233,7 +240,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     loadFavorites();
   }, []);
 
-  // Load cart from localStorage
+  // Load cart from localStorage — UNCHANGED
   useEffect(() => {
     try {
       const cart = JSON.parse(localStorage.getItem('cart-products') || '{}');
@@ -272,6 +279,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     setDraftMinPrice(''); setDraftMaxPrice(''); setDraftHarvest('All Time');
   };
 
+  // toggleFavorite — UNCHANGED
   const toggleFavorite = async (fid: string) => {
     if (!requireAuth()) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -286,6 +294,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
+  // addToCart — UNCHANGED
   const addToCart = (product: Product, qty: number) => {
     if (!requireAuth()) return;
     const existing = cartItems[product.id];
@@ -361,6 +370,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
     <div style={{ minHeight: '100vh' }}>
       <style>{fontStyles}</style>
 
+      {/* ── Product Detail Modal — UNCHANGED ── */}
       {selectedProduct && (
         <div className="info-modal-overlay" onClick={() => setSelectedProduct(null)}>
           <div className="info-modal-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -442,6 +452,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
+      {/* ── Cart Slide-out Panel ── */}
       {isCartOpen && (
         <div className="sidebar-overlay" onClick={() => setIsCartOpen(false)}>
           <div className="sidebar-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -489,6 +500,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
+      {/* ── Favorites Slide-out Panel — UNCHANGED ── */}
       {isFavOpen && (
         <div className="sidebar-overlay" onClick={() => setIsFavOpen(false)}>
           <div className="sidebar-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -514,6 +526,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
+      {/* ── Filter Panel — UNCHANGED ── */}
       {filterOpen && (
         <div className="filter-overlay" onClick={() => setFilterOpen(false)}>
           <div className="filter-panel" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -577,11 +590,26 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
 
       <Navbar />
 
+      {/* ── FLOATING CART BUTTON (NEW) ── */}
+      <button
+        className="float-cart-btn"
+        onClick={() => setIsCartOpen(true)}
+        aria-label={`Open basket, ${cartTotalQty} items`}
+      >
+        <ShoppingBasket size={26} color="#fff" strokeWidth={2.2} />
+        {cartTotalQty > 0 && (
+          <span className="float-cart-badge">
+            {cartTotalQty > 99 ? '99+' : cartTotalQty}
+          </span>
+        )}
+      </button>
+
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 5%' }}>
         <a href="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#666', fontWeight: '600', fontSize: '14px', marginBottom: '30px' }}>
           <ChevronLeft size={16} /> Back to Shops
         </a>
 
+        {/* ── Shop Header — UNCHANGED ── */}
         <div style={{ borderRadius: '32px', backgroundColor: surfaceWhite, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '50px', overflow: 'hidden' }}>
           <div style={{ position: 'relative', height: '280px' }}>
             <img src={shopCover} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt=""
@@ -615,6 +643,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
 
+        {/* ── Products Section — UNCHANGED ── */}
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
