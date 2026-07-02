@@ -29,7 +29,7 @@ export default function OTPPage() {
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <input
                 key={i}
-                ref={(el) => (inputs.current[i] = el)}
+                ref={(el) => { inputs.current[i] = el; }}
                 type="text"
                 maxLength={1}
                 onChange={(e) => handleChange(e, i)}

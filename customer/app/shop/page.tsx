@@ -117,89 +117,93 @@ function QtyStepperLg({ value, onChange, max }: { value: number; onChange: (v: n
   );
 }
 
-// ── Main ShopPage component ───────────────────────────────────────────────────
+
 export default function ShopPage() {
   const { requireAuth } = useAuth();
 
-  // ── Data fetching state — UNCHANGED ────────────────────────────────────
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchProducts() {
-      setLoading(true);
+    setLoading(true);
 
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id, name, slug, description, price, stock_quantity, unit,
-          image_urls, is_active, harvest_date, expire_date, is_organic,
-          merchant_id, category_id,
-          categories ( name )
-        `)
-        .eq('is_active', true);
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        id, name, slug, description, price, stock_quantity, unit,
+        profile_pic_url, is_active, harvest_date, expire_date, is_organic,
+        merchant_id, category_id,
+        categories ( name )
+      `)
+      .eq('is_active', true);
 
-      if (error) { console.error(error); setLoading(false); return; }
+    if (error) { console.error(error); setLoading(false); return; }
 
-      // Fetch merchants separately
-      const merchantIds = [...new Set((data ?? []).map((p: any) => p.merchant_id).filter(Boolean))];
-      const { data: merchants } = await supabase
+    const merchantIds = [...new Set((data ?? []).map((p: any) => p.merchant_id).filter(Boolean))];
+    const productIds = (data ?? []).map((p: any) => p.id);
+
+    // Run merchants + reviews in parallel instead of one after another
+    const [merchantsRes, reviewsRes] = await Promise.all([
+      supabase
         .from('profile_merchants')
         .select('id, full_name, community_name, province, profile_url')
-        .in('id', merchantIds);
+        .in('id', merchantIds),
+      productIds.length > 0
+        ? supabase.from('reviews').select('product_id, rating').in('product_id', productIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
 
-      const merchantMap: Record<string, any> = {};
-      (merchants ?? []).forEach(m => { merchantMap[m.id] = m; });
+    const merchants = merchantsRes.data;
+    const reviews = reviewsRes.data;
 
-      // Fetch reviews
-      const { data: reviews } = await supabase
-        .from('reviews')
-        .select('product_id, rating');
+    const merchantMap: Record<string, any> = {};
+    (merchants ?? []).forEach(m => { merchantMap[m.id] = m; });
 
-      const ratingMap: Record<string, number> = {};
-      if (reviews) {
-        const grouped: Record<string, number[]> = {};
-        reviews.forEach(r => {
-          if (!grouped[r.product_id]) grouped[r.product_id] = [];
-          grouped[r.product_id].push(r.rating);
-        });
-        Object.entries(grouped).forEach(([pid, ratings]) => {
-          ratingMap[pid] = parseFloat((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1));
-        });
-      }
-
-      const mapped: Product[] = (data ?? []).map((p: any) => {
-        const merchant = merchantMap[p.merchant_id] ?? {};
-        return {
-          id: p.id,
-          name: p.name,
-          category: p.categories?.name ?? 'Uncategorized',
-          price: Number(p.price),
-          unit: p.unit ?? '',
-          benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
-          description: p.description ?? '',
-          popularity: p.stock_quantity ?? 0,
-          rating: ratingMap[p.id] ?? 0,
-          isAvailable: p.is_active && p.stock_quantity > 0,
-          img: p.image_urls?.[0] ?? '',
-          quantity: p.stock_quantity ?? 0,
-          harvestDate: p.harvest_date ?? '',
-          sellByDate: p.expire_date ?? '',
-          shopSlug: p.merchant_id ?? '',
-          shopName: merchant.full_name ?? '',
-          shopAvatar: merchant.profile_url ?? '',
-          shopLocation: merchant.province ?? '',
-        };
+    const ratingMap: Record<string, number> = {};
+    if (reviews) {
+      const grouped: Record<string, number[]> = {};
+      reviews.forEach((r: any) => {
+        if (!grouped[r.product_id]) grouped[r.product_id] = [];
+        grouped[r.product_id].push(r.rating);
       });
-
-      setAllProducts(mapped);
-      setLoading(false);
+      Object.entries(grouped).forEach(([pid, ratings]) => {
+        ratingMap[pid] = parseFloat((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1));
+      });
     }
+
+    const mapped: Product[] = (data ?? []).map((p: any) => {
+      const merchant = merchantMap[p.merchant_id] ?? {};
+      return {
+        id: p.id,
+        name: p.name,
+        category: p.categories?.name ?? 'Uncategorized',
+        price: Number(p.price),
+        unit: p.unit ?? '',
+        benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
+        description: p.description ?? '',
+        popularity: p.stock_quantity ?? 0,
+        rating: ratingMap[p.id] ?? 0,
+        isAvailable: p.is_active && p.stock_quantity > 0,
+        img: p.profile_pic_url ?? '',
+        quantity: p.stock_quantity ?? 0,
+        harvestDate: p.harvest_date ?? '',
+        sellByDate: p.expire_date ?? '',
+        shopSlug: p.merchant_id ?? '',
+        shopName: merchant.full_name ?? '',
+        shopAvatar: merchant.profile_url ?? '',
+        shopLocation: merchant.province ?? '',
+      };
+    });
+
+    setAllProducts(mapped);
+    setLoading(false);
+  }
 
     fetchProducts();
   }, []);
 
-  // ── UI state ────────────────────────────────────────────────────────────
+  
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Most Popular');

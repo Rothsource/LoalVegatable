@@ -89,7 +89,17 @@ export default function UserInfoPage() {
     map.on('click', (e: any) => { placePin(e.latlng.lat, e.latlng.lng); });
 
     mapInstanceRef.current = map;
-    return () => { map.remove(); mapInstanceRef.current = null; };
+
+    // Fix map sizing when container becomes visible/resized (important for responsive layouts)
+    setTimeout(() => map.invalidateSize(), 100);
+    const resizeHandler = () => map.invalidateSize();
+    window.addEventListener('resize', resizeHandler);
+
+    return () => {
+      window.removeEventListener('resize', resizeHandler);
+      map.remove();
+      mapInstanceRef.current = null;
+    };
   }, [mapLoaded]);
 
   // ── Close suggestions when clicking outside ───────────────────────────────
@@ -307,26 +317,87 @@ export default function UserInfoPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: 'Inter, sans-serif', backgroundColor: '#fdfdfb' }}>
+    <div className="userinfo-wrapper">
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .leaflet-container { font-family: Inter, sans-serif !important; }
         .leaflet-popup-content-wrapper { border-radius: 12px !important; font-size: 13px; font-weight: 600; }
         .suggestion-item:hover { background: #f0fdf4 !important; }
+
+        /* ── Responsive layout ── */
+        .userinfo-wrapper {
+          display: flex;
+          min-height: 100vh;
+          width: 100%;
+          font-family: 'Inter', sans-serif;
+          background-color: #fdfdfb;
+        }
+        .userinfo-left {
+          width: 50%;
+          padding: 40px 8%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          overflow-y: auto;
+          box-sizing: border-box;
+        }
+        .userinfo-inner {
+          max-width: 420px;
+          width: 100%;
+          margin: 0 auto;
+        }
+        .userinfo-right {
+          width: 50%;
+          background-image: url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200');
+          background-size: cover;
+          background-position: center;
+        }
+        .userinfo-title { font-size: 32px; }
+        .userinfo-map-box { height: 200px; }
+
+        /* ── Cambodian address grid: 2 cols by default ── */
+        .khmer-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        /* ── Search row: input + Google Maps button ── */
+        .search-row {
+          display: flex;
+          gap: 8px;
+        }
+
+        /* ── Tablet ── */
+        @media (max-width: 900px) {
+          .userinfo-wrapper { flex-direction: column; min-height: 100vh; }
+          .userinfo-left { width: 100%; padding: 32px 6%; }
+          .userinfo-right { display: none; }
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 520px) {
+          .userinfo-left { padding: 24px 5%; }
+          .userinfo-title { font-size: 26px; }
+          .userinfo-map-box { height: 170px; }
+          .khmer-grid { grid-template-columns: 1fr; }
+          .search-row { flex-direction: column; }
+          .search-row > button { width: 100%; justify-content: center; }
+        }
       `}</style>
 
       {/* ── LEFT PANEL ── */}
-      <div style={{ width: '50%', padding: '40px 8%', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflowY: 'auto' }}>
-        <div style={{ maxWidth: '420px', width: '100%', margin: '0 auto' }}>
+      <div className="userinfo-left">
+        <div className="userinfo-inner">
 
-          <h1 style={{ fontSize: '32px', fontWeight: '800', marginBottom: '8px', color: '#1a1a1a', letterSpacing: '-1px' }}>Complete your profile</h1>
+          <h1 className="userinfo-title" style={{ fontWeight: '800', marginBottom: '8px', color: '#1a1a1a', letterSpacing: '-1px' }}>Complete your profile</h1>
           <p style={{ color: '#666', marginBottom: '24px', fontSize: '15px' }}>Help us get your fresh vegetables delivered to the right place.</p>
 
           {error && <p style={{ color: 'red', fontSize: '14px', marginBottom: '16px' }}>{error}</p>}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-            {/* Name fields — UNCHANGED */}
+            {/* Name fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
                 <label style={labelStyle}>Last Name</label>
@@ -338,7 +409,7 @@ export default function UserInfoPage() {
               </div>
             </div>
 
-            {/* Favourite vegetable — UNCHANGED */}
+            {/* Favourite vegetable */}
             <div>
               <label style={labelStyle}>Favorite Vegetable</label>
               <input type="text" placeholder="e.g. Bok Choy, Morning Glory" value={favVeg} onChange={e => setFavVeg(e.target.value)} style={inputStyle} />
@@ -348,9 +419,8 @@ export default function UserInfoPage() {
             <div>
               <label style={labelStyle}>Search Landmark</label>
 
-              {/* Search input + buttons row */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div ref={suggestionsRef} style={{ flex: 1, position: 'relative' }}>
+              <div className="search-row">
+                <div ref={suggestionsRef} style={{ flex: 1, position: 'relative', minWidth: 0 }}>
                   <Search size={16} color="#999" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                   {searchingAuto && (
                     <Loader2 size={15} color="#2e7d32" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', animation: 'spin 1s linear infinite' }} />
@@ -364,7 +434,6 @@ export default function UserInfoPage() {
                     style={{ ...inputStyle, paddingLeft: '38px', paddingRight: '36px' }}
                   />
 
-                  {/* Dropdown suggestions */}
                   {showSuggestions && suggestions.length > 0 && (
                     <div style={{
                       position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
@@ -389,7 +458,7 @@ export default function UserInfoPage() {
                             }}
                           >
                             <MapPin size={14} color="#2e7d32" style={{ flexShrink: 0, marginTop: '2px' }} />
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: '13px', fontWeight: '700', color: '#111' }}>{title}</div>
                               <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{subtitle}</div>
                             </div>
@@ -400,7 +469,6 @@ export default function UserInfoPage() {
                   )}
                 </div>
 
-                {/* Open Google Maps button */}
                 <button
                   onClick={handleOpenGoogleMaps}
                   title="Open in Google Maps"
@@ -409,14 +477,14 @@ export default function UserInfoPage() {
                     backgroundColor: '#2e7d32', color: '#fff',
                     border: 'none', fontWeight: '600', cursor: 'pointer',
                     fontSize: '13px', display: 'flex', alignItems: 'center',
-                    gap: '5px', whiteSpace: 'nowrap',
+                    gap: '5px', whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                 >
                   <ExternalLink size={14} /> Google Maps
                 </button>
               </div>
 
-              {/* ── Paste coords box — appears after Google Maps is opened ── */}
+              {/* ── Paste coords box ── */}
               {showCoordsBox && (
                 <div style={{
                   marginTop: '10px', background: '#fffbeb',
@@ -428,14 +496,14 @@ export default function UserInfoPage() {
                   <p style={{ margin: '0 0 10px', fontSize: '11px', color: '#a16207', lineHeight: '1.5' }}>
                     In Google Maps: long-press your location → copy the coordinates shown → paste below
                   </p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     <input
                       type="text"
                       placeholder="e.g. 11.123456, 104.567890  or paste Google Maps link"
                       value={coordsInput}
                       onChange={e => { setCoordsInput(e.target.value); setCoordsError(''); }}
                       onKeyDown={e => e.key === 'Enter' && handleCoordsSubmit()}
-                      style={{ ...inputStyle, fontSize: '12px', border: '1px solid #fde68a', background: '#fff', flex: 1 }}
+                      style={{ ...inputStyle, fontSize: '12px', border: '1px solid #fde68a', background: '#fff', flex: '1 1 180px', minWidth: 0 }}
                     />
                     <button
                       onClick={handleCoordsSubmit}
@@ -471,9 +539,9 @@ export default function UserInfoPage() {
               </label>
 
               <div style={{ border: '1px solid #e0e0e0', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
-                <div ref={mapRef} style={{ height: '200px', width: '100%', background: '#eef1ee' }}>
+                <div ref={mapRef} className="userinfo-map-box" style={{ width: '100%', background: '#eef1ee' }}>
                   {!mapLoaded && (
-                    <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf0' }}>
+                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf0' }}>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: '24px' }}>🗺️</div>
                         <p style={{ fontSize: '13px', color: '#2e7d32', fontWeight: '600', margin: '6px 0 0' }}>Loading map…</p>
@@ -498,11 +566,13 @@ export default function UserInfoPage() {
                 </button>
               </div>
 
-              <p style={{ fontSize: '12px', color: '#888', fontWeight: '600', margin: '6px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <MapPin size={11} color="#2e7d32" />
-                {pickedLabel
-                  ? `📍 ${pickedLabel.length > 55 ? pickedLabel.slice(0, 55) + '…' : pickedLabel}`
-                  : 'Type to search, or click directly on the map'}
+              <p style={{ fontSize: '12px', color: '#888', fontWeight: '600', margin: '6px 0 0', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                <MapPin size={11} color="#2e7d32" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  {pickedLabel
+                    ? `📍 ${pickedLabel.length > 55 ? pickedLabel.slice(0, 55) + '…' : pickedLabel}`
+                    : 'Type to search, or click directly on the map'}
+                </span>
               </p>
             </div>
 
@@ -511,7 +581,7 @@ export default function UserInfoPage() {
               <p style={{ margin: 0, fontSize: '12px', fontWeight: '800', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 📍 {khmerAddr.phum || khmerAddr.khum ? 'Cambodian Address (auto-filled)' : 'Cambodian Address — click map to auto-fill'}
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="khmer-grid">
                 <div>
                   <label style={khmerLabelStyle}>លេខផ្ទះ (House No.) Optional</label>
                   <input type="text" placeholder="e.g. #123" value={houseNumber} onChange={e => setHouseNumber(e.target.value)} style={khmerInputStyle} />
@@ -539,13 +609,13 @@ export default function UserInfoPage() {
               </div>
             </div>
 
-            {/* Note for rider — UNCHANGED */}
+            {/* Note for rider */}
             <div>
               <label style={labelStyle}>Note for Rider (Optional)</label>
               <textarea placeholder="e.g. Gate is green, call when you arrive" value={note} onChange={e => setNote(e.target.value)} style={{ ...inputStyle, height: '60px', resize: 'none' }} />
             </div>
 
-            {/* Submit — UNCHANGED */}
+            {/* Submit */}
             <button
               onClick={handleSubmit}
               disabled={loading}
@@ -558,8 +628,8 @@ export default function UserInfoPage() {
         </div>
       </div>
 
-      {/* RIGHT PANEL — UNCHANGED */}
-      <div style={{ width: '50%', backgroundImage: "url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
+      {/* RIGHT PANEL — hidden on tablet/mobile via CSS */}
+      <div className="userinfo-right" />
     </div>
   );
 }

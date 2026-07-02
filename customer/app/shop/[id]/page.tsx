@@ -215,7 +215,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           popularity: p.stock_quantity ?? 0,
           rating: ratingMap[p.id] ?? 0,
           isAvailable: p.is_active && p.stock_quantity > 0,
-          img: p.image_urls?.[0] ?? 'https://placehold.co/400x300?text=No+Image',
+          img: p.profile_pic_url ?? 'https://placehold.co/400x300?text=No+Image',
           quantity: p.stock_quantity ?? 0,
           harvestDate: p.harvest_date ?? '',
           sellByDate: p.expire_date ?? '',
