@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Header from "@/components/Header";
+import { useDashboard } from "@/lib/dashboardContext";
 import { supabase } from "@/lib/supabase";
 
 type Filter = "day" | "week" | "month";
@@ -49,6 +49,7 @@ function orderBadge(status: string) {
 }
 
 export default function HomePage() {
+  const { merchantName } = useDashboard();
   const [filter, setFilter]     = useState<Filter>("week");
   const [products, setProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -56,7 +57,6 @@ export default function HomePage() {
   const [greeting, setGreeting] = useState("Good morning");
   const [mounted, setMounted]   = useState(false);
   const [loading, setLoading]   = useState(true);
-  const [merchantName, setMerchantName] = useState("Merchant");
 
   useEffect(() => {
     setMounted(true);
@@ -64,7 +64,6 @@ export default function HomePage() {
     if (h >= 12 && h < 17) setGreeting("Good afternoon");
     else if (h >= 17) setGreeting("Good evening");
     fetchProducts();
-    fetchMerchant();
   }, []);
 
   async function fetchProducts() {
@@ -81,17 +80,6 @@ export default function HomePage() {
 
     setProducts(data ?? []);
     setLoading(false);
-  }
-
-  async function fetchMerchant() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase
-      .from("profile_merchants")
-      .select("full_name")
-      .eq("id", user.id)
-      .single();
-    if (data?.full_name) setMerchantName(data.full_name);
   }
 
   const stats    = STATS[filter];
@@ -113,8 +101,6 @@ export default function HomePage() {
   return (
     <div className={`min-h-screen bg-[#f5f9f3] transition-opacity duration-500 ${mounted ? "opacity-100" : "opacity-0"}`}
       style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif" }}>
-
-      <Header lowStock={lowStock} activePath="/home" merchantName={merchantName} />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-6 pb-20">
 

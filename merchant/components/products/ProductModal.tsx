@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { FormErrors, FormState, Unit } from "@/types/product";
 import {
   inputErr,
@@ -7,6 +8,7 @@ import {
   labelCls,
   sectionHead,
 } from "@/lib/productHelpers";
+import { supabase } from "@/lib/supabase";
 
 import { ImageUploadBox } from "./ImageUploadBox";
 import { Icons } from "./ProductIcons";
@@ -33,6 +35,18 @@ export function ProductModal({
   setField,
   setBgPic,
 }: Props) {
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    async function loadCategories() {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name")
+        .order("name");
+      if (!error && data) setCategories(data);
+    }
+    loadCategories();
+  }, []);
   return (
     <div
       role="dialog"
@@ -134,13 +148,13 @@ export function ProductModal({
 
             {/* Price */}
             <div>
-              <label className={labelCls}>Price *</label>
+              <label className={labelCls}>Price (KHR) *</label>
 
               <input
                 type="number"
                 min="0"
-                step="0.01"
-                placeholder="e.g. 4.50"
+                step="100"
+                placeholder="e.g. 4,000"
                 value={form.price}
                 onChange={(e) => setField("price", e.target.value)}
                 className={formErrors.price ? inputErr : inputOk}
@@ -156,16 +170,30 @@ export function ProductModal({
             {/* Description */}
             <div>
               <label className={labelCls}>Description</label>
-
               <textarea
                 rows={3}
                 placeholder="Describe your product — freshness, origin, how it's grown..."
                 value={form.description}
-                onChange={(e) =>
-                  setField("description", e.target.value)
-                }
+                onChange={(e) => setField("description", e.target.value)}
                 className={`${inputOk} resize-none`}
               />
+            </div>
+
+            {/* Category — NEW */}
+            <div>
+              <label className={labelCls}>Category</label>
+              <select
+                value={form.categoryId}
+                onChange={(e) => setField("categoryId", e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100 transition cursor-pointer"
+              >
+                <option value="">Uncategorized</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </section>
 

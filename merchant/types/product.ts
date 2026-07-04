@@ -12,6 +12,7 @@ export type Product = {
   backgroundPicUrls: string[];
   active: boolean;
   price: number;
+  categoryId: string;        // ← add
 };
 
 export type FormState = {
@@ -25,6 +26,7 @@ export type FormState = {
   backgroundPicUrls: string[];
   active: boolean;
   price: string;
+  categoryId: string;        // ← add
 };
 
 export type FormErrors = Partial<Record<keyof FormState, string>>;
@@ -46,6 +48,7 @@ export const EMPTY_FORM: FormState = {
   backgroundPicUrls: ["", "", ""],
   active: true,
   price: "",
+  categoryId: "",           // ← add
 };
 
 export const INITIAL_PRODUCTS: Product[] = [];

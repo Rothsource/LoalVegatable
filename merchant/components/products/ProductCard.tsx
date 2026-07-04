@@ -1,5 +1,6 @@
 import { Product } from "@/types/product";
 import { stockStatus, isExpired, isExpiringSoon, fmtDate } from "@/lib/productHelpers";
+import { formatKHR } from "@/lib/currency";
 import { Icons } from "./ProductIcons";
 
 type Props = {
@@ -7,8 +8,9 @@ type Props = {
   isSelected: boolean;
   onSelect: (id: string) => void;
   onEdit: (p: Product) => void;
-  onDelete: (p: Product) => void;
-  onToggleActive: (p: Product) => void;
+  onArchive: (p: Product) => void;
+  onRestore: (p: Product) => void;
+  onPermanentDelete: (p: Product) => void;
 };
 
 export function ProductCard({
@@ -16,8 +18,9 @@ export function ProductCard({
   isSelected,
   onSelect,
   onEdit,
-  onDelete,
-  onToggleActive,
+  onArchive,
+  onRestore,
+  onPermanentDelete,
 }: Props) {
   const { label, cls } = stockStatus(p.quantity);
   const expired = isExpired(p.expireDate);
@@ -32,6 +35,8 @@ export function ProductCard({
       {/* Image area */}
       <div className="relative h-48 bg-gray-100 overflow-hidden">
         {p.profilePicUrl ? (
+          // Starter products use public external vegetable photos.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={p.profilePicUrl}
             alt={p.name}
@@ -58,19 +63,19 @@ export function ProductCard({
           {label}
         </span>
 
-        {/* Active toggle */}
-        <button
-          onClick={() => onToggleActive(p)}
+        {/* Product visibility */}
+        <span
           className={`absolute top-2 right-2 flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm transition
             ${p.active ? "bg-green-600 text-white" : "bg-white/90 text-gray-600 border border-gray-200"}`}
         >
-          {p.active ? <><Icons.Eye /> Active</> : <><Icons.EyeOff /> Hidden</>}
-        </button>
+          {p.active ? <><Icons.Eye /> Active</> : <><Icons.EyeOff /> Archived</>}
+        </span>
 
         {/* Background pics strip */}
         {p.backgroundPicUrls.some((u) => u) && (
           <div className="absolute bottom-0 left-0 right-0 flex h-10 gap-px">
             {p.backgroundPicUrls.filter((u) => u).map((u, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
               <img key={i} src={u} alt="" className="flex-1 h-full object-cover opacity-80" />
             ))}
           </div>
@@ -97,6 +102,11 @@ export function ProductCard({
           >
             {p.quantity} {p.unit ?? "units"}
           </span>
+        </div>
+
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-400 font-medium">Price</span>
+          <span className="font-black text-green-700">{formatKHR(p.price)}</span>
         </div>
 
         <div className="space-y-1.5 pt-2 border-t border-gray-100">
@@ -129,12 +139,31 @@ export function ProductCard({
           >
             <Icons.Pencil /> Edit
           </button>
-          <button
-            onClick={() => onDelete(p)}
-            className="flex items-center justify-center px-3 text-gray-600 hover:text-red-600 border border-gray-200 hover:border-red-200 hover:bg-red-50 rounded-xl py-2 transition"
-          >
-            <Icons.Trash />
-          </button>
+          {p.active ? (
+            <button
+              onClick={() => onArchive(p)}
+              title="Archive product"
+              className="flex items-center justify-center gap-1.5 px-3 text-gray-600 hover:text-amber-700 border border-gray-200 hover:border-amber-200 hover:bg-amber-50 rounded-xl py-2 transition text-xs font-semibold"
+            >
+              <Icons.EyeOff /> Archive
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => onRestore(p)}
+                className="flex items-center justify-center gap-1.5 px-3 text-green-700 border border-green-200 hover:bg-green-50 rounded-xl py-2 transition text-xs font-bold"
+              >
+                <Icons.Eye /> Restore
+              </button>
+              <button
+                onClick={() => onPermanentDelete(p)}
+                title="Delete permanently"
+                className="flex items-center justify-center px-3 text-red-600 border border-red-200 hover:bg-red-50 rounded-xl py-2 transition"
+              >
+                <Icons.Trash />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

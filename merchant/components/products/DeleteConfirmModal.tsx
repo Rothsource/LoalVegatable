@@ -15,14 +15,14 @@ export function DeleteConfirmModal({ product, onCancel, onConfirm }: Props) {
       onClick={(e) => e.target === e.currentTarget && onCancel()}
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
-        <div className="w-14 h-14 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-400">
+        <div className="w-14 h-14 bg-amber-50 border border-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-500">
           <Icons.AlertTriangle />
         </div>
-        <h2 className="text-lg font-black text-gray-900 text-center">Delete product?</h2>
+        <h2 className="text-lg font-black text-gray-900 text-center">Archive product?</h2>
         <p className="text-sm text-gray-500 text-center mt-2 leading-relaxed">
-          You're about to permanently delete{" "}
-          <strong className="text-gray-800">"{product.name}"</strong>.<br />
-          This action cannot be undone.
+          You are about to archive{" "}
+          <strong className="text-gray-800">{product.name}</strong>.<br />
+          It will be hidden from customers and can be restored later.
         </p>
         <div className="flex gap-3 mt-6">
           <button
@@ -33,9 +33,9 @@ export function DeleteConfirmModal({ product, onCancel, onConfirm }: Props) {
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition text-sm"
+            className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl transition text-sm"
           >
-            Yes, delete
+            Archive
           </button>
         </div>
       </div>

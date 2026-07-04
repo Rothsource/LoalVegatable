@@ -1,11 +1,9 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -19,7 +17,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setError(error.message); setLoading(false); return; }
 
-    window.location.href = "/";
+    window.location.href = "/home";
   };
 
   return (
@@ -45,7 +43,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="text-center text-sm text-gray-500 mt-6">
-          Don't have an account? <Link href="/auth/register" className="text-green-600 font-medium hover:underline">Sign Up</Link>
+          Don&apos;t have an account? <Link href="/auth/register" className="text-green-600 font-medium hover:underline">Sign Up</Link>
         </p>
       </div>
     </div>

@@ -1,436 +1,378 @@
 "use client";
+
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+type LowStockItem = {
+  id?: string | number;
+  name: string;
+  stock: number;
+};
 
-type NavItem = { label: string; href: string; icon: React.ReactNode };
-type LowStockItem = { name: string; stock: number };
-
-interface HeaderProps {
-  /** Items whose stock is at or below the low-stock threshold */
+type HeaderProps = {
   lowStock?: LowStockItem[];
-  /** Currently active route, e.g. "/home" */
-  activePath?: string;
-  /** Merchant display name */
   merchantName?: string;
-  /** Merchant avatar initial (defaults to first char of merchantName) */
-  avatarInitial?: string;
-}
+  profileUrl?: string;
+};
 
-// ─── Icons (inline SVG helpers) ──────────────────────────────────────────────
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+};
 
 const Icon = {
   Home: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 10v10h14V10M9 20v-6h6v6" />
     </svg>
   ),
   Product: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
     </svg>
   ),
   Order: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6m-6 4h6m-6 4h4m-6 8h10a2 2 0 002-2V7a2 2 0 00-2-2h-1a2 2 0 00-2-2h-4a2 2 0 00-2 2H7a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
   ),
-  Menu: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M4 6h16M4 12h16M4 18h16" />
+  Profile: () => (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m14-11a4 4 0 11-8 0 4 4 0 018 0z" />
     </svg>
   ),
   Bell: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 10-4 0v.3A6 6 0 006 11v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0" />
     </svg>
   ),
-  Warning: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+  Chevron: () => (
+    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
     </svg>
   ),
   Close: () => (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
-  ChevronDown: () => (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
     </svg>
   ),
 };
 
-// ─── Nav config ──────────────────────────────────────────────────────────────
-
 const NAV: NavItem[] = [
-  { label: "Home",    href: "/home",    icon: <Icon.Home />    },
+  { label: "Home", href: "/home", icon: <Icon.Home /> },
   { label: "Product", href: "/product", icon: <Icon.Product /> },
-  { label: "Order",   href: "/order",   icon: <Icon.Order />   },
-  { label: "Menu",    href: "/menu",    icon: <Icon.Menu />    },
+  { label: "Order", href: "/order", icon: <Icon.Order /> },
+  { label: "Profile", href: "/profile", icon: <Icon.Profile /> },
 ];
 
-// ─── Low-Stock Dropdown ───────────────────────────────────────────────────────
+function MerchantAvatar({
+  profileUrl,
+  initial,
+  className,
+}: {
+  profileUrl: string;
+  initial: string;
+  className: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
 
-function StockDropdown({ items, onClose }: { items: LowStockItem[]; onClose: () => void }) {
+  return (
+    <span className={`flex flex-shrink-0 items-center justify-center overflow-hidden bg-green-600 font-black text-white ${className}`}>
+      {profileUrl && !imageFailed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={profileUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        initial
+      )}
+    </span>
+  );
+}
+
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function NotificationMenu({
+  items,
+  onClose,
+}: {
+  items: LowStockItem[];
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) onClose();
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, [onClose]);
 
   return (
-    <div
-      ref={ref}
-      className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden z-50"
-      style={{ animation: "dropIn 0.18s cubic-bezier(.22,.68,0,1.2) both" }}
-    >
-      <style>{`
-        @keyframes dropIn {
-          from { opacity: 0; transform: translateY(-6px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0)   scale(1);    }
-        }
-      `}</style>
-
-      {/* Header row */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 bg-amber-50">
-        <div className="flex items-center gap-2">
-          <span className="text-amber-500"><Icon.Warning /></span>
-          <span className="text-xs font-bold text-amber-800">Low Stock Alert</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-amber-400 hover:text-amber-700 transition-colors rounded-lg p-0.5"
-          aria-label="Close"
-        >
+    <div ref={ref} className="absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <p className="text-sm font-black text-gray-900">Notifications</p>
+        <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Close notifications">
           <Icon.Close />
         </button>
       </div>
 
-      {/* Item list */}
-      <ul className="divide-y divide-gray-50">
-        {items.map((item) => (
-          <li key={item.name} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors">
-            <span className="text-sm font-medium text-gray-700">{item.name}</span>
-            <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                item.stock === 0
-                  ? "bg-red-100 text-red-600"
-                  : "bg-amber-100 text-amber-700"
+      {items.length === 0 ? (
+        <div className="px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-gray-600">All clear</p>
+          <p className="mt-1 text-xs text-gray-400">No low-stock alerts right now.</p>
+        </div>
+      ) : (
+        <>
+          <div className="max-h-72 overflow-y-auto">
+            {items.map((item, index) => (
+              <div key={item.id ?? `${item.name}-${index}`} className="flex items-center gap-3 border-b border-gray-50 px-4 py-3 last:border-0">
+                <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${item.stock === 0 ? "bg-red-50 text-red-500" : "bg-amber-50 text-amber-500"}`}>
+                  <Icon.Bell />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-gray-800">{item.name}</p>
+                  <p className={`text-xs font-medium ${item.stock === 0 ? "text-red-500" : "text-amber-600"}`}>
+                    {item.stock === 0 ? "Out of stock" : `${item.stock} left`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-gray-100 bg-gray-50 px-4 py-2.5 text-center">
+            <Link href="/product" onClick={onClose} className="text-xs font-bold text-green-700 hover:underline">
+              Manage inventory
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AccountMenu({
+  merchantName,
+  initial,
+  profileUrl,
+  onClose,
+}: {
+  merchantName: string;
+  initial: string;
+  profileUrl: string;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [signOutError, setSignOutError] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) onClose();
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [onClose]);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    setSignOutError("");
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setSignOutError(error.message);
+      setSigningOut(false);
+      return;
+    }
+
+    window.location.href = "/auth/login";
+  }
+
+  return (
+    <div ref={ref} className="absolute right-0 top-11 z-50 w-52 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
+      <div className="flex items-center gap-3 border-b border-green-100 bg-green-50 px-4 py-3">
+        <MerchantAvatar
+          key={profileUrl || "initial"}
+          profileUrl={profileUrl}
+          initial={initial}
+          className="h-8 w-8 rounded-xl text-sm"
+        />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-gray-800">{merchantName}</p>
+          <p className="text-[10px] font-semibold text-green-700">Merchant</p>
+        </div>
+      </div>
+      <div className="p-1.5">
+        <Link href="/profile" onClick={onClose} className="block rounded-xl px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+          My profile
+        </Link>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+        >
+          {signingOut ? "Signing out..." : "Sign out"}
+        </button>
+        {signOutError && <p className="px-3 pb-2 text-xs text-red-500">{signOutError}</p>}
+      </div>
+    </div>
+  );
+}
+
+export default function Header({ lowStock = [], merchantName = "Merchant", profileUrl }: HeaderProps) {
+  const pathname = usePathname();
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [fetchedProfileUrl, setFetchedProfileUrl] = useState("");
+  const initial = merchantName.trim().charAt(0).toUpperCase() || "M";
+  const resolvedProfileUrl = profileUrl ?? fetchedProfileUrl;
+
+  useEffect(() => {
+    if (profileUrl !== undefined) return;
+
+    let active = true;
+    async function loadProfilePhoto() {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data } = await supabase
+        .from("profile_merchants")
+        .select("profile_url")
+        .eq("id", userData.user.id)
+        .maybeSingle();
+
+      if (active && data?.profile_url) setFetchedProfileUrl(data.profile_url);
+    }
+
+    void loadProfilePhoto();
+    return () => {
+      active = false;
+    };
+  }, [profileUrl]);
+
+  function toggleNotifications() {
+    setNotificationOpen((open) => !open);
+    setAccountOpen(false);
+  }
+
+  function toggleAccount() {
+    setAccountOpen((open) => !open);
+    setNotificationOpen(false);
+  }
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 shadow-sm backdrop-blur-xl">
+      <div className="mx-auto grid h-16 max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 sm:px-6">
+        <Link href="/home" className="flex min-w-0 items-center gap-2.5 justify-self-start">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-green-600 shadow">
+            <span className="text-xs font-black text-white">LV</span>
+          </div>
+          <span className="hidden truncate text-sm font-bold tracking-tight text-gray-900 lg:block">
+            LocalVeg <span className="font-medium text-green-500">Merchant</span>
+          </span>
+        </Link>
+
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Merchant navigation">
+          {NAV.map((item) => {
+            const active = isActivePath(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex w-[92px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold transition-colors ${
+                  active ? "bg-green-50 text-green-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                }`}
+              >
+                <span className={active ? "text-green-600" : "text-gray-400"}>{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2 justify-self-end">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={toggleNotifications}
+              aria-label={`${lowStock.length} low-stock alerts`}
+              aria-expanded={notificationOpen}
+              className={`relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+                lowStock.length > 0
+                  ? "border-amber-200 bg-amber-50 text-amber-500 hover:bg-amber-100"
+                  : "border-gray-200 bg-gray-50 text-gray-400 hover:bg-gray-100"
               }`}
             >
-              {item.stock === 0 ? "Out of stock" : `${item.stock} left`}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {/* Footer CTA */}
-      <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
-        <Link
-          href="/product"
-          onClick={onClose}
-          className="block w-full text-center text-xs font-bold text-green-700 hover:text-green-800 transition-colors py-1"
-        >
-          Manage Inventory →
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// ─── User Menu Dropdown ───────────────────────────────────────────────────────
-
-function UserMenu({ initial, name, onClose }: { initial: string; name: string; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
-
-  const menuItems = [
-    { label: "My Profile",    href: "/profile"  },
-    { label: "Store Settings",href: "/settings" },
-    { label: "Help Center",   href: "/help"     },
-  ];
-
-  return (
-    <div
-      ref={ref}
-      className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden z-50"
-      style={{ animation: "dropIn 0.18s cubic-bezier(.22,.68,0,1.2) both" }}
-    >
-      {/* Profile header */}
-      <div className="px-4 py-3 bg-green-50 border-b border-green-100/60 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-xl bg-green-600 text-white text-sm font-black flex items-center justify-center shadow-sm">
-          {initial}
-        </div>
-        <div>
-          <p className="text-sm font-bold text-gray-800">{name}</p>
-          <p className="text-[10px] text-green-600 font-semibold">Merchant</p>
-        </div>
-      </div>
-
-      <ul className="py-1.5">
-        {menuItems.map((item) => (
-          <li key={item.label}>
-            <Link
-              href={item.href}
-              onClick={onClose}
-              className="block px-4 py-2 text-sm text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900 transition-colors"
-            >
-              {item.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <div className="border-t border-gray-100 py-1.5">
-        <button className="w-full text-left px-4 py-2 text-sm text-red-500 font-medium hover:bg-red-50 transition-colors">
-          Sign out
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Header Component ────────────────────────────────────────────────────
-
-export default function Header({
-  lowStock = [],
-  activePath = "/home",
-  merchantName = "Dara",
-  avatarInitial,
-}: HeaderProps) {
-  const initial = avatarInitial ?? merchantName.charAt(0).toUpperCase();
-
-  const [stockOpen, setStockOpen] = useState(false);
-  const [userOpen,  setUserOpen]  = useState(false);
-  const [scrolled,  setScrolled]  = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Scroll shadow
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Close dropdowns when either opens
-  const openStock = () => { setStockOpen(true);  setUserOpen(false);  };
-  const openUser  = () => { setUserOpen(true);   setStockOpen(false); };
-
-  return (
-    <>
-      {/* ── Sticky bar ── */}
-      <header
-        className={`sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 transition-shadow duration-200 ${
-          scrolled ? "shadow-md shadow-gray-200/60" : "shadow-sm"
-        }`}
-      >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-
-          {/* Logo */}
-          <Link href="/home" className="flex items-center gap-2.5 flex-shrink-0 group">
-            <div className="w-8 h-8 rounded-xl bg-green-600 flex items-center justify-center shadow group-hover:scale-105 transition-transform duration-150">
-              <span className="text-white text-xs font-black">LV</span>
-            </div>
-            <span className="font-bold text-gray-900 text-sm tracking-tight hidden xs:block">
-              LocalVeg{" "}
-              <span className="text-green-500 font-medium">Merchant</span>
-            </span>
-          </Link>
-
-          {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-0.5" aria-label="Main navigation">
-            {NAV.map((n) => {
-              const isActive = activePath === n.href;
-              return (
-                <Link
-                  key={n.label}
-                  href={n.href}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
-                    isActive
-                      ? "bg-green-50 text-green-700 font-semibold"
-                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                  }`}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <span className={isActive ? "text-green-600" : "text-gray-400"}>{n.icon}</span>
-                  {n.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-
-            {/* Stock alert bell */}
-            {lowStock.length > 0 && (
-              <div className="relative">
-                <button
-                  onClick={() => (stockOpen ? setStockOpen(false) : openStock())}
-                  aria-label={`${lowStock.length} low stock alert${lowStock.length > 1 ? "s" : ""}`}
-                  className={`relative w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
-                    stockOpen
-                      ? "bg-amber-100 border-amber-300 text-amber-600"
-                      : "bg-amber-50 border-amber-200 text-amber-500 hover:bg-amber-100"
-                  }`}
-                >
-                  <Icon.Bell />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-bold flex items-center justify-center shadow">
-                    {lowStock.length}
-                  </span>
-                </button>
-                {stockOpen && (
-                  <StockDropdown items={lowStock} onClose={() => setStockOpen(false)} />
-                )}
-              </div>
-            )}
-
-            {/* User pill */}
-            <div className="relative">
-              <button
-                onClick={() => (userOpen ? setUserOpen(false) : openUser())}
-                className={`flex items-center gap-2 border rounded-xl px-3 py-1.5 transition-colors ${
-                  userOpen
-                    ? "bg-green-50 border-green-200"
-                    : "bg-gray-50 border-gray-200 hover:bg-green-50 hover:border-green-200"
-                }`}
-              >
-                <div className="w-5 h-5 rounded-md bg-green-600 text-white text-[10px] font-black flex items-center justify-center">
-                  {initial}
-                </div>
-                <span className="text-sm font-semibold text-gray-700 hidden sm:block">{merchantName}</span>
-                <span className={`text-gray-400 transition-transform duration-150 ${userOpen ? "rotate-180" : ""}`}>
-                  <Icon.ChevronDown />
+              <Icon.Bell />
+              {lowStock.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                  {lowStock.length}
                 </span>
-              </button>
-              {userOpen && (
-                <UserMenu initial={initial} name={merchantName} onClose={() => setUserOpen(false)} />
               )}
-            </div>
-
-            {/* Mobile hamburger */}
-            <button
-              className="sm:hidden w-9 h-9 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
-              onClick={() => setMobileMenuOpen((v) => !v)}
-              aria-label="Toggle mobile menu"
-            >
-              {mobileMenuOpen ? <Icon.Close /> : <Icon.Menu />}
             </button>
+            {notificationOpen && <NotificationMenu items={lowStock} onClose={() => setNotificationOpen(false)} />}
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={toggleAccount}
+              aria-expanded={accountOpen}
+              className="flex h-9 max-w-40 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2.5 text-gray-700 transition-colors hover:border-green-200 hover:bg-green-50"
+            >
+              <MerchantAvatar
+                key={resolvedProfileUrl || "initial"}
+                profileUrl={resolvedProfileUrl}
+                initial={initial}
+                className="h-5 w-5 rounded-md text-[10px]"
+              />
+              <span className="hidden max-w-24 truncate text-sm font-semibold sm:block">{merchantName}</span>
+              <span className={`text-gray-400 transition-transform ${accountOpen ? "rotate-180" : ""}`}>
+                <Icon.Chevron />
+              </span>
+            </button>
+            {accountOpen && (
+              <AccountMenu
+                merchantName={merchantName}
+                initial={initial}
+                profileUrl={resolvedProfileUrl}
+                onClose={() => setAccountOpen(false)}
+              />
+            )}
           </div>
         </div>
-
-        {/* Mobile bottom nav strip */}
-        <div className="sm:hidden flex border-t border-gray-100">
-          {NAV.map((n) => {
-            const isActive = activePath === n.href;
-            return (
-              <Link
-                key={n.label}
-                href={n.href}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
-                  isActive ? "text-green-700 bg-green-50/60" : "text-gray-400 hover:text-green-600"
-                }`}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <span className={isActive ? "text-green-600" : "text-gray-400"}>{n.icon}</span>
-                {n.label}
-              </Link>
-            );
-          })}
-        </div>
-      </header>
-
-      {/* ── Mobile full-screen menu ── */}
-      {mobileMenuOpen && (
-        <div className="sm:hidden fixed inset-0 z-30 bg-white/95 backdrop-blur-md pt-16 px-6 pb-8 flex flex-col gap-2">
-          {NAV.map((n) => {
-            const isActive = activePath === n.href;
-            return (
-              <Link
-                key={n.label}
-                href={n.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-base font-semibold transition-colors ${
-                  isActive
-                    ? "bg-green-100 text-green-800"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <span className={`${isActive ? "text-green-600" : "text-gray-400"}`}>{n.icon}</span>
-                {n.label}
-              </Link>
-            );
-          })}
-
-          {lowStock.length > 0 && (
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-              <p className="text-xs font-bold text-amber-800 mb-2 flex items-center gap-2">
-                <Icon.Warning /> Low Stock ({lowStock.length})
-              </p>
-              {lowStock.map((item) => (
-                <p key={item.name} className="text-xs text-amber-700 font-medium py-0.5">
-                  · {item.name} — <span className="font-bold">{item.stock} left</span>
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Low-stock banner (below header) ── */}
-      {lowStock.length > 0 && (
-        <LowStockBanner items={lowStock} />
-      )}
-    </>
-  );
-}
-
-// ─── Dismissible banner ───────────────────────────────────────────────────────
-
-function LowStockBanner({ items }: { items: LowStockItem[] }) {
-  const [visible, setVisible] = useState(true);
-  if (!visible) return null;
-
-  return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-amber-500 flex-shrink-0"><Icon.Warning /></span>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-amber-800">Low Stock Alert</p>
-            <p className="text-xs text-amber-600 mt-0.5 truncate">
-              {items.map((p) => `${p.name} (${p.stock} left)`).join(" · ")}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => setVisible(false)}
-          className="text-amber-400 hover:text-amber-700 transition-colors flex-shrink-0 p-1 rounded-lg hover:bg-amber-100"
-          aria-label="Dismiss alert"
-        >
-          <Icon.Close />
-        </button>
       </div>
-    </div>
+
+      <nav className="grid grid-cols-4 border-t border-gray-100 md:hidden" aria-label="Mobile merchant navigation">
+        {NAV.map((item) => {
+          const active = isActivePath(pathname, item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
+                active ? "bg-green-50/70 text-green-700" : "text-gray-400 hover:text-green-600"
+              }`}
+            >
+              <span>{item.icon}</span>
+              <span className="truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+    </header>
   );
 }

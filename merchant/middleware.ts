@@ -1,6 +1,3 @@
-export const runtime = "experimental-edge"
-
-
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
@@ -15,6 +12,7 @@ export async function middleware(request: NextRequest) {
     '/auth/callback',
     '/auth/merchant-info',
     '/auth/pending',
+    '/auth/reset-password',
   ]
   if (publicPaths.some(p => pathname.startsWith(p))) return NextResponse.next()
 

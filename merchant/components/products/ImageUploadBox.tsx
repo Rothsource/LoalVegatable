@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { labelCls } from "@/lib/productHelpers";
 import { Icons } from "./ProductIcons";
 import { supabase } from "@/lib/supabase";
+import imageCompression from "browser-image-compression";
 
 type Props = {
   label: string;
@@ -27,12 +28,26 @@ export function ImageUploadBox({ label, preview, onFile, onClear, small = false 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setUploading(false); return; }
 
-    const ext = file.name.split(".").pop();
+    // Compress before upload 
+    let fileToUpload: File = file;
+    try {
+      fileToUpload = await imageCompression(file, {
+        maxSizeMB: 0.3,           // target ~300KB
+        maxWidthOrHeight: 1200,   // no need for anything larger for product photos
+        useWebWorker: true,
+        fileType: "image/webp",  // smaller than jpeg/png at same quality
+      });
+    } catch (err) {
+      console.error("Compression failed, uploading original:", err);
+      // fall back to original file if compression fails for any reason
+    }
+
+    const ext = "webp"; // compressed output is always webp now
     const path = `${user.id}/${Date.now()}.${ext}`;
 
     const { error } = await supabase.storage
       .from("products-images")
-      .upload(path, file, { upsert: true });
+      .upload(path, fileToUpload, { upsert: true });
 
     if (error) { console.error(error); setUploading(false); return; }
 
