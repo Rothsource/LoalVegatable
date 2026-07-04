@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Leaf, ShieldCheck, Truck } from "lucide-react";
+import { ChevronRight, Leaf, Truck } from "lucide-react";
 
 export default function Hero() {
   return (
@@ -188,7 +188,7 @@ export default function Hero() {
           </h1>
 
           <p className="hero-sub">
-            Join our digital marketplace connecting Cambodian farmers directly with you. Fair prices, guaranteed freshness, delivered fast.
+            Join our digital marketplace connecting Cambodian farmers directly with you. Fair prices, Guaranteed freshness, Quick delivery.
           </p>
 
           <div className="hero-actions">
@@ -212,7 +212,7 @@ export default function Hero() {
             </div>
             <div className="hero-divider" />
             <div className="hero-stat">
-              <strong>Free</strong>
+              <strong>Fast</strong>
               <span>Delivery</span>
             </div>
           </div>
@@ -228,7 +228,6 @@ export default function Hero() {
             <div className="hero-img-overlay" />
           </div>
 
-          {/* Floating card top-left */}
           <div className="hero-float-card hero-float-top">
             <div className="hero-float-card-icon" style={{ background: '#eff6ef' }}>
               <Leaf size={20} color="#0DB30D" />
@@ -239,14 +238,13 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Floating card bottom-right */}
           <div className="hero-float-card hero-float-bottom">
             <div className="hero-float-card-icon" style={{ background: '#fff7ed' }}>
               <Truck size={20} color="#f97316" />
             </div>
             <div>
               <div className="hero-float-card-label">Delivery</div>
-              <div className="hero-float-card-value">Free & Fast 🚚</div>
+              <div className="hero-float-card-value">Right to your door🚚</div>
             </div>
           </div>
         </div>

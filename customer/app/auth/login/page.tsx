@@ -32,6 +32,45 @@ function LoginForm() {
     if (error) setError(error.message);
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px 16px',
+    borderRadius: '10px',
+    border: '1px solid #e0e0e0',
+    outline: 'none',
+    fontSize: '15px',
+    boxSizing: 'border-box',
+  };
+
+  const btnPrimaryStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: '10px',
+    backgroundColor: '#2e7d32',
+    color: '#fff',
+    border: 'none',
+    fontWeight: '600',
+    fontSize: '16px',
+    cursor: 'pointer',
+    boxSizing: 'border-box',
+  };
+
+  const btnGoogleStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: '10px',
+    border: '1px solid #e0e0e0',
+    backgroundColor: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    fontSize: '15px',
+    boxSizing: 'border-box',
+  };
+
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: 'Inter, sans-serif', backgroundColor: '#fdfdfb' }}>
       <div style={{ width: '50%', padding: '0 8%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -42,7 +81,7 @@ function LoginForm() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', color: '#444', fontWeight: '600', fontSize: '14px' }}>Email address</label>
-              <input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid #e0e0e0', outline: 'none' }} />
+              <input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
             </div>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -50,13 +89,13 @@ function LoginForm() {
                 <span style={{ fontSize: '13px', color: '#2e7d32', fontWeight: '600', cursor: 'pointer' }}>Forgot password?</span>
               </div>
               <div style={{ position: 'relative' }}>
-                <input type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid #e0e0e0', outline: 'none' }} />
+                <input type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
                 <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '16px', top: '14px', cursor: 'pointer', color: '#888' }}>
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </div>
               </div>
             </div>
-            <button onClick={handleLogin} disabled={loading} style={{ width: '100%', padding: '14px', borderRadius: '10px', backgroundColor: '#2e7d32', color: '#fff', border: 'none', fontWeight: '600', fontSize: '16px', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+            <button onClick={handleLogin} disabled={loading} style={{ ...btnPrimaryStyle, opacity: loading ? 0.7 : 1 }}>
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0' }}>
@@ -64,7 +103,7 @@ function LoginForm() {
               <span style={{ padding: '0 15px', color: '#bbb', fontSize: '12px' }}>OR</span>
               <div style={{ flex: 1, height: '1px', backgroundColor: '#eee' }}></div>
             </div>
-            <button onClick={handleGoogleLogin} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
+            <button onClick={handleGoogleLogin} style={btnGoogleStyle}>
               <img src="https://authjs.dev/img/providers/google.svg" width="18" alt="Google" /> Continue with Google
             </button>
             <p style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: '20px' }}>

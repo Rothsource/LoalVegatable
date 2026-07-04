@@ -1,16 +1,26 @@
 "use client";
 
-import { Leaf, Mail, Phone, MapPin, Globe, AtSign, Share2 } from "lucide-react";
+import { Mail, Phone, MapPin, Globe, AtSign, Share2 } from "lucide-react";
+import Image from "next/image";
+
+// ── Same design tokens as the homepage ──
+const leaf = '#2E6F40';
+const sprout = '#6FAE5C';
+const paper = '#FBF8F2';
+const soil = '#3B2B20';
 
 export default function Footer() {
   return (
     <footer className="footer-root">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700;800&display=swap');
+
+        .footer-veg-heading { font-family: 'Fraunces', serif; }
+
         .footer-root {
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          background: #0A490A;
-          color: #fff;
+          font-family: 'Inter', sans-serif;
+          background: ${soil};
+          color: ${paper};
           padding: 80px 6% 0;
           position: relative;
           overflow: hidden;
@@ -18,7 +28,7 @@ export default function Footer() {
         .footer-bg-blob {
           position: absolute; top: -100px; right: -80px;
           width: 400px; height: 400px; border-radius: 50%;
-          background: radial-gradient(circle, rgba(13,179,13,0.08), transparent 70%);
+          background: radial-gradient(circle, rgba(111,174,92,0.10), transparent 70%);
           pointer-events: none;
         }
         .footer-grid {
@@ -27,7 +37,7 @@ export default function Footer() {
           grid-template-columns: 2fr 1fr 1fr 1.4fr;
           gap: 50px;
           padding-bottom: 60px;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
+          border-bottom: 1px solid rgba(251,248,242,0.1);
         }
         .footer-brand-logo {
           display: flex; align-items: center; gap: 10px;
@@ -35,17 +45,19 @@ export default function Footer() {
           text-decoration: none;
         }
         .footer-brand-icon {
-          width: 38px; height: 38px; border-radius: 10px;
-          background: linear-gradient(135deg, #0DB30D, #a8e063);
-          display: flex; align-items: center; justify-content: center;
+          width: 60px;
+          height: 60px;
+          border-radius: 10px;
+          object-fit: cover;
+          flex-shrink: 0;
         }
         .footer-brand-name {
-          font-size: 20px; font-weight: 800; color: #fff;
-          letter-spacing: -0.5px;
+          font-size: 21px; font-weight: 700; color: ${paper};
+          letter-spacing: -0.3px;
         }
-        .footer-brand-name span { color: #a8e063; }
+        .footer-brand-name span { color: ${sprout}; }
         .footer-tagline {
-          font-size: 14px; color: rgba(255,255,255,0.55);
+          font-size: 14px; color: rgba(251,248,242,0.6);
           line-height: 1.7; max-width: 260px; margin: 0 0 24px;
         }
         .footer-socials {
@@ -53,45 +65,45 @@ export default function Footer() {
         }
         .footer-social-btn {
           width: 38px; height: 38px; border-radius: 10px;
-          background: rgba(255,255,255,0.07);
+          background: rgba(251,248,242,0.07);
           display: flex; align-items: center; justify-content: center;
           cursor: pointer; transition: all 0.2s;
-          border: 1px solid rgba(255,255,255,0.08);
-          color: rgba(255,255,255,0.6);
+          border: 1px solid rgba(251,248,242,0.1);
+          color: rgba(251,248,242,0.65);
           text-decoration: none;
         }
         .footer-social-btn:hover {
-          background: #0DB30D; color: #fff;
-          border-color: #0DB30D;
+          background: ${leaf}; color: ${paper};
+          border-color: ${leaf};
           transform: translateY(-2px);
         }
         .footer-col-title {
           font-size: 12px; font-weight: 800;
           text-transform: uppercase; letter-spacing: 1.5px;
-          color: #a8e063; margin: 0 0 20px;
+          color: ${sprout}; margin: 0 0 20px;
         }
         .footer-links-list {
           display: flex; flex-direction: column; gap: 12px;
           list-style: none; margin: 0; padding: 0;
         }
         .footer-links-list a {
-          font-size: 14px; color: rgba(255,255,255,0.55);
+          font-size: 14px; color: rgba(251,248,242,0.6);
           text-decoration: none; transition: color 0.2s;
           font-weight: 500;
         }
-        .footer-links-list a:hover { color: #fff; }
+        .footer-links-list a:hover { color: ${paper}; }
         .footer-contact-item {
           display: flex; align-items: flex-start; gap: 12px;
           margin-bottom: 16px;
         }
         .footer-contact-icon {
           width: 34px; height: 34px; border-radius: 9px;
-          background: rgba(255,255,255,0.07);
+          background: rgba(251,248,242,0.07);
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0; margin-top: 1px;
         }
         .footer-contact-text {
-          font-size: 13px; color: rgba(255,255,255,0.55);
+          font-size: 13px; color: rgba(251,248,242,0.6);
           line-height: 1.5; font-weight: 500;
         }
         .footer-bottom {
@@ -102,16 +114,16 @@ export default function Footer() {
           flex-wrap: wrap; gap: 12px;
         }
         .footer-bottom-text {
-          font-size: 13px; color: rgba(255,255,255,0.3); margin: 0;
+          font-size: 13px; color: rgba(251,248,242,0.35); margin: 0;
         }
         .footer-bottom-links {
           display: flex; gap: 24px;
         }
         .footer-bottom-links a {
-          font-size: 13px; color: rgba(255,255,255,0.3);
+          font-size: 13px; color: rgba(251,248,242,0.35);
           text-decoration: none; transition: color 0.2s;
         }
-        .footer-bottom-links a:hover { color: rgba(255,255,255,0.7); }
+        .footer-bottom-links a:hover { color: rgba(251,248,242,0.75); }
         @media (max-width: 900px) {
           .footer-grid { grid-template-columns: 1fr 1fr; gap: 36px; }
         }
@@ -127,10 +139,8 @@ export default function Footer() {
         {/* Brand */}
         <div>
           <a href="/" className="footer-brand-logo">
-            <div className="footer-brand-icon">
-              <Leaf size={18} color="#0A490A" strokeWidth={2.5} />
-            </div>
-            <span className="footer-brand-name">Local<span>Veg</span></span>
+            <Image src="/image/logo.png" alt="LocalVegetable logo" width={38} height={38} className="footer-brand-icon" />
+            <span className="footer-veg-heading footer-brand-name">Local<span>Vegetable</span></span>
           </a>
           <p className="footer-tagline">
             Empowering local Cambodian farmers through fair digital trade. Fresh vegetables, straight to your door.
@@ -168,15 +178,15 @@ export default function Footer() {
         <div>
           <p className="footer-col-title">Contact Us</p>
           <div className="footer-contact-item">
-            <div className="footer-contact-icon"><MapPin size={15} color="#a8e063" /></div>
+            <div className="footer-contact-icon"><MapPin size={15} color={sprout} /></div>
             <span className="footer-contact-text">Phnom Penh, Cambodia</span>
           </div>
           <div className="footer-contact-item">
-            <div className="footer-contact-icon"><Mail size={15} color="#a8e063" /></div>
+            <div className="footer-contact-icon"><Mail size={15} color={sprout} /></div>
             <span className="footer-contact-text">hello@localveg.com</span>
           </div>
           <div className="footer-contact-item">
-            <div className="footer-contact-icon"><Phone size={15} color="#a8e063" /></div>
+            <div className="footer-contact-icon"><Phone size={15} color={sprout} /></div>
             <span className="footer-contact-text">+855 12 345 678</span>
           </div>
         </div>
