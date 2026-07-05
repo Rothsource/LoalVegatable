@@ -18,7 +18,6 @@ interface KhmerAddress {
 export default function UserInfoPage() {
   const router = useRouter();
 
-  // ── ALL ORIGINAL STATE — UNCHANGED ───────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -30,7 +29,6 @@ export default function UserInfoPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ── Map + Cambodian address state ─────────────────────────────────────────
   const [khmerAddr, setKhmerAddr] = useState<KhmerAddress>({
     phum: '', khum: '', srok: '', khett: '', lat: null, lng: null,
   });
@@ -38,14 +36,12 @@ export default function UserInfoPage() {
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [pickedLabel, setPickedLabel] = useState('');
 
-  // ── Autocomplete suggestions ──────────────────────────────────────────────
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingAuto, setSearchingAuto] = useState(false);
   const searchDebounceRef = useRef<any>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  // ── Paste coords (from Google Maps) ──────────────────────────────────────
   const [showCoordsBox, setShowCoordsBox] = useState(false);
   const [coordsInput, setCoordsInput] = useState('');
   const [coordsError, setCoordsError] = useState('');
@@ -54,7 +50,6 @@ export default function UserInfoPage() {
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
 
-  // ── Load Leaflet ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link');
@@ -70,7 +65,6 @@ export default function UserInfoPage() {
     document.head.appendChild(script);
   }, []);
 
-  // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || mapInstanceRef.current) return;
     const L = (window as any).L;
@@ -90,7 +84,6 @@ export default function UserInfoPage() {
 
     mapInstanceRef.current = map;
 
-    // Fix map sizing when container becomes visible/resized (important for responsive layouts)
     setTimeout(() => map.invalidateSize(), 100);
     const resizeHandler = () => map.invalidateSize();
     window.addEventListener('resize', resizeHandler);
@@ -102,7 +95,6 @@ export default function UserInfoPage() {
     };
   }, [mapLoaded]);
 
-  // ── Close suggestions when clicking outside ───────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
@@ -113,7 +105,6 @@ export default function UserInfoPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Green teardrop pin ────────────────────────────────────────────────────
   const getGreenIcon = () => {
     const L = (window as any).L;
     return L.divIcon({
@@ -124,7 +115,6 @@ export default function UserInfoPage() {
     });
   };
 
-  // ── Place pin + reverse geocode ───────────────────────────────────────────
   const placePin = async (lat: number, lng: number) => {
     const L = (window as any).L;
     if (!mapInstanceRef.current) return;
@@ -153,7 +143,6 @@ export default function UserInfoPage() {
     }
   };
 
-  // ── Parse Nominatim → Cambodian fields ───────────────────────────────────
   const parseAndFill = (data: any, lat: number, lng: number) => {
     const a = data.address ?? {};
     const phum  = a.village || a.hamlet || a.neighbourhood || a.quarter || '';
@@ -169,7 +158,6 @@ export default function UserInfoPage() {
     setPickedLabel(label || data.display_name?.split(',').slice(0, 3).join(',') || '');
   };
 
-  // ── Autocomplete: fetch suggestions as user types ─────────────────────────
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
     setShowSuggestions(false);
@@ -193,7 +181,6 @@ export default function UserInfoPage() {
     }, 400);
   };
 
-  // ── Pick a suggestion → move map + fill fields ────────────────────────────
   const handleSuggestionPick = (s: any) => {
     const lat = parseFloat(s.lat);
     const lng = parseFloat(s.lon);
@@ -204,25 +191,19 @@ export default function UserInfoPage() {
     placePin(lat, lng);
   };
 
-  // ── Open Google Maps for reference ───────────────────────────────────────
   const handleOpenGoogleMaps = () => {
     const query = searchQuery.trim()
       ? encodeURIComponent(searchQuery + ' Cambodia')
       : '11.5564,104.9282';
     window.open(`https://www.google.com/maps/search/${query}`, '_blank');
-    // Show the coords paste box after opening Google Maps
     setShowCoordsBox(true);
   };
 
-  // ── Parse pasted coords from Google Maps ─────────────────────────────────
-  // Google Maps share link format: maps.google.com/...@11.1234,104.5678,...
-  // Or user copies coords like "11.123456, 104.567890"
   const handleCoordsSubmit = () => {
     setCoordsError('');
     const raw = coordsInput.trim();
     if (!raw) return;
 
-    // Try "lat, lng" format (plain numbers)
     const plain = raw.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/);
     if (plain) {
       const lat = parseFloat(plain[1]);
@@ -236,7 +217,6 @@ export default function UserInfoPage() {
       }
     }
 
-    // Try Google Maps URL format: @11.1234,104.5678
     const urlMatch = raw.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
     if (urlMatch) {
       const lat = parseFloat(urlMatch[1]);
@@ -251,7 +231,6 @@ export default function UserInfoPage() {
     setCoordsError('Could not read coordinates. Try: 11.123456, 104.567890');
   };
 
-  // ── GPS location ──────────────────────────────────────────────────────────
   const handleMyLocation = () => {
     if (!navigator.geolocation) return;
     setIsLocating(true);
@@ -266,7 +245,9 @@ export default function UserInfoPage() {
     );
   };
 
-  // ── ORIGINAL handleSubmit — BACKEND UNCHANGED ────────────────────────────
+  // ── BACKEND UNCHANGED — always sends the user to '/' once their
+  // profile is saved. This is the one place profile_users actually gets
+  // written to, and it's what makes the login/callback checks work. ──
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
@@ -298,7 +279,6 @@ export default function UserInfoPage() {
     router.push('/');
   };
 
-  // ── Styles ────────────────────────────────────────────────────────────────
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '12px 16px', borderRadius: '10px',
     border: '1px solid #e0e0e0', outline: 'none', fontSize: '14px',
@@ -324,7 +304,6 @@ export default function UserInfoPage() {
         .leaflet-popup-content-wrapper { border-radius: 12px !important; font-size: 13px; font-weight: 600; }
         .suggestion-item:hover { background: #f0fdf4 !important; }
 
-        /* ── Responsive layout ── */
         .userinfo-wrapper {
           display: flex;
           min-height: 100vh;
@@ -355,27 +334,23 @@ export default function UserInfoPage() {
         .userinfo-title { font-size: 32px; }
         .userinfo-map-box { height: 200px; }
 
-        /* ── Cambodian address grid: 2 cols by default ── */
         .khmer-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 10px;
         }
 
-        /* ── Search row: input + Google Maps button ── */
         .search-row {
           display: flex;
           gap: 8px;
         }
 
-        /* ── Tablet ── */
         @media (max-width: 900px) {
-          .userinfo-wrapper { flex-direction: column; min-height: 100vh; }
+          .userinfo-wrapper { flex-direction: column; min-height: 100dvh; }
           .userinfo-left { width: 100%; padding: 32px 6%; }
           .userinfo-right { display: none; }
         }
 
-        /* ── Mobile ── */
         @media (max-width: 520px) {
           .userinfo-left { padding: 24px 5%; }
           .userinfo-title { font-size: 26px; }
@@ -386,7 +361,6 @@ export default function UserInfoPage() {
         }
       `}</style>
 
-      {/* ── LEFT PANEL ── */}
       <div className="userinfo-left">
         <div className="userinfo-inner">
 
@@ -397,7 +371,6 @@ export default function UserInfoPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-            {/* Name fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
                 <label style={labelStyle}>Last Name</label>
@@ -409,13 +382,11 @@ export default function UserInfoPage() {
               </div>
             </div>
 
-            {/* Favourite vegetable */}
             <div>
               <label style={labelStyle}>Favorite Vegetable</label>
               <input type="text" placeholder="e.g. Bok Choy, Morning Glory" value={favVeg} onChange={e => setFavVeg(e.target.value)} style={inputStyle} />
             </div>
 
-            {/* ── SEARCH with autocomplete dropdown ── */}
             <div>
               <label style={labelStyle}>Search Landmark</label>
 
@@ -484,7 +455,6 @@ export default function UserInfoPage() {
                 </button>
               </div>
 
-              {/* ── Paste coords box ── */}
               {showCoordsBox && (
                 <div style={{
                   marginTop: '10px', background: '#fffbeb',
@@ -532,7 +502,6 @@ export default function UserInfoPage() {
               )}
             </div>
 
-            {/* ── MAP ── */}
             <div>
               <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <MapPin size={14} color="#2e7d32" /> Delivery Location
@@ -576,7 +545,6 @@ export default function UserInfoPage() {
               </p>
             </div>
 
-            {/* ── Cambodian address fields ── */}
             <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <p style={{ margin: 0, fontSize: '12px', fontWeight: '800', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 📍 {khmerAddr.phum || khmerAddr.khum ? 'Cambodian Address (auto-filled)' : 'Cambodian Address — click map to auto-fill'}
@@ -609,13 +577,11 @@ export default function UserInfoPage() {
               </div>
             </div>
 
-            {/* Note for rider */}
             <div>
               <label style={labelStyle}>Note for Rider (Optional)</label>
               <textarea placeholder="e.g. Gate is green, call when you arrive" value={note} onChange={e => setNote(e.target.value)} style={{ ...inputStyle, height: '60px', resize: 'none' }} />
             </div>
 
-            {/* Submit */}
             <button
               onClick={handleSubmit}
               disabled={loading}
@@ -628,7 +594,6 @@ export default function UserInfoPage() {
         </div>
       </div>
 
-      {/* RIGHT PANEL — hidden on tablet/mobile via CSS */}
       <div className="userinfo-right" />
     </div>
   );

@@ -19,7 +19,8 @@ export default function RegisterPage() {
     if (!agreedToTerms) { setError('Please agree to the Terms of Service first.'); return; }
     setLoading(true);
     setError('');
-    const { error } = await supabase.auth.signUp({
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -27,7 +28,21 @@ export default function RegisterPage() {
         emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=/shop`,
       }
     });
+
     if (error) { setError(error.message); setLoading(false); return; }
+
+    // ── Supabase quirk: if the email is already registered, signUp does NOT
+    // return an error (this is intentional, to prevent attackers from using
+    // this form to check which emails have accounts). Instead it returns a
+    // user object with an EMPTY identities array. Without this check, the
+    // form would show "Check your email!" even though nothing actually
+    // happened — no new account, no new email sent. ──
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      setError('An account with this email already exists. Try logging in instead.');
+      setLoading(false);
+      return;
+    }
+
     setSuccess(true);
     setLoading(false);
   };
@@ -80,9 +95,9 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: 'Inter, sans-serif', backgroundColor: '#fdfdfb' }}>
-      <div style={{ width: '50%', padding: '0 8%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div style={{ maxWidth: '420px', width: '100%', margin: '0 auto' }}>
+    <div className="register-wrapper">
+      <div className="register-form-panel">
+        <div className="register-form-inner">
           {success ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>📬</div>
@@ -96,7 +111,7 @@ export default function RegisterPage() {
             </div>
           ) : (
             <>
-              <h1 style={{ fontSize: '40px', fontWeight: '800', marginBottom: '8px', color: '#1a1a1a', letterSpacing: '-1px' }}>Sign up</h1>
+              <h1 className="register-title">Sign up</h1>
               <p style={{ color: '#666', marginBottom: '32px', fontSize: '16px' }}>Join Local Vegetable today</p>
               {error && <p style={{ color: 'red', fontSize: '14px', marginBottom: '16px' }}>{error}</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -142,7 +157,77 @@ export default function RegisterPage() {
           )}
         </div>
       </div>
-      <div style={{ width: '50%', backgroundImage: "url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200')", backgroundSize: 'cover', backgroundPosition: 'center', borderLeft: '1px solid #eee' }} />
+      <div className="register-image-panel" />
+
+      <style jsx>{`
+        .register-wrapper {
+          display: flex;
+          min-height: 100vh;
+          width: 100%;
+          font-family: Inter, sans-serif;
+          background-color: #fdfdfb;
+        }
+
+        .register-form-panel {
+          width: 50%;
+          padding: 0 8%;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        .register-form-inner {
+          max-width: 420px;
+          width: 100%;
+          margin: 0 auto;
+        }
+
+        .register-title {
+          font-size: clamp(28px, 4vw, 40px);
+          font-weight: 800;
+          margin-bottom: 8px;
+          color: #1a1a1a;
+          letter-spacing: -1px;
+        }
+
+        .register-image-panel {
+          width: 50%;
+          background-image: url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200');
+          background-size: cover;
+          background-position: center;
+          border-left: 1px solid #eee;
+        }
+
+        @media (max-width: 1024px) {
+          .register-form-panel {
+            padding: 0 6%;
+          }
+        }
+
+        @media (max-width: 820px) {
+          .register-wrapper {
+            flex-direction: column;
+            min-height: 100dvh;
+          }
+
+          .register-image-panel {
+            display: none;
+          }
+
+          .register-form-panel {
+            width: 100%;
+            min-height: 100dvh;
+            padding: 32px 6% 48px;
+            justify-content: flex-start;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .register-form-panel {
+            padding: 24px 20px 40px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

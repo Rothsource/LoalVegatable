@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, Bell, Home, Store, Menu, X, User, Heart } from "lucide-react";
+import { ShoppingCart, Bell, Home, Store, Menu, X, User, Heart, LogIn } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { supabase } from "@/lib/supabase";
 
 // ── Same design tokens as the homepage, Hero, and Footer ──
 const leaf = '#2E6F40';
@@ -14,12 +15,32 @@ const soil = '#3B2B20';
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // ── Track auth state so the nav updates instantly on login/logout,
+  //    without needing a full page reload ──
+  useEffect(() => {
+    let active = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (active) setIsLoggedIn(!!data.user);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session?.user);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const navLinks = [
@@ -133,6 +154,20 @@ export default function Navbar() {
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
         }
+        .nav-login-btn {
+          display: flex; align-items: center; gap: 7px;
+          padding: 9px 18px; border-radius: 10px;
+          background: transparent; color: ${soil};
+          font-size: 14px; font-weight: 700;
+          text-decoration: none;
+          border: 1.5px solid ${soil};
+          transition: all 0.2s;
+        }
+        .nav-login-btn:hover {
+          background: ${soil};
+          color: #fff;
+          transform: translateY(-1px);
+        }
         .menu-btn {
           display: none; background: none; border: none;
           color: ${soil}; cursor: pointer; padding: 6px;
@@ -171,6 +206,17 @@ export default function Navbar() {
           transition: all 0.2s;
         }
         .mobile-link-profile:hover { background: #e2efda; border-color: ${leaf}; }
+        .mobile-link-login {
+          display: flex; align-items: center; gap: 10px;
+          color: ${soil}; text-decoration: none;
+          padding: 12px 14px; border-radius: 10px;
+          font-size: 15px; font-weight: 700;
+          background: transparent;
+          border: 1.5px solid ${soil};
+          margin-top: 4px;
+          transition: all 0.2s;
+        }
+        .mobile-link-login:hover { background: ${soil}; color: #fff; }
         @media (max-width: 768px) {
           .nav-links { display: none; }
           .nav-actions { display: none; }
@@ -202,12 +248,18 @@ export default function Navbar() {
             <Link href="/shop" className="nav-cta">
               <ShoppingCart size={15} /> Shop Now
             </Link>
-            <Link href="/auth/user-info" className="nav-profile">
-              <div className="nav-profile-avatar">
-                <User size={14} color={soil} strokeWidth={2.5} />
-              </div>
-              Profile
-            </Link>
+            {isLoggedIn ? (
+              <Link href="/auth/profile" className="nav-profile">
+                <div className="nav-profile-avatar">
+                  <User size={14} color={soil} strokeWidth={2.5} />
+                </div>
+                Profile
+              </Link>
+            ) : (
+              <Link href="/auth/login" className="nav-login-btn">
+                <LogIn size={15} /> Login
+              </Link>
+            )}
           </div>
 
           {/* Mobile burger */}
@@ -226,12 +278,18 @@ export default function Navbar() {
                 {icon} {label}
               </Link>
             ))}
-            <Link href="/auth/user-info" className="mobile-link-profile" onClick={() => setMenuOpen(false)}>
-              <div className="nav-profile-avatar">
-                <User size={14} color={soil} strokeWidth={2.5} />
-              </div>
-              Profile
-            </Link>
+            {isLoggedIn ? (
+              <Link href="/auth/profile" className="mobile-link-profile" onClick={() => setMenuOpen(false)}>
+                <div className="nav-profile-avatar">
+                  <User size={14} color={soil} strokeWidth={2.5} />
+                </div>
+                Profile
+              </Link>
+            ) : (
+              <Link href="/auth/login" className="mobile-link-login" onClick={() => setMenuOpen(false)}>
+                <LogIn size={15} /> Login
+              </Link>
+            )}
           </div>
         )}
       </nav>

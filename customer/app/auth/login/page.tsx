@@ -20,11 +20,20 @@ function LoginForm() {
   // skip straight to the shop / intended page. Otherwise, make them
   // finish onboarding first.
   const redirectBasedOnProfile = async (userId: string) => {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profile_users')
       .select('first_name, location')
       .eq('id', userId)
       .maybeSingle();
+
+    // If the lookup itself failed (RLS, network, etc.), don't hang forever —
+    // log it and fall back to sending them to user-info rather than leaving
+    // the button stuck on "Signing in...".
+    if (profileError) {
+      console.error('Profile lookup failed:', profileError);
+      router.push('/auth/user-info');
+      return;
+    }
 
     const profileComplete = !!profile?.first_name && !!profile?.location;
 
@@ -41,26 +50,41 @@ function LoginForm() {
     setLoading(true);
     setError('');
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error('signInWithPassword error:', error);
+        setError(error.message || `Login failed (${error.status ?? 'unknown'})`);
+        return;
+      }
 
-    await redirectBasedOnProfile(data.user.id);
+      await redirectBasedOnProfile(data.user.id);
+    } catch (err) {
+      // Catches anything unexpected (network failure, thrown exception, etc.)
+      // so the button never gets stuck on "Signing in..." indefinitely.
+      console.error('Login failed:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ── Google OAuth login ──
+  // The profile-complete check for Google users lives in
+  // app/auth/callback/route.ts (it mirrors redirectBasedOnProfile above).
+  // The one thing THIS component is responsible for is making sure the
+  // page the user was originally trying to reach survives the round trip
+  // through Google and back to /auth/callback — otherwise the callback
+  // route has no way to know where to send them and always falls back to '/'.
   const handleGoogleLogin = async () => {
+    const redirectTo = searchParams.get('redirectTo') || '/';
+    const callbackUrl = `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl },
     });
     if (error) setError(error.message);
-    // NOTE: Google sign-in redirects to /auth/callback, not back through this
-    // component. The same profile_users check needs to run there too, or
-    // Google users will bypass the profile-completion step. Send me that
-    // callback file and I'll wire it in.
   };
 
   return (
@@ -84,7 +108,7 @@ function LoginForm() {
             <div>
               <div className="login-password-row">
                 <label className="login-label" style={{ marginBottom: 0 }}>Password</label>
-                <span className="login-forgot">Forgot password?</span>
+                <Link href="/auth/forgot-password" className="login-forgot">Forgot password?</Link>
               </div>
               <div className="login-password-wrap">
                 <input
