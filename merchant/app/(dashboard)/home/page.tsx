@@ -20,9 +20,9 @@ const WEEK_LABELS: Record<Filter, string[]> = {
 };
 
 const RECENT_ORDERS = [
-  { id: "#0041", customer: "Sophea K.", items: "Tomatoes x3, Morning Glory x2", total: "$9.00",  status: "Delivered", time: "2h ago"    },
-  { id: "#0040", customer: "Dara M.",   items: "Spinach x2, Tomatoes x1",       total: "$5.60",  status: "Pending",   time: "4h ago"    },
-  { id: "#0039", customer: "Bopha S.",  items: "Morning Glory x4",              total: "$6.00",  status: "Preparing", time: "5h ago"    },
+  { id: "#0041", customer: "Sophea K.", items: "Tomatoes x3, Morning Glory x2", total: "$9.00",  status: "Delivered", time: "2h ago"  },
+  { id: "#0040", customer: "Dara M.",   items: "Spinach x2, Tomatoes x1",       total: "$5.60",  status: "Pending",   time: "4h ago"  },
+  { id: "#0039", customer: "Bopha S.",  items: "Morning Glory x4",              total: "$6.00",  status: "Preparing", time: "5h ago"  },
   { id: "#0038", customer: "Vanna T.",  items: "Tomatoes x5, Spinach x1",       total: "$11.80", status: "Delivered", time: "Yesterday" },
 ];
 
@@ -57,6 +57,8 @@ export default function HomePage() {
   const [greeting, setGreeting] = useState("Good morning");
   const [mounted, setMounted]   = useState(false);
   const [loading, setLoading]   = useState(true);
+  const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [locationMessage, setLocationMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -92,6 +94,43 @@ export default function HomePage() {
     setEditingId(null);
   };
 
+  async function shareLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatus("error");
+      setLocationMessage("Location isn't supported on this device.");
+      return;
+    }
+
+    setLocationStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const res = await fetch("/api/merchant-location", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error ?? "Failed to share location.");
+          }
+          setLocationStatus("success");
+          setLocationMessage("Your location was shared.");
+        } catch (err) {
+          setLocationStatus("error");
+          setLocationMessage(err instanceof Error ? err.message : "Failed to share location.");
+        }
+      },
+      () => {
+        setLocationStatus("error");
+        setLocationMessage("Location permission was denied.");
+      }
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-[#f5f9f3] transition-opacity duration-500 ${mounted ? "opacity-100" : "opacity-0"}`}
       style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif" }}>
@@ -109,6 +148,30 @@ export default function HomePage() {
               <Link href="/product" className="px-5 py-2.5 bg-white text-green-800 rounded-xl text-sm font-bold hover:bg-green-50 transition shadow-sm">+ Add Product</Link>
               <Link href="/order" className="px-5 py-2.5 bg-white/15 backdrop-blur text-white border border-white/25 rounded-xl text-sm font-semibold hover:bg-white/25 transition">View Orders</Link>
             </div>
+          </div>
+        </section>
+
+        {/* SHARE LOCATION */}
+        <section>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-gray-800">Shop location</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Share your current location so assigned riders can find you.
+              </p>
+              {locationMessage && (
+                <p className={`text-xs mt-1.5 font-semibold ${locationStatus === "error" ? "text-red-600" : "text-green-600"}`}>
+                  {locationMessage}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={shareLocation}
+              disabled={locationStatus === "loading"}
+              className="px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition shadow-sm disabled:opacity-60 whitespace-nowrap"
+            >
+              {locationStatus === "loading" ? "Sharing..." : "Share my location"}
+            </button>
           </div>
         </section>
 
@@ -221,7 +284,7 @@ export default function HomePage() {
                       <div className="flex items-center justify-between mt-3 gap-2">
                         {editingId === p.id ? (
                           <div className="flex items-center gap-1.5 w-full">
-                            <input type="number" value={editVal} onChange={(e) => setEditVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveStock(p.id)}
+                            <input type="number" value={editVal} onChange={(e) => setEditVal(e.target.value)} onKeyDown={(e) => e.key=== "Enter" && saveStock(p.id)}
                               className="w-16 border border-green-400 rounded-lg px-2 py-1 text-xs text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-green-400" autoFocus />
                             <button onClick={() => saveStock(p.id)} className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 transition font-bold">Save</button>
                             <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600 transition">Cancel</button>
