@@ -1,9 +1,9 @@
+// lib/delivery-service.ts
+import {createClient} from "@/lib/supabase";
 import {
   createInitialDemoState,
-  DEMO_AUTH,
   DEMO_INCOMING_DELIVERY,
   DEMO_NOTIFICATION,
-  DEMO_USER,
 } from "@/lib/demo-data";
 import type {
   DeliveryHistoryItem,
@@ -14,34 +14,67 @@ import type {
   ServiceResult,
 } from "@/lib/types";
 
-const STORAGE_KEY = "localveg-delivery-demo-v1";
-const WAIT_MS = 420;
+const OPS_STORAGE_KEY = "localveg-delivery-ops-v1"; // mock delivery-request data only
+const PENDING_EMAIL_KEY = "localveg-delivery-pending-email";
 
-function wait() {
-  return new Promise((resolve) => setTimeout(resolve, WAIT_MS));
-}
+type OpsState = Pick<DemoDeliveryState, "incoming" | "current" | "history" | "notifications">;
 
-function readState(): DemoDeliveryState {
-  if (typeof window === "undefined") return createInitialDemoState();
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+function readOps(): OpsState {
+  if (typeof window === "undefined") {
+    const initial = createInitialDemoState();
+    return { incoming: initial.incoming, current: initial.current, history: initial.history, notifications: initial.notifications };
+  }
+  const stored = window.localStorage.getItem(OPS_STORAGE_KEY);
   if (!stored) {
     const initial = createInitialDemoState();
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
+    const ops: OpsState = { incoming: initial.incoming, current: initial.current, history: initial.history, notifications: initial.notifications };
+    window.localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(ops));
+    return ops;
   }
-
   try {
-    return JSON.parse(stored) as DemoDeliveryState;
+    return JSON.parse(stored) as OpsState;
   } catch {
     const initial = createInitialDemoState();
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
+    return { incoming: initial.incoming, current: initial.current, history: initial.history, notifications: initial.notifications };
   }
 }
 
-function writeState(state: DemoDeliveryState) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  return state;
+function writeOps(ops: OpsState) {
+  window.localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(ops));
+  return ops;
+}
+
+function getPendingEmail(): string {
+  if (typeof window === "undefined") return "";
+  return window.sessionStorage.getItem(PENDING_EMAIL_KEY) ?? "";
+}
+
+function setPendingEmail(email: string) {
+  window.sessionStorage.setItem(PENDING_EMAIL_KEY, email);
+}
+
+function clearPendingEmail() {
+  window.sessionStorage.removeItem(PENDING_EMAIL_KEY);
+}
+
+async function fetchDeliveryUser(authUserId: string, authEmail: string): Promise<DeliveryUser | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("deliveries")
+    .select("id, first_name, last_name, phone, is_active")
+    .eq("user_id", authUserId)
+    .single();
+
+  if (error || !data || !data.is_active) return null;
+
+  return {
+    id: data.id,
+    name: `${data.first_name} ${data.last_name}`.trim(),
+    email: authEmail,
+    phone: data.phone ?? "",
+    accountStatus: "active",
+    available: true,
+  };
 }
 
 export interface DeliveryService {
@@ -63,156 +96,148 @@ export interface DeliveryService {
   resetDemo(mode: "incoming" | "empty"): Promise<DemoDeliveryState>;
 }
 
-class MockDeliveryService implements DeliveryService {
-  async getState() {
-    await wait();
-    return readState();
+class SupabaseDeliveryService implements DeliveryService {
+  async getState(): Promise<DemoDeliveryState> {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const ops = readOps();
+    const user = session?.user
+      ? await fetchDeliveryUser(session.user.id, session.user.email ?? "")
+      : null;
+
+    return {
+      user,
+      ...ops,
+      activationEmail: getPendingEmail(),
+      password: "",
+    };
   }
 
-  async login(email: string, password: string) {
-    await wait();
-    const state = readState();
-    if (email.toLowerCase() !== DEMO_AUTH.authorizedEmail || password !== state.password) {
-      return { ok: false, message: "That email or password doesn't match the demo rider account." };
+  async login(email: string, password: string): Promise<ServiceResult> {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.session) {
+      return { ok: false, message: "That email or password doesn't match your rider account." };
     }
-    writeState({ ...state, user: { ...DEMO_USER } });
-    return { ok: true };
-  }
-
-  async startActivation(email: string) {
-    await wait();
-    if (email.toLowerCase() !== DEMO_AUTH.authorizedEmail) {
-      return {
-        ok: false,
-        message: "This email has not been authorized for Delivery access. Try the demo email below.",
-      };
-    }
-    const state = readState();
-    writeState({ ...state, activationEmail: email.toLowerCase() });
-    return { ok: true };
-  }
-
-  async verifyCode(code: string) {
-    await wait();
-    if (code !== DEMO_AUTH.verificationCode) {
-      return { ok: false, message: "That code is incorrect or expired. Use the demo code shown below." };
+    const user = await fetchDeliveryUser(data.session.user.id, data.session.user.email ?? "");
+    if (!user) {
+      await supabase.auth.signOut();
+      return { ok: false, message: "Your rider account isn't active. Contact your admin." };
     }
     return { ok: true };
   }
 
-  async resendCode() {
-    await wait();
-    return { ok: true, message: "A fresh demo code is ready." };
-  }
-
-  async setPassword(password: string) {
-    await wait();
-    const state = readState();
-    writeState({ ...state, password, user: { ...DEMO_USER, email: state.activationEmail || DEMO_USER.email } });
+  async startActivation(email: string): Promise<ServiceResult> {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+    if (error) {
+      return { ok: false, message: "This email has not been authorized for Delivery access." };
+    }
+    setPendingEmail(email);
     return { ok: true };
   }
 
-  async logout() {
-    await wait();
-    const state = readState();
-    writeState({ ...state, user: null });
+  async verifyCode(code: string): Promise<ServiceResult> {
+    const supabase = createClient();
+    const email = getPendingEmail();
+    if (!email) return { ok: false, message: "Start again from the activation screen." };
+    const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+    if (error || !data.session) {
+      return { ok: false, message: "That code is incorrect or expired." };
+    }
+    return { ok: true };
   }
+
+  async resendCode(): Promise<ServiceResult> {
+    const supabase = createClient();
+    const email = getPendingEmail();
+    if (!email) return { ok: false, message: "Start again from the activation screen." };
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) return { ok: false, message: "Couldn't resend the code. Try again shortly." };
+    return { ok: true, message: "A new code is on its way." };
+  }
+
+  async setPassword(password: string): Promise<ServiceResult> {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.updateUser({
+      password,
+      data: { password_set: true },
+    });
+    if (error || !data.user) {
+      return { ok: false, message: "Unable to set your password. Try again." };
+    }
+    clearPendingEmail();
+    return { ok: true };
+  }
+
+  async logout(): Promise<void> {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+  }
+
+  // ---- Below: still mock, pending orders/merchant_locations wiring ----
 
   async getIncomingDeliveries() {
-    await wait();
-    return readState().incoming;
+    return readOps().incoming;
   }
 
   async getCurrentDelivery() {
-    await wait();
-    return readState().current;
+    return readOps().current;
   }
 
   async getDeliveryHistory() {
-    await wait();
-    return readState().history;
+    return readOps().history;
   }
 
   async getNotifications() {
-    await wait();
-    return readState().notifications;
+    return readOps().notifications;
   }
 
   async markNotificationsRead() {
-    const state = readState();
-    writeState({
-      ...state,
-      notifications: state.notifications.map((notification) => ({ ...notification, read: true })),
-    });
+    const ops = readOps();
+    writeOps({ ...ops, notifications: ops.notifications.map((n) => ({ ...n, read: true })) });
   }
 
-  async acceptDelivery(id: string) {
-    await wait();
-    const state = readState();
-    if (state.current) {
-      return { ok: false, message: "Finish your current delivery before accepting another request." };
-    }
-    const request = state.incoming.find((item) => item.id === id);
+  async acceptDelivery(id: string): Promise<ServiceResult> {
+    const ops = readOps();
+    if (ops.current) return { ok: false, message: "Finish your current delivery before accepting another request." };
+    const request = ops.incoming.find((item) => item.id === id);
     if (!request) return { ok: false, message: "This request is no longer available." };
-    const current: DeliveryRequest = {
-      ...request,
-      status: "accepted",
-      acceptedAt: new Date().toISOString(),
-    };
-    writeState({
-      ...state,
-      incoming: state.incoming.filter((item) => item.id !== id),
+    const current: DeliveryRequest = { ...request, status: "accepted", acceptedAt: new Date().toISOString() };
+    writeOps({
+      ...ops,
+      incoming: ops.incoming.filter((item) => item.id !== id),
       current,
-      notifications: state.notifications.map((notification) =>
-        notification.deliveryId === id ? { ...notification, read: true } : notification
-      ),
+      notifications: ops.notifications.map((n) => (n.deliveryId === id ? { ...n, read: true } : n)),
     });
     return { ok: true };
   }
 
-  async markArrived(id: string) {
-    await wait();
-    const state = readState();
-    if (!state.current || state.current.id !== id) {
-      return { ok: false, message: "We couldn't find that active delivery." };
-    }
+  async markArrived(id: string): Promise<ServiceResult> {
+    const ops = readOps();
+    if (!ops.current || ops.current.id !== id) return { ok: false, message: "We couldn't find that active delivery." };
     const completedAt = new Date().toISOString();
-    const completed: DeliveryHistoryItem = {
-      ...state.current,
-      status: "completed",
-      arrivedAt: completedAt,
-      completedAt,
-    };
-    writeState({ ...state, current: null, history: [completed, ...state.history] });
+    const completed: DeliveryHistoryItem = { ...ops.current, status: "completed", arrivedAt: completedAt, completedAt };
+    writeOps({ ...ops, current: null, history: [completed, ...ops.history] });
     return { ok: true };
   }
 
-  async setAvailability(available: boolean) {
-    const state = readState();
-    if (!state.user) return;
-    writeState({ ...state, user: { ...state.user, available } });
+  async setAvailability(_available: boolean) {
+    // no-op for now — will PATCH a real availability column later
   }
 
-  async resetDemo(mode: "incoming" | "empty") {
-    await wait();
-    const current = readState();
-    const next: DemoDeliveryState = {
-      ...createInitialDemoState(),
-      user: current.user ?? { ...DEMO_USER },
-      password: current.password,
-      activationEmail: current.activationEmail,
-    };
-    if (mode === "empty") {
-      next.incoming = [];
-      next.notifications = [];
-    } else {
-      next.incoming = [{ ...DEMO_INCOMING_DELIVERY }];
-      next.notifications = [{ ...DEMO_NOTIFICATION, read: false }];
-    }
-    return writeState(next);
+  async resetDemo(mode: "incoming" | "empty"): Promise<DemoDeliveryState> {
+    const next: OpsState =
+      mode === "empty"
+        ? { incoming: [], current: null, history: readOps().history, notifications: [] }
+        : { incoming: [{ ...DEMO_INCOMING_DELIVERY }], current: null, history: readOps().history, notifications: [{ ...DEMO_NOTIFICATION, read: false }] };
+    writeOps(next);
+    return this.getState();
   }
 }
 
-export const deliveryService: DeliveryService = new MockDeliveryService();
-
+export const deliveryService: DeliveryService = new SupabaseDeliveryService();
 export type { DeliveryUser };
