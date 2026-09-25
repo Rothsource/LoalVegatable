@@ -9,8 +9,7 @@ const navItems = [
   { label: "Users",     href: "/users" },
   { label: "Products",  href: "/products" },
   { label: "Orders",    href: "/orders" },
-  { label: "Categories",href: "/categories" },
-  { label: "Settings",  href: "/settings" },
+
 ];
 
 export default function Sidebar() {
