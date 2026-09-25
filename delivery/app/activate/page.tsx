@@ -1,0 +1,54 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Info, MailCheck } from "lucide-react";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { Button } from "@/components/ui/Button";
+import { FormField } from "@/components/ui/FormField";
+import { useDelivery } from "@/context/DeliveryProvider";
+import { DEMO_AUTH } from "@/lib/demo-data";
+
+export default function ActivatePage() {
+  const router = useRouter();
+  const { startActivation } = useDelivery();
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setError("Enter the Gmail address authorized for your rider account.");
+      return;
+    }
+    setLoading(true);
+    const result = await startActivation(email.trim().toLowerCase());
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.message ?? "This email is not authorized.");
+      return;
+    }
+    router.push("/verify");
+  }
+
+  return (
+    <AuthShell step={1}>
+      <Link href="/login" className="mb-7 inline-flex min-h-10 items-center gap-2 rounded-xl text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]"><ArrowLeft size={16} />Back to login</Link>
+      <span className="grid h-14 w-14 place-items-center rounded-[18px] bg-[var(--surface-soft)] text-[var(--leaf)]"><MailCheck size={25} /></span>
+      <h1 className="mt-6 text-[34px] font-black tracking-[-0.045em] sm:text-[40px]">Activate your account</h1>
+      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Enter the Gmail address approved for Delivery access. We&apos;ll check it before sending a verification code.</p>
+      <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
+        <FormField label="Authorized Gmail" type="email" autoComplete="email" placeholder="name@gmail.com" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} error={error} />
+        <Button type="submit" fullWidth loading={loading} icon={<ArrowRight size={18} />}>Continue</Button>
+      </form>
+      <div className="mt-6 rounded-[18px] border border-[#d7e3d2] bg-[#f1f7ee] p-4">
+        <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.08em] text-[var(--leaf-dark)]"><BadgeCheck size={15} />Demo authorized email</p>
+        <button type="button" onClick={() => { setEmail(DEMO_AUTH.authorizedEmail); setError(""); }} className="mt-2 break-all text-left text-sm font-bold text-[var(--leaf)] hover:underline">{DEMO_AUTH.authorizedEmail}</button>
+      </div>
+      <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-[#7b8678]"><Info size={14} className="mt-0.5 shrink-0" />In production, account authorization will be checked by the Admin/backend system. This demo uses a local mock service.</p>
+    </AuthShell>
+  );
+}
