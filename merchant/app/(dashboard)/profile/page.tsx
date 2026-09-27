@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useDashboard } from "@/lib/dashboardContext";
 import { validateProfilePhoto } from "@/lib/profilePhoto";
 import { supabase } from "@/lib/supabase";
+import { PageHeading } from "@/components/ui/PageHeading";
 
 type Alert = { type: "success" | "error" | "warning"; message: string } | null;
 
@@ -59,6 +60,8 @@ export default function ProfilePage() {
   const [alert, setAlert] = useState<Alert>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
+  const [togglingStatus, setTogglingStatus] = useState(false);
   const profileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,13 +79,21 @@ export default function ProfilePage() {
 
       if (!active || !user) return;
 
-      const { data: profile } = await supabase
-        .from("profile_merchants")
-        .select("full_name, community_name, province, fav_vegetable, profile_url")
-        .eq("id", user.id)
-        .maybeSingle();
+      const [profileResult, statusResult] = await Promise.all([
+        supabase
+          .from("profile_merchants")
+          .select("full_name, community_name, province, fav_vegetable, profile_url")
+          .eq("id", user.id)
+          .maybeSingle(),
+        fetch(`/api/merchant/shop-status?merchantId=${user.id}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
 
       if (!active) return;
+
+      const profile = profileResult.data;
+      if (statusResult?.is_open !== undefined) {
+        setIsOpen(Boolean(statusResult.is_open));
+      }
 
       const savedProfileUrl = typeof profile?.profile_url === "string" ? profile.profile_url : "";
       const loadedFullName = profile?.full_name || INITIAL_ACCOUNT.fullName;
@@ -238,16 +249,38 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleToggleShopStatus() {
+    setTogglingStatus(true);
+    const next = !isOpen;
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch("/api/merchant/shop-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ isOpen: next }),
+      });
+      if (res.ok) {
+        setIsOpen(next);
+        setAlert({
+          type: "success",
+          message: next ? "Shop is now OPEN for customer orders." : "Shop is now CLOSED. Consumers will see 'Closed' status.",
+        });
+      }
+    } catch {
+      setAlert({ type: "error", message: "Failed to update shop status." });
+    } finally {
+      setTogglingStatus(false);
+    }
+  }
+
   return (
-    <div
-      className="min-h-screen bg-[#f5f9f3] text-gray-900"
-      style={{ fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}
-    >
+    <div className="w-full">
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-20">
-        <div>
-          <h1 className="text-xl font-black text-gray-900">Profile</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Manage your merchant account information and security.</p>
-        </div>
+        <PageHeading
+          eyebrow="Merchant Settings"
+          title="Farm Profile"
+          description="Manage your farm shop identity, contact province, and account security."
+        />
 
         {alert && (
           <div
@@ -263,11 +296,12 @@ export default function ProfilePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
-          <form onSubmit={updateAccount} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+          <form onSubmit={updateAccount} className="bg-white rounded-[24px] border border-[#dfe6d9] card-shadow p-6 space-y-5">
             <div>
-              <h2 className="text-base font-black text-gray-900">Merchant account</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Edit shop and owner details shown across the dashboard.</p>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--leaf)] mb-1">Identity & Location</p>
+              <h2 className="text-lg font-black text-[var(--foreground)] font-heading">Merchant Account</h2>
+              <p className="text-xs text-[#556353] mt-0.5">Edit shop and grower details shown across the community marketplace.</p>
             </div>
 
             <div className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center">
@@ -377,34 +411,86 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={saving}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-sm font-bold px-5 py-3 rounded-xl transition shadow-sm"
+              className="bg-[var(--leaf-dark)] hover:bg-[var(--leaf)] disabled:opacity-50 text-white text-sm font-bold px-6 py-3 rounded-xl transition shadow-sm cursor-pointer"
             >
-              {saving ? (profileFile ? "Uploading and saving..." : "Saving...") : "Update account"}
+              {saving ? (profileFile ? "Uploading and saving..." : "Saving...") : "Save Changes"}
             </button>
           </form>
 
-          <section className="bg-white rounded-2xl border border-red-100 shadow-sm p-5 space-y-4">
-            <div>
-              <h2 className="text-base font-black text-red-600">Delete account</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Permanently removes the merchant login. Type DELETE to confirm.
+          <div className="space-y-6">
+            {/* Store Operations & Shop Open/Closed Status */}
+            <section className="bg-white rounded-[24px] border border-[#dfe6d9] card-shadow p-6 space-y-4">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--leaf-dark)] mb-1">Store Operations</p>
+                <h2 className="text-base font-black text-[#182216] font-heading">Shop Operating Status</h2>
+                <p className="text-xs text-[#556353] mt-0.5">
+                  Control whether consumers can browse and place new vegetable orders from your farm.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-2xl border border-[#dfe6d9] bg-[#fafbf9]">
+                <div className="flex items-center gap-3">
+                  <span className={`w-3.5 h-3.5 rounded-full ${isOpen ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"}`} />
+                  <div>
+                    <p className={`text-sm font-black ${isOpen ? "text-emerald-900" : "text-neutral-700"}`}>
+                      {isOpen ? "Shop is Open" : "Shop is Closed"}
+                    </p>
+                    <p className="text-[11px] text-[#647060]">
+                      {isOpen ? "Accepting orders • Linked distributors online" : "Orders paused • Linked distributors offline"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Modern Interactive Toggle Switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isOpen}
+                  onClick={handleToggleShopStatus}
+                  disabled={togglingStatus}
+                  className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    isOpen ? "bg-emerald-600" : "bg-neutral-300"
+                  } ${togglingStatus ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      isOpen ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <p className="text-[11px] text-[#71826d] leading-relaxed">
+                ℹ️ <strong>Synchronized:</strong> When you toggle your shop open or closed, all your linked distributors are automatically synchronized.
               </p>
-            </div>
-            <input
-              className={inputClass()}
-              value={deletePhrase}
-              onChange={(e) => setDeletePhrase(e.target.value)}
-              placeholder="DELETE"
-            />
-            <button
-              type="button"
-              disabled={!canDelete || deleting}
-              onClick={deleteAccount}
-              className="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-200 text-white text-sm font-bold px-5 py-3 rounded-xl transition"
-            >
-              {deleting ? "Deleting..." : "Delete merchant account"}
-            </button>
-          </section>
+            </section>
+
+            {/* Danger Zone */}
+            <section className="bg-white rounded-[24px] border border-red-200 card-shadow p-6 space-y-4">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-red-600 mb-1">Danger Zone</p>
+                <h2 className="text-base font-black text-red-600 font-heading">Delete Account</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Permanently removes the merchant login. Type DELETE to confirm.
+                </p>
+              </div>
+              <input
+                className={inputClass()}
+                value={deletePhrase}
+                onChange={(e) => setDeletePhrase(e.target.value)}
+                placeholder="DELETE"
+              />
+              <button
+                type="button"
+                disabled={!canDelete || deleting}
+                onClick={deleteAccount}
+                className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white text-sm font-bold px-5 py-3 rounded-xl transition cursor-pointer"
+              >
+                {deleting ? "Deleting..." : "Delete Merchant Account"}
+              </button>
+            </section>
+          </div>
         </div>
       </main>
     </div>

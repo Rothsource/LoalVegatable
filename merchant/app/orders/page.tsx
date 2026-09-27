@@ -390,15 +390,15 @@ function OrderModal({
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-800">{item.name}</p>
-                      <p className="text-xs text-gray-400">×{item.qty} · ${item.price.toFixed(2)} each</p>
+                      <p className="text-xs text-gray-400">×{item.qty} · {Math.round(item.price * (item.price < 50 ? 4000 : 1)).toLocaleString()} KHR each</p>
                     </div>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">${(item.qty * item.price).toFixed(2)}</p>
+                  <p className="text-sm font-bold text-gray-900">{Math.round(item.qty * item.price * (item.price < 50 ? 4000 : 1)).toLocaleString()} KHR</p>
                 </div>
               ))}
               <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
                 <p className="text-sm font-black text-gray-700">Total</p>
-                <p className="text-base font-black text-green-600">${order.total.toFixed(2)}</p>
+                <p className="text-base font-black text-green-600">{Math.round(order.total * (order.total < 100 ? 4000 : 1)).toLocaleString()} KHR</p>
               </div>
             </div>
           </div>
@@ -602,7 +602,7 @@ export default function OrdersPage() {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-base font-black text-gray-900">${order.total.toFixed(2)}</p>
+                      <p className="text-base font-black text-gray-900">{Math.round(order.total * (order.total < 100 ? 4000 : 1)).toLocaleString()} KHR</p>
                       <p className="text-[10px] text-gray-400 mt-0.5">{order.time}</p>
                     </div>
                     <svg className="w-4 h-4 text-gray-300 group-hover:text-green-500 transition flex-shrink-0"

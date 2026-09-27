@@ -9,12 +9,27 @@ export function stockStatus(qty: number) {
 }
 
 export function isExpired(date: string) {
-  return !!date && new Date(date).getTime() < Date.now();
+  if (!date) return false;
+  const trimmed = date.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const endOfDay = new Date(`${trimmed}T23:59:59.999`);
+    return !isNaN(endOfDay.getTime()) && endOfDay.getTime() < Date.now();
+  }
+  const d = new Date(trimmed);
+  return !isNaN(d.getTime()) && d.getTime() < Date.now();
 }
 
 export function isExpiringSoon(date: string) {
   if (!date) return false;
-  const diff = new Date(date).getTime() - Date.now();
+  const trimmed = date.trim();
+  let expiryTime: number;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    expiryTime = new Date(`${trimmed}T23:59:59.999`).getTime();
+  } else {
+    expiryTime = new Date(trimmed).getTime();
+  }
+  if (isNaN(expiryTime)) return false;
+  const diff = expiryTime - Date.now();
   return diff > 0 && diff < 1000 * 60 * 60 * 24 * 3;
 }
 

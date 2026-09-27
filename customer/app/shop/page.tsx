@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ProductGridSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
+import { isProductExpired, getTodayDateString } from '@/lib/expiry';
 
 const brandGreen = '#0DB30D';
 const deepGreen = '#0A490A';
@@ -29,6 +30,7 @@ interface Product {
   shopName: string;
   shopAvatar: string;
   shopLocation: string;
+  isShopOpen?: boolean;
 }
 
 interface CartItem extends Product {
@@ -127,6 +129,8 @@ export default function ShopPage() {
     async function fetchProducts() {
     setLoading(true);
 
+    const today = getTodayDateString();
+
     const { data, error } = await supabase
       .from('products')
       .select(`
@@ -135,26 +139,37 @@ export default function ShopPage() {
         merchant_id, category_id,
         categories ( name )
       `)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .or(`expire_date.is.null,expire_date.gte.${today}`);
 
     if (error) { console.error(error); setLoading(false); return; }
 
-    const merchantIds = [...new Set((data ?? []).map((p: any) => p.merchant_id).filter(Boolean))];
-    const productIds = (data ?? []).map((p: any) => p.id);
+    const validData = (data ?? []).filter((p: any) => !isProductExpired(p.expire_date));
 
-    // Run merchants + reviews in parallel instead of one after another
-    const [merchantsRes, reviewsRes] = await Promise.all([
-      supabase
-        .from('profile_merchants')
-        .select('id, full_name, community_name, province, profile_url')
-        .in('id', merchantIds),
+    const merchantIds = [...new Set(validData.map((p: any) => p.merchant_id).filter(Boolean))];
+    const productIds = validData.map((p: any) => p.id);
+
+    // Run merchants + reviews + shopStatuses in parallel
+    const [merchantsRes, reviewsRes, shopStatusesRes] = await Promise.all([
+      merchantIds.length > 0
+        ? supabase
+            .from('profile_merchants')
+            .select('id, full_name, community_name, province, profile_url')
+            .in('id', merchantIds)
+        : Promise.resolve({ data: [] as any[] }),
       productIds.length > 0
         ? supabase.from('reviews').select('product_id, rating').in('product_id', productIds)
         : Promise.resolve({ data: [] as any[] }),
+      merchantIds.length > 0
+        ? fetch(`/api/shop-status?merchantIds=${encodeURIComponent(merchantIds.join(','))}`)
+            .then(r => r.ok ? r.json() : { statuses: {} })
+            .catch(() => ({ statuses: {} }))
+        : Promise.resolve({ statuses: {} }),
     ]);
 
     const merchants = merchantsRes.data;
     const reviews = reviewsRes.data;
+    const shopStatusMap: Record<string, boolean> = shopStatusesRes?.statuses || {};
 
     const merchantMap: Record<string, any> = {};
     (merchants ?? []).forEach(m => { merchantMap[m.id] = m; });
@@ -171,8 +186,9 @@ export default function ShopPage() {
       });
     }
 
-    const mapped: Product[] = (data ?? []).map((p: any) => {
+    const mapped: Product[] = validData.map((p: any) => {
       const merchant = merchantMap[p.merchant_id] ?? {};
+      const isShopOpen = p.merchant_id ? (shopStatusMap[p.merchant_id] ?? true) : true;
       return {
         id: p.id,
         name: p.name,
@@ -184,13 +200,14 @@ export default function ShopPage() {
         popularity: p.stock_quantity ?? 0,
         rating: ratingMap[p.id] ?? 0,
         isAvailable: p.is_active && p.stock_quantity > 0,
-        img: p.profile_pic_url ?? '',
+        isShopOpen,
+        img: p.profile_pic_url || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
         quantity: p.stock_quantity ?? 0,
         harvestDate: p.harvest_date ?? '',
         sellByDate: p.expire_date ?? '',
         shopSlug: p.merchant_id ?? '',
-        shopName: merchant.full_name ?? '',
-        shopAvatar: merchant.profile_url ?? '',
+        shopName: merchant.community_name ?? merchant.full_name ?? 'Local Farm',
+        shopAvatar: merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant.community_name || merchant.full_name || 'Farm')}&background=0DB30D&color=fff&size=50`,
         shopLocation: merchant.province ?? '',
       };
     });
@@ -240,10 +257,11 @@ export default function ShopPage() {
     } catch (e) {}
   }, []);
 
-  // Load favorites — UNCHANGED
+  // Load favorites
   useEffect(() => {
     async function loadFavorites() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? (await supabase.auth.getUser()).data?.user;
       if (!user) return;
       const { data } = await supabase
         .from('favourite_vegetables')
@@ -310,8 +328,10 @@ export default function ShopPage() {
   // addToCart — UNCHANGED
   const addToCart = (product: Product, qty: number) => {
     if (!requireAuth()) return;
+    if (product.quantity <= 0) return;
+    const addAmount = Math.max(1, qty);
     const existing = cartItems[product.id]?.qty ?? 0;
-    const newQty = Math.min(existing + qty, product.quantity);
+    const newQty = Math.max(1, Math.min(existing + addAmount, product.quantity));
     setCartItems(prev => ({ ...prev, [product.id]: { ...product, qty: newQty } }));
     setPendingQty(prev => ({ ...prev, [product.id]: 1 }));
     try {
@@ -325,10 +345,12 @@ export default function ShopPage() {
     if (newQty <= 0) { removeFromCart(productId); return; }
     const item = cartItems[productId];
     if (!item) return;
-    setCartItems(prev => ({ ...prev, [productId]: { ...prev[productId], qty: newQty } }));
+    const maxQty = item.quantity || 999;
+    const clamped = Math.max(1, Math.min(newQty, maxQty));
+    setCartItems(prev => ({ ...prev, [productId]: { ...prev[productId], qty: clamped } }));
     try {
       const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
-      if (stored[productId]) { stored[productId].qty = newQty; localStorage.setItem('cart-products', JSON.stringify(stored)); }
+      if (stored[productId]) { stored[productId].qty = clamped; localStorage.setItem('cart-products', JSON.stringify(stored)); }
     } catch (e) {}
   };
 
@@ -383,8 +405,12 @@ export default function ShopPage() {
             onClick={e => e.stopPropagation()}
             style={{ background: '#fff', maxWidth: '560px', width: '100%', borderRadius: '32px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', maxHeight: '90vh', overflowY: 'auto', animation: 'modalIn 0.25s cubic-bezier(0.16,1,0.3,1)' }}
           >
-            <img src={selectedProduct.img} alt={selectedProduct.name}
-              style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }} />
+            <img
+              src={selectedProduct.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'}
+              alt={selectedProduct.name}
+              style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }}
+              onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'; }}
+            />
             <button onClick={() => setSelectedProduct(null)}
               style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <X size={18} color="#fff" />
@@ -432,9 +458,12 @@ export default function ShopPage() {
               <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '18px', marginBottom: '22px' }}>
                 <p style={{ fontSize: '11px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px' }}>Sold By</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <img src={selectedProduct.shopAvatar} alt=""
+                  <img
+                    src={selectedProduct.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`}
+                    alt=""
                     style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #eff6ef' }}
-                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName)}&background=0DB30D&color=fff&size=50`; }} />
+                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`; }}
+                  />
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: '800', fontSize: '15px', color: deepGreen }}>{selectedProduct.shopName}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#888', fontSize: '13px', marginTop: '3px' }}>
@@ -454,15 +483,21 @@ export default function ShopPage() {
                   style={{ padding: '10px 13px', borderRadius: '12px', border: '2px solid #f0f0f0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Heart size={20} fill={favorites.includes(selectedProduct.id) ? '#ef4444' : 'none'} color={favorites.includes(selectedProduct.id) ? '#ef4444' : '#333'} />
                 </button>
-                {selectedProduct.isAvailable && (
+                {selectedProduct.isShopOpen !== false && selectedProduct.isAvailable && (
                   <QtyStepperLg value={modalQty} onChange={setModalQty} max={selectedProduct.quantity} />
                 )}
-                <button
-                  disabled={!selectedProduct.isAvailable}
-                  onClick={() => { addToCart(selectedProduct, modalQty); setModalQty(1); setSelectedProduct(null); }}
-                  style={{ flex: 1, backgroundColor: selectedProduct.isAvailable ? brandGreen : '#f3f4f6', color: selectedProduct.isAvailable ? '#fff' : '#9ca3af', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '800', cursor: selectedProduct.isAvailable ? 'pointer' : 'not-allowed', fontSize: '14px', fontFamily: 'inherit' }}>
-                  {selectedProduct.isAvailable ? `Add${modalQty > 1 ? ` ${modalQty}` : ''} to Basket` : 'Out of Stock'}
-                </button>
+                {selectedProduct.isShopOpen === false ? (
+                  <button disabled style={{ flex: 1, backgroundColor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '14px', borderRadius: '12px', fontWeight: '800', cursor: 'not-allowed', fontSize: '13px', fontFamily: 'inherit' }}>
+                    Shop Closed (Temporarily)
+                  </button>
+                ) : (
+                  <button
+                    disabled={!selectedProduct.isAvailable}
+                    onClick={() => { addToCart(selectedProduct, modalQty); setModalQty(1); setSelectedProduct(null); }}
+                    style={{ flex: 1, backgroundColor: selectedProduct.isAvailable ? brandGreen : '#f3f4f6', color: selectedProduct.isAvailable ? '#fff' : '#9ca3af', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '800', cursor: selectedProduct.isAvailable ? 'pointer' : 'not-allowed', fontSize: '14px', fontFamily: 'inherit' }}>
+                    {selectedProduct.isAvailable ? `Add${modalQty > 1 ? ` ${modalQty}` : ''} to Basket` : 'Out of Stock'}
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => { setSelectedProduct(null); if (requireAuth()) window.location.href = `/shop/${selectedProduct!.shopSlug}`; }}
@@ -509,8 +544,12 @@ export default function ShopPage() {
                 </div>
               ) : cartList.map(item => (
                 <div key={item.id} style={{ display: 'flex', gap: '12px', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' }}>
-                  <img src={item.img} style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} alt=""
-                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=eff6ef&color=0A490A&size=60`; }} />
+                  <img
+                    src={item.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'}
+                    style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
+                    alt=""
+                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'Produce')}&background=eff6ef&color=0A490A&size=60`; }}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h5 style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: '700', color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</h5>
                     <p style={{ margin: '0 0 8px', color: '#9ca3af', fontSize: '12px' }}>{item.price.toLocaleString()} KHR / {item.unit}</p>
@@ -671,7 +710,7 @@ export default function ShopPage() {
         {loading ? (
           <div className="mb-20 space-y-6">
             <div className="flex items-center justify-center py-2">
-              <CircularLoader size={40} />
+              <CircularLoader size={40} label="Gathering fresh produce…" />
             </div>
             <ProductGridSkeleton count={8} />
           </div>
@@ -707,7 +746,18 @@ export default function ShopPage() {
                     <Heart size={16} fill={isFav ? "#ef4444" : "none"} color={isFav ? "#ef4444" : "#999"} />
                   </button>
 
-                  <img src={product.img} style={{ width: '100%', height: '185px', objectFit: 'cover', opacity: product.isAvailable ? 1 : 0.55 }} alt={product.name} />
+                  {product.isShopOpen === false && (
+                    <div style={{ position: 'absolute', top: '14px', left: '14px', zIndex: 10, backgroundColor: '#991b1b', color: '#fff', fontSize: '10px', fontWeight: '800', padding: '4px 9px', borderRadius: '7px', boxShadow: '0 2px 6px rgba(0,0,0,0.25)', letterSpacing: '0.04em' }}>
+                      SHOP CLOSED
+                    </div>
+                  )}
+
+                  <img
+                    src={product.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'}
+                    style={{ width: '100%', height: '185px', objectFit: 'cover', opacity: product.isShopOpen === false ? 0.6 : product.isAvailable ? 1 : 0.55 }}
+                    alt={product.name}
+                    onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'; }}
+                  />
 
                   <div style={{ padding: '16px' }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: brandGreen }}>{product.category}</span>
@@ -724,7 +774,12 @@ export default function ShopPage() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px', padding: '8px 10px', backgroundColor: '#f9fafb', borderRadius: '10px' }}>
-                      <img src={product.shopAvatar} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" />
+                      <img
+                        src={product.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`}
+                        style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                        alt=""
+                        onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`; }}
+                      />
                       <div style={{ minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#444', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.shopName}</p>
                         <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>{product.shopLocation}</p>
@@ -737,7 +792,11 @@ export default function ShopPage() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={e => e.stopPropagation()}>
-                      {product.isAvailable ? (
+                      {product.isShopOpen === false ? (
+                        <button disabled style={{ width: '100%', backgroundColor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', height: '34px', borderRadius: '10px', fontWeight: '700', cursor: 'not-allowed', fontSize: '12px', fontFamily: 'inherit' }}>
+                          Shop Closed (Temporarily)
+                        </button>
+                      ) : product.isAvailable ? (
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <QtyStepper value={pQty} onChange={v => setPendingQty(prev => ({ ...prev, [product.id]: v }))} max={product.quantity} />
                           <button onClick={() => addToCart(product, pQty)}

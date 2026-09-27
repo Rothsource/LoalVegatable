@@ -8,8 +8,8 @@ import {
 } from "../lib/starterProducts.ts";
 
 test("formats whole-number Khmer riel prices", () => {
-  assert.equal(formatKHR(4000), "៛ 4,000");
-  assert.equal(formatKHR(12500), "៛ 12,500");
+  assert.equal(formatKHR(4000), "4,000 KHR");
+  assert.equal(formatKHR(12500), "12,500 KHR");
 });
 
 test("defines ten starter vegetables with unique stable slugs", () => {

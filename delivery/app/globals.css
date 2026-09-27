@@ -2,22 +2,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf7f0;
-  --foreground: #2c3e1f;
-  --canvas: #fbf8f2;
+  --background: #f8f5ee;
+  --foreground: #231b14;
+  --canvas: #fbf9f5;
   --surface: #ffffff;
-  --surface-soft: #edf4e8;
-  --leaf: #0DB30D;
-  --leaf-dark: #0A490A;
-  --soil: #3B2B20;
-  --leaf-accent: #2E6F40;
-  --sprout: #6FAE5C;
-  --paper: #FBF8F2;
-  --line: #dfe6d9;
-  --ink: #2c3e1f;
-  --muted: #556353;
-  --lime: #dff0a9;
-  --amber: #b96a1d;
+  --surface-soft: #efeae1;
+  --leaf: #1b4332;
+  --leaf-dark: #0f281e;
+  --leaf-accent: #2d6a4f;
+  --soil: #4a3525;
+  --soil-dark: #2d1f15;
+  --soil-light: #6f4e37;
+  --sprout: #40916c;
+  --paper: #faf7f2;
+  --line: #e2dad0;
+  --ink: #231b14;
+  --muted: #68594e;
+  --lime: #d8e2dc;
+  --amber: #935626;
+  --leather: #855838;
+  --tan: #ddb892;
   --danger: #b94a48;
 }
 
@@ -35,7 +39,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at 90% 0%, rgba(111, 174, 92, 0.10), transparent 26rem),
+    radial-gradient(circle at 90% 0%, rgba(74, 53, 37, 0.06), transparent 28rem),
+    radial-gradient(circle at 10% 20%, rgba(27, 67, 50, 0.05), transparent 32rem),
     var(--background);
   color: var(--foreground);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;

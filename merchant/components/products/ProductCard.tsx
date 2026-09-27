@@ -28,9 +28,9 @@ export function ProductCard({
 
   return (
     <div
-      className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-md transition-all group
+      className={`bg-white rounded-[24px] border card-shadow card-lift overflow-hidden group
         ${!p.active ? "opacity-60" : ""}
-        ${isSelected ? "border-green-400 ring-2 ring-green-100" : "border-gray-100"}`}
+        ${isSelected ? "border-[var(--leaf)] ring-2 ring-[var(--leaf)]/20" : "border-[#dfe6d9]"}`}
     >
       {/* Image area */}
       <div className="relative h-48 bg-gray-100 overflow-hidden">

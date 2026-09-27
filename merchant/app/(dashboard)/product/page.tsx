@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 import { Product, FormState, EMPTY_FORM } from "@/types/product";
-import { validateForm } from "@/lib/productHelpers";
+import { validateForm, isExpired } from "@/lib/productHelpers";
 
 import { useToast, ToastContainer } from "@/components/products/ProductToast";
 import { ProductCard } from "@/components/products/ProductCard";
@@ -12,6 +12,7 @@ import { DeleteConfirmModal } from "@/components/products/DeleteConfirmModal";
 import { BulkConfirmModal } from "@/components/products/BulkConfirmModal";
 import { PermanentDeleteProductModal } from "@/components/products/PermanentDeleteProductModal";
 import { Icons } from "@/components/products/ProductIcons";
+import { PageHeading } from "@/components/ui/PageHeading";
 
 export default function ProductsPage() {
   const { toasts, toast, remove } = useToast();
@@ -19,7 +20,7 @@ export default function ProductsPage() {
   const [products, setProducts]         = useState<Product[]>([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState("");
-  const [statusFilter, setStatusFilter] = useState<"active" | "archived">("active");
+  const [statusFilter, setStatusFilter] = useState<"active" | "expired" | "archived">("active");
   const [showModal, setShowModal]       = useState(false);
   const [editProduct, setEditProduct]   = useState<Product | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
@@ -70,12 +71,23 @@ export default function ProductsPage() {
 
   const filtered = useMemo(() => {
     const query = search.toLowerCase();
-    return products.filter(
-      (product) =>
-        product.active === (statusFilter === "active") &&
-        (product.name.toLowerCase().includes(query) ||
-          product.description.toLowerCase().includes(query))
-    );
+    return products.filter((product) => {
+      const matchesSearch =
+        product.name.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+
+      if (statusFilter === "expired") {
+        return isExpired(product.expireDate);
+      }
+      if (statusFilter === "active") {
+        return product.active && !isExpired(product.expireDate);
+      }
+      if (statusFilter === "archived") {
+        return !product.active;
+      }
+      return true;
+    });
   }, [products, search, statusFilter]);
 
   const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
@@ -248,57 +260,64 @@ export default function ProductsPage() {
     setPermanentDeleteTarget(null);
   }
 
+  const expiredCount = products.filter((p) => isExpired(p.expireDate)).length;
+  const activeCount  = products.filter((p) => p.active && !isExpired(p.expireDate)).length;
   const stats = [
     { label: "Total",        value: products.length,                                color: "text-gray-900"  },
-    { label: "Active",       value: products.filter((p) => p.active).length,        color: "text-green-600" },
-    { label: "Archived",     value: products.filter((p) => !p.active).length,       color: "text-gray-500"  },
+    { label: "Active Live",  value: activeCount,                                    color: "text-green-600" },
+    { label: "Expired",      value: expiredCount,                                   color: expiredCount > 0 ? "text-red-600" : "text-gray-500" },
     { label: "Low / Out",    value: products.filter((p) => p.active && p.quantity <= 10).length, color: "text-amber-500" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#f5f9f3] text-gray-900"
-      style={{ fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
+    <div className="w-full">
       <ToastContainer toasts={toasts} onRemove={remove} />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-5 pb-24">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-black text-gray-900">Products</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
-              {products.length} total · {products.filter((p) => p.active).length} active
-            </p>
-          </div>
-          <button onClick={openAdd}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-4 py-2 rounded-xl transition shadow-sm">
-            <Icons.Plus /> Add product
-          </button>
-        </div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-24">
+        <PageHeading
+          eyebrow="Produce Catalog"
+          title="Vegetable Inventory"
+          description={`${products.length} total crops registered · ${products.filter((p) => p.active).length} active in community marketplace`}
+          action={
+            <button onClick={openAdd}
+              className="flex items-center gap-2 bg-[var(--leaf-dark)] hover:bg-[var(--leaf)] text-white text-sm font-bold px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer border border-[#2e6f40]">
+              <Icons.Plus /> Add Crop
+            </button>
+          }
+        />
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">{s.label}</p>
-              <p className={`text-2xl font-black mt-1 ${s.color}`}>{s.value}</p>
+            <div key={s.label} className="bg-white rounded-[22px] border border-[#dfe6d9] card-shadow p-4">
+              <p className="text-[10px] text-[#7d8b79] font-extrabold uppercase tracking-wider">{s.label}</p>
+              <p className={`text-2xl font-black mt-1 font-heading ${s.color}`}>{s.value}</p>
             </div>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-xl border border-gray-200 bg-white p-1">
-            {(["active", "archived"] as const).map((filter) => (
+          <div className="flex rounded-xl border border-[#dfe6d9] bg-white p-1">
+            {(["active", "expired", "archived"] as const).map((filter) => (
               <button
                 key={filter}
                 onClick={() => {
                   setStatusFilter(filter);
                   setSelected(new Set());
                 }}
-                className={`rounded-lg px-4 py-2 text-xs font-bold capitalize transition ${
+                className={`rounded-lg px-4 py-2 text-xs font-extrabold capitalize transition cursor-pointer flex items-center gap-1.5 ${
                   statusFilter === filter
-                    ? "bg-green-600 text-white"
-                    : "text-gray-500 hover:bg-gray-50"
+                    ? "bg-[var(--leaf-dark)] text-white shadow-xs"
+                    : "text-[#556353] hover:bg-[#fafbf9]"
                 }`}
               >
-                {filter}
+                <span>{filter}</span>
+                {filter === "expired" && expiredCount > 0 && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    statusFilter === "expired" ? "bg-red-500 text-white" : "bg-red-100 text-red-700"
+                  }`}>
+                    {expiredCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -307,7 +326,7 @@ export default function ProductsPage() {
               <Icons.Search />
             </span>
             <input type="text"
-              className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-9 py-2.5 text-sm text-gray-900 outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100 transition placeholder:text-gray-400"
+              className="w-full bg-white border border-[#dfe6d9] rounded-xl pl-9 pr-9 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--leaf)] focus:ring-2 focus:ring-[var(--leaf)]/10 transition placeholder:text-gray-400"
               placeholder={`Search ${statusFilter} products...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -339,6 +358,16 @@ export default function ProductsPage() {
           </div>
         )}
 
+        {statusFilter === "expired" && expiredCount > 0 && (
+          <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-3">
+            <span className="text-xl">⚠️</span>
+            <div className="text-xs">
+              <p className="font-bold text-amber-900">Expired crops are hidden from the customer store</p>
+              <p className="text-amber-700 mt-0.5">Click <strong>Edit</strong> on any product below and update the <strong>Expire date</strong> to restore it to the live marketplace.</p>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-28 text-gray-400">
             <p className="text-sm font-semibold">Loading products...</p>
@@ -352,6 +381,8 @@ export default function ProductsPage() {
             <p className="text-sm text-gray-400 mt-1">
               {statusFilter === "active"
                 ? "Try a different search or add a new product"
+                : statusFilter === "expired"
+                ? "Great news! No crops are currently expired."
                 : "Products you archive will stay here until you restore them"}
             </p>
             {statusFilter === "active" && (

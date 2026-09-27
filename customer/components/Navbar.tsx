@@ -48,12 +48,13 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!isLoggedIn) { setActiveOrderCount(0); return; }
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data?.user) return;
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data?.session?.user;
+      if (!user) return;
       supabase
         .from('orders')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', data.user.id)
+        .eq('user_id', user.id)
         .in('status', ['pending', 'accepted', 'out_for_delivery', 'delivering'])
         .then(({ count }) => {
           if (count !== null) setActiveOrderCount(count);
@@ -72,8 +73,8 @@ export default function Navbar() {
   useEffect(() => {
     let active = true;
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (active) setIsLoggedIn(!!data.user);
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setIsLoggedIn(!!data.session?.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {

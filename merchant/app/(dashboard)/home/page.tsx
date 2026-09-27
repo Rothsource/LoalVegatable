@@ -8,9 +8,9 @@ import { supabase } from "@/lib/supabase";
 type Filter = "day" | "week" | "month";
 
 const STATS: Record<Filter, { revenue: string; orders: number; sold: number; customers: number; revenueData: number[] }> = {
-  day:   { revenue: "$124.50",   orders: 8,   sold: 34,  customers: 7,   revenueData: [20, 45, 30, 60, 38, 55, 124]             },
-  week:  { revenue: "$872.00",   orders: 53,  sold: 210, customers: 41,  revenueData: [210, 340, 280, 420, 390, 520, 872]        },
-  month: { revenue: "$3,410.00", orders: 198, sold: 847, customers: 132, revenueData: [1200, 1800, 2100, 1600, 2400, 2900, 3410] },
+  day:   { revenue: "510,000 KHR",    orders: 8,   sold: 34,  customers: 7,   revenueData: [82000, 185000, 120000, 245000, 155000, 225000, 510000] },
+  week:  { revenue: "3,575,000 KHR",  orders: 53,  sold: 210, customers: 41,  revenueData: [860000, 1390000, 1140000, 1720000, 1600000, 2130000, 3575000] },
+  month: { revenue: "13,980,000 KHR", orders: 198, sold: 847, customers: 132, revenueData: [4900000, 7380000, 8610000, 6560000, 9840000, 11890000, 13980000] },
 };
 
 const WEEK_LABELS: Record<Filter, string[]> = {
@@ -20,10 +20,10 @@ const WEEK_LABELS: Record<Filter, string[]> = {
 };
 
 const RECENT_ORDERS = [
-  { id: "#0041", customer: "Sophea K.", items: "Organic Bok Choy x3, Morning Glory x2", total: "$9.00",  status: "Delivered", time: "2h ago"  },
-  { id: "#0040", customer: "Dara M.",   items: "Khmer Spinach x2, Farm Tomatoes x1",      total: "$5.60",  status: "Pending",   time: "4h ago"  },
-  { id: "#0039", customer: "Bopha S.",  items: "Fresh Morning Glory x4",                 total: "$6.00",  status: "Preparing", time: "5h ago"  },
-  { id: "#0038", customer: "Vanna T.",  items: "Hydroponic Lettuce x5, Spinach x1",       total: "$11.80", status: "Delivered", time: "Yesterday" },
+  { id: "#0041", customer: "Sophea K.", items: "Organic Bok Choy x3, Morning Glory x2", total: "36,000 KHR", status: "Delivered", time: "2h ago"  },
+  { id: "#0040", customer: "Dara M.",   items: "Khmer Spinach x2, Farm Tomatoes x1",      total: "22,400 KHR", status: "Pending",   time: "4h ago"  },
+  { id: "#0039", customer: "Bopha S.",  items: "Fresh Morning Glory x4",                 total: "24,000 KHR", status: "Preparing", time: "5h ago"  },
+  { id: "#0038", customer: "Vanna T.",  items: "Hydroponic Lettuce x5, Spinach x1",       total: "47,200 KHR", status: "Delivered", time: "Yesterday" },
 ];
 
 type Product = {
@@ -57,8 +57,6 @@ export default function HomePage() {
   const [greeting, setGreeting] = useState("Good morning");
   const [mounted, setMounted]   = useState(false);
   const [loading, setLoading]   = useState(true);
-  const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [locationMessage, setLocationMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -94,45 +92,6 @@ export default function HomePage() {
     setEditingId(null);
   };
 
-  async function shareLocation() {
-    if (!navigator.geolocation) {
-      setLocationStatus("error");
-      setLocationMessage("Location isn't supported on this device.");
-      return;
-    }
-
-    setLocationStatus("loading");
-    setLocationMessage("Locating farm shop...");
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const res = await fetch("/api/merchant/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            }),
-          });
-          if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error ?? "Failed to share location.");
-          }
-          setLocationStatus("success");
-          setLocationMessage("Your farm shop location was broadcast to active couriers.");
-        } catch (err) {
-          setLocationStatus("error");
-          setLocationMessage(err instanceof Error ? err.message : "Failed to share location.");
-        }
-      },
-      () => {
-        setLocationStatus("error");
-        setLocationMessage("Location permission was denied.");
-      }
-    );
-  }
-
   const lowStockProducts = products.filter((p) => p.stock_quantity <= 10);
 
   return (
@@ -140,15 +99,15 @@ export default function HomePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 pb-20">
 
         {/* HERO BANNER */}
-        <section className="relative rounded-3xl overflow-hidden h-56 sm:h-64 shadow-[0_12px_36px_rgba(44,62,31,0.08)] border border-[#dfe6d9]">
+        <section className="relative rounded-[28px] overflow-hidden h-56 sm:h-64 card-shadow border border-[#dfe6d9]">
           <Image src="https://images.unsplash.com/photo-1540420773420-3366772f4999?w=1400&h=600&fit=crop" alt="Fresh vegetables" fill className="object-cover scale-105" priority />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#172813]/90 via-[#23381d]/75 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#172813]/90 via-[#23381d]/80 to-transparent" />
           <div className={`absolute inset-0 flex flex-col justify-center px-8 sm:px-12 transition-all duration-700 ${mounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}>
-            <span className="text-[#9fe39a] text-xs font-bold tracking-widest uppercase mb-1.5">{greeting}, Grower</span>
+            <span className="text-[#9fe39a] text-[10px] font-extrabold tracking-[0.2em] uppercase mb-1.5">{greeting}, Grower</span>
             <h1 className="text-white text-2xl sm:text-4xl font-black leading-tight font-heading">{merchantName}&apos;s Harvest Market</h1>
             <p className="text-white/80 text-xs sm:text-sm mt-1 max-w-lg">Manage real-time produce stock, accept customer orders, and coordinate daily dispatches.</p>
             <div className="flex gap-3 mt-5 flex-wrap">
-              <Link href="/product" className="px-5 py-2.5 bg-[var(--leaf)] text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-[var(--leaf-dark)] transition shadow-sm">+ Add New Crop</Link>
+              <Link href="/product" className="px-5 py-2.5 bg-[var(--leaf-dark)] text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-[var(--leaf)] transition shadow-sm border border-[#2e6f40]">+ Add New Crop</Link>
               <Link href="/order" className="px-5 py-2.5 bg-white/15 backdrop-blur text-white border border-white/25 rounded-xl text-xs sm:text-sm font-bold hover:bg-white/25 transition">View Customer Orders</Link>
             </div>
           </div>
@@ -161,16 +120,17 @@ export default function HomePage() {
           <div className="lg:col-span-7 space-y-8">
 
             {/* SALES OVERVIEW */}
-            <section className="bg-white rounded-3xl p-6 border border-[#dfe6d9] shadow-sm">
+            <section className="bg-white rounded-[24px] p-6 border border-[#dfe6d9] card-shadow">
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h2 className="text-base font-bold text-[var(--foreground)] font-heading">Sales & Revenue Metrics</h2>
-                  <p className="text-xs text-[#7d8b79] mt-0.5">Overview of customer checkouts and produce volume</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--leaf)] mb-1">Financial Insights</p>
+                  <h2 className="text-lg font-black text-[var(--foreground)] font-heading">Sales & Revenue Metrics</h2>
+                  <p className="text-xs text-[#556353] mt-0.5">Overview of customer checkouts and produce volume in KHR</p>
                 </div>
                 <div className="flex bg-[#faf7f0] border border-[#dfe6d9] rounded-xl overflow-hidden text-xs font-bold p-0.5">
                   {(["day", "week", "month"] as Filter[]).map((f) => (
                     <button key={f} onClick={() => setFilter(f)}
-                      className={`px-3 py-1.5 rounded-lg transition capitalize cursor-pointer ${filter === f ? "bg-[var(--leaf)] text-white shadow-2xs" : "text-[#667262] hover:bg-white"}`}>
+                      className={`px-3 py-1.5 rounded-lg transition capitalize cursor-pointer ${filter === f ? "bg-[var(--leaf-dark)] text-white shadow-2xs" : "text-[#667262] hover:bg-white"}`}>
                       {f}
                     </button>
                   ))}
@@ -187,8 +147,8 @@ export default function HomePage() {
                 ].map((s) => (
                   <div key={s.label} className="bg-[#fafbf9] rounded-2xl p-4 border border-[#dfe6d9]/80 shadow-2xs">
                     <div className={`w-6 h-1.5 ${s.bg} rounded-full mb-2.5`} />
-                    <p className="text-[11px] text-[#7d8b79] font-bold uppercase tracking-wider">{s.label}</p>
-                    <p className={`text-xl font-black mt-0.5 font-heading ${s.accent}`}>{s.value}</p>
+                    <p className="text-[10px] text-[#7d8b79] font-extrabold uppercase tracking-wider">{s.label}</p>
+                    <p className={`text-base sm:text-lg font-black mt-1 font-heading leading-tight ${s.accent}`}>{s.value}</p>
                   </div>
                 ))}
               </div>
@@ -196,7 +156,7 @@ export default function HomePage() {
               {/* Revenue Trend Chart */}
               <div className="rounded-2xl border border-[#dfe6d9]/80 bg-[#fbf8f2]/60 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold text-[var(--foreground)]">Revenue Trend</span>
+                  <span className="text-xs font-bold text-[var(--foreground)]">Revenue Trend (KHR)</span>
                   <span className="text-[10px] text-[#7d8b79] font-semibold">Last 7 {filter === "day" ? "days" : filter === "week" ? "weeks" : "months"}</span>
                 </div>
                 <div key={filter} className="flex items-end gap-2 sm:gap-3" style={{ height: "130px" }}>
@@ -205,13 +165,13 @@ export default function HomePage() {
                     const last = i === chart.length - 1;
                     return (
                       <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer">
-                        <span className="text-[9px] font-extrabold text-[var(--leaf-dark)] opacity-0 group-hover:opacity-100 transition-opacity">
-                          ${val}
+                        <span className="text-[9px] font-extrabold text-[var(--leaf-dark)] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                          {val.toLocaleString()} KHR
                         </span>
                         <div className="w-full flex items-end" style={{ height: "85px" }}>
                           <div
                             className={`w-full rounded-t-lg transition-all duration-300 ${
-                              last ? "bg-[var(--leaf)] shadow-xs" : "bg-[#c8dfc5] group-hover:bg-[var(--leaf)]"
+                              last ? "bg-[var(--leaf-dark)] shadow-xs" : "bg-[#c8dfc5] group-hover:bg-[var(--leaf-dark)]"
                             }`}
                             style={{ height: `${pct}%` }}
                           />
@@ -225,11 +185,12 @@ export default function HomePage() {
             </section>
 
             {/* PRODUCE INVENTORY MANAGER */}
-            <section className="bg-white rounded-3xl p-6 border border-[#dfe6d9] shadow-sm">
+            <section className="bg-white rounded-[24px] p-6 border border-[#dfe6d9] card-shadow">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-base font-bold text-[var(--foreground)] font-heading">Produce on Sale</h2>
-                  <p className="text-xs text-[#7d8b79] mt-0.5">Quick stock quantity management and availability</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--leaf)] mb-1">Live Inventory</p>
+                  <h2 className="text-lg font-black text-[var(--foreground)] font-heading">Produce on Sale</h2>
+                  <p className="text-xs text-[#556353] mt-0.5">Quick stock quantity management and availability</p>
                 </div>
                 <Link href="/product" className="text-xs text-[var(--leaf-accent)] font-bold hover:underline">
                   Manage Full Catalog →
@@ -251,7 +212,7 @@ export default function HomePage() {
                   {products.map((p) => {
                     const { label, cls } = stockStatus(p.stock_quantity);
                     return (
-                      <div key={p.id} className="bg-[#fafbf9] rounded-2xl border border-[#dfe6d9] p-3.5 hover:shadow-md transition-shadow group flex flex-col justify-between">
+                      <div key={p.id} className="bg-[#fafbf9] rounded-2xl border border-[#dfe6d9] p-3.5 card-lift group flex flex-col justify-between">
                         <div className="flex items-center gap-3">
                           <div className="relative h-16 w-16 shrink-0 rounded-xl overflow-hidden bg-[#eaf0e6] border border-[#dfe6d9]">
                             {p.profile_pic_url ? (
@@ -262,7 +223,7 @@ export default function HomePage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-bold text-[var(--foreground)] truncate">{p.name}</p>
-                            <p className="text-xs font-black text-[var(--leaf-dark)] mt-0.5">${p.price} / {p.unit}</p>
+                            <p className="text-xs font-black text-[var(--leaf-dark)] mt-0.5">{Number(p.price).toLocaleString()} KHR / {p.unit}</p>
                             <span className={`inline-block mt-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
                           </div>
                         </div>
@@ -306,47 +267,14 @@ export default function HomePage() {
           {/* RIGHT COLUMN (5 Cols): Dispatch Beacon, Low Stock Alerts, Orders Stream, Checklist */}
           <div className="lg:col-span-5 space-y-6">
 
-            {/* SHOP LOCATION BEACON */}
-            <section className="bg-white rounded-3xl border border-[#dfe6d9] shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[var(--leaf)] animate-ping" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--foreground)] font-heading">
-                  Rider Dispatch Geolocation
-                </h3>
-              </div>
-              <p className="text-xs text-[#556353] leading-relaxed">
-                Broadcast your farm&apos;s GPS coordinate ping so assigned delivery riders can navigate directly to your harvest pickup point.
-              </p>
-
-              {locationMessage && (
-                <div className={`mt-3 p-3 rounded-xl text-xs font-semibold ${locationStatus === "error" ? "bg-red-50 text-red-600 border border-red-200" : "bg-[#edf6e9] text-[var(--leaf-dark)] border border-[#c8dfc5]"}`}>
-                  {locationMessage}
-                </div>
-              )}
-
-              <button
-                onClick={shareLocation}
-                disabled={locationStatus === "loading"}
-                className="mt-4 w-full px-5 py-3 bg-[var(--leaf)] text-white rounded-xl text-xs font-bold hover:bg-[var(--leaf-dark)] transition shadow-sm disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
-              >
-                {locationStatus === "loading" ? (
-                  <>
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                    <span>Broadcasting GPS…</span>
-                  </>
-                ) : (
-                  "📍 Broadcast Farm Location"
-                )}
-              </button>
-            </section>
 
             {/* CRITICAL LOW-STOCK ALERTS */}
-            <section className="bg-white rounded-3xl border border-[#dfe6d9] shadow-sm p-6">
+            <section className="bg-white rounded-[24px] border border-[#dfe6d9] card-shadow p-6">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--foreground)] font-heading">
+                <h3 className="text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--foreground)] font-heading">
                   Inventory Alerts
                 </h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#fef8ea] text-[#935b0b] border border-[#f4dfab]">
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#fef8ea] text-[#935b0b] border border-[#f4dfab]">
                   {lowStockProducts.length} Needs Restock
                 </span>
               </div>
@@ -374,13 +302,13 @@ export default function HomePage() {
             </section>
 
             {/* RECENT ORDERS FEED */}
-            <section className="bg-white rounded-3xl border border-[#dfe6d9] shadow-sm p-6">
+            <section className="bg-white rounded-[24px] border border-[#dfe6d9] card-shadow p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--foreground)] font-heading">
+                  <h3 className="text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--foreground)] font-heading">
                     Recent Customer Orders
                   </h3>
-                  <p className="text-xs text-[#7d8b79] mt-0.5">Live transaction log</p>
+                  <p className="text-xs text-[#7d8b79] mt-0.5">Live transaction log in KHR</p>
                 </div>
                 <Link href="/order" className="text-xs text-[var(--leaf-accent)] font-bold hover:underline">
                   All Orders →
@@ -409,29 +337,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* DAILY OPERATIONAL CHECKLIST */}
-            <section className="bg-[#faf7f0] rounded-3xl border border-[#dfe6d9] p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm">🌱</span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)] font-heading">
-                  Daily Grower Checklist
-                </h3>
-              </div>
-              <ul className="space-y-2 text-xs text-[#556353] mt-3">
-                <li className="flex items-center gap-2">
-                  <span className="text-[var(--leaf)] font-bold">✓</span> Morning fresh harvest verified & weighed
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-[var(--leaf)] font-bold">✓</span> Produce bundles washed and packaged clean
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-[var(--leaf)] font-bold">✓</span> ABA PayWay payment verified on confirmed orders
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-[var(--leaf)] font-bold">✓</span> Rider handover coordinated via GPS dispatch
-                </li>
-              </ul>
-            </section>
+
 
           </div>
         </div>

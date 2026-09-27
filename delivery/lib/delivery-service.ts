@@ -30,15 +30,18 @@ async function fetchDeliveryUser(authUserId: string, authEmail: string): Promise
     .eq("user_id", authUserId)
     .single();
 
-  if (error || !data || !data.is_active) return null;
+  if (error || !data) return null;
+
+  const storedDuty = typeof window !== "undefined" ? localStorage.getItem("delivery_duty_status") : null;
+  const isAvailable = storedDuty !== null ? storedDuty === "true" : (data.is_active ?? true);
 
   return {
     id: data.id, // this is deliveries.id — the value stored in orders.delivery_id once claimed
     name: `${data.first_name} ${data.last_name}`.trim(),
     email: authEmail,
     phone: data.phone ?? "",
-    accountStatus: "active",
-    available: true,
+    accountStatus: data.is_active ? "active" : "offline",
+    available: isAvailable,
   };
 }
 
@@ -395,8 +398,17 @@ class SupabaseDeliveryService implements DeliveryService {
     return { ok: true };
   }
 
-  async setAvailability(_available: boolean) {
-    // no-op for now — will PATCH a real availability column later
+  async setAvailability(available: boolean) {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("delivery_duty_status", String(available));
+    }
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("deliveries").update({ is_active: available }).eq("user_id", user.id);
+      }
+    } catch {}
   }
 
   async resetDemo(mode: "incoming" | "empty"): Promise<DemoDeliveryState> {

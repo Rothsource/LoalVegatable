@@ -56,7 +56,8 @@ export default function NotificationsPage() {
   const fetchOrderNotifications = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? (await supabase.auth.getUser()).data?.user;
       if (!user) {
         setIsLoggedIn(false);
         setNotifications([]);
@@ -350,8 +351,18 @@ export default function NotificationsPage() {
           </button>
         </div>
 
+        {/* While checking auth or loading orders */}
+        {(loading || isLoggedIn === null) && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center py-2">
+              <CircularLoader size={38} label="Checking order updates…" />
+            </div>
+            <NotificationSkeleton />
+          </div>
+        )}
+
         {/* Not Logged In State */}
-        {isLoggedIn === false && (
+        {!loading && isLoggedIn === false && (
           <div style={{
             background: '#fff',
             borderRadius: '24px',
@@ -388,7 +399,7 @@ export default function NotificationsPage() {
         )}
 
         {/* Logged in Content */}
-        {isLoggedIn && (
+        {!loading && isLoggedIn && (
           <>
             {/* Filter Tabs */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -412,14 +423,7 @@ export default function NotificationsPage() {
               ))}
             </div>
 
-            {loading ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-center py-2">
-                  <CircularLoader size={38} />
-                </div>
-                <NotificationSkeleton />
-              </div>
-            ) : filtered.length === 0 ? (
+            {filtered.length === 0 ? (
               <div style={{
                 background: '#fff',
                 borderRadius: '24px',

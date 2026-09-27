@@ -55,7 +55,7 @@ export type DeliveryUser = {
   name: string;
   email: string;
   phone: string;
-  accountStatus: "active";
+  accountStatus: "active" | "offline";
   available: boolean;
 };
 

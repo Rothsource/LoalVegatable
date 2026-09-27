@@ -3,5 +3,9 @@ const KHR_FORMATTER = new Intl.NumberFormat("en-US", {
 });
 
 export function formatKHR(value: number) {
-  return `៛ ${KHR_FORMATTER.format(Math.round(value))}`;
+  return `${KHR_FORMATTER.format(Math.round(value))} KHR`;
+}
+
+export function formatRiel(value: number) {
+  return `${KHR_FORMATTER.format(Math.round(value))} KHR`;
 }

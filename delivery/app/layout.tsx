@@ -6,6 +6,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Local Vegetable Delivery",
   description: "A focused delivery workspace for Local Vegetable riders.",
+  icons: {
+    icon: "/image/logo.png",
+    shortcut: "/image/logo.png",
+    apple: "/image/logo.png",
+  },
 };
 
 export const viewport: Viewport = {

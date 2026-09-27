@@ -83,19 +83,29 @@ export async function POST(req: NextRequest) {
 
   let sent = 0;
 
-  // --- Notify riders (broadcast to everyone with role='rider') ---
+  // --- Notify riders (only riders who are currently active/on-duty) ---
+  const { data: activeDeliveries } = await supabaseAdmin
+    .from('deliveries')
+    .select('user_id')
+    .eq('is_active', true);
+
+  const activeRiderIds = new Set((activeDeliveries || []).map((d) => d.user_id).filter(Boolean));
+
   const { data: riderSubs } = await supabaseAdmin
     .from('push_subscriptions')
     .select('*')
     .eq('role', 'rider');
 
-  if (riderSubs && riderSubs.length > 0) {
+  // Filter out any riders who have closed their duty (is_active = false)
+  const eligibleRiders = (riderSubs || []).filter((s) => !s.user_id || activeRiderIds.has(s.user_id));
+
+  if (eligibleRiders.length > 0) {
     const riderPayload = JSON.stringify({
       title: 'New delivery available',
       body: `Pickup at ${pickupAddress} — order #${String(order.id).slice(0, 8)}.`,
       url: '/home',
     });
-    const results = await Promise.all(riderSubs.map((s) => sendTo(s, riderPayload)));
+    const results = await Promise.all(eligibleRiders.map((s) => sendTo(s, riderPayload)));
     sent += results.filter(Boolean).length;
   }
 

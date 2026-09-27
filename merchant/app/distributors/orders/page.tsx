@@ -4,17 +4,29 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { 
   Package, Truck, Phone, MapPin, CheckCircle2, Clock, 
-  ArrowRight, AlertCircle, RefreshCw, ChevronRight, Check
+  ArrowRight, AlertCircle, RefreshCw, ChevronRight, Check,
+  Image as ImageIcon
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { DistributorSpinner, OrderCardSkeleton } from "@/components/distributors/DistributorUI";
+import OrderItemsPictureModal, { OrderPreviewModalData } from "@/components/OrderItemsPictureModal";
+
+type OrderItem = {
+  product_id: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  img?: string;
+};
 
 type PendingOrder = {
   id: string;
   total_amount: number;
   created_at: string;
   address: { street: string | null; province: string | null; phone: string | null } | null;
-  items: { product_id: string; quantity: number; unit_price: number }[];
+  items: OrderItem[];
 };
 
 type ActiveOrder = {
@@ -23,6 +35,7 @@ type ActiveOrder = {
   total_amount: number;
   created_at: string;
   address: { street: string | null; province: string | null; phone: string | null } | null;
+  items: OrderItem[];
 };
 
 const STATUS_FLOW = ["accepted", "preparing", "packaged", "out_for_delivery"] as const;
@@ -85,6 +98,7 @@ export default function DistributorOrdersPage() {
   const [advancingId, setAdvancingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [distributorId, setDistributorId] = useState<string | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<OrderPreviewModalData | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,39 +113,22 @@ export default function DistributorOrdersPage() {
 
     setDistributorId(user.id);
 
-    const { data, error: fetchError } = await supabase
-      .from("orders")
-      .select(`
-        id, total_amount, created_at,
-        address:address_id ( street, province, phone ),
-        items:order_items ( product_id, quantity, unit_price )
-      `)
-      .eq("status", "pending")
-      .is("distributor_id", null)
-      .order("created_at", { ascending: true });
-
-    if (fetchError) {
-      setError(fetchError.message);
+    try {
+      const res = await fetch(`/api/distributor/orders?distributorId=${user.id}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to load orders");
+      }
+      const data = await res.json();
+      const denied = getDenied();
+      const pendingFiltered = ((data.pending as PendingOrder[]) || []).filter((o) => !denied.includes(o.id));
+      setOrders(pendingFiltered);
+      setActiveOrders((data.active as ActiveOrder[]) || []);
+    } catch (err: any) {
+      setError(err.message || "Failed to load orders");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const denied = getDenied();
-    const pendingFiltered = ((data as any[]) || []).filter((o) => !denied.includes(o.id));
-    setOrders(pendingFiltered);
-
-    const { data: active, error: activeError } = await supabase
-      .from("orders")
-      .select(`id, status, total_amount, created_at, address:address_id ( street, province, phone )`)
-      .eq("distributor_id", user.id)
-      .in("status", STATUS_FLOW as unknown as string[])
-      .order("accepted_at", { ascending: true });
-
-    if (!activeError) {
-      setActiveOrders((active as any[]) || []);
-    }
-
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -337,7 +334,7 @@ export default function DistributorOrdersPage() {
 
                     <div className="text-right">
                       <span className="text-xl sm:text-2xl font-black text-[#0A490A]">
-                        ${Number(order.total_amount).toFixed(2)}
+                        {Number(order.total_amount).toLocaleString()} KHR
                       </span>
                       <p className="text-[11px] font-bold text-[#647060]">
                         {itemCount} units total
@@ -381,20 +378,51 @@ export default function DistributorOrdersPage() {
                     )}
                   </div>
 
-                  {/* Items Chips */}
+                  {/* Items Chips with Image Previews */}
                   <div>
-                    <p className="text-xs font-bold text-[#52604f] mb-2 uppercase tracking-wider">
-                      Ordered Vegetables ({order.items.length} items):
-                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-black text-[#52604f] uppercase tracking-wider">
+                        Ordered Vegetables ({order.items?.length || 0} items):
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewOrder({
+                          orderId: order.id,
+                          totalAmount: order.total_amount,
+                          status: "pending",
+                          address: order.address,
+                          items: order.items,
+                        })}
+                        className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#2E6F40] hover:text-[#0A490A] hover:underline cursor-pointer"
+                      >
+                        <ImageIcon size={13} />
+                        <span>View Produce Pictures</span>
+                      </button>
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                      {order.items.map((it, idx) => (
-                        <span
+                      {(order.items || []).map((it, idx) => (
+                        <button
                           key={idx}
-                          className="flex items-center gap-1.5 rounded-xl border border-[#e2e8dd] bg-[#fdfdfc] px-3 py-1.5 text-xs font-bold text-[#182216]"
+                          type="button"
+                          onClick={() => setPreviewOrder({
+                            orderId: order.id,
+                            totalAmount: order.total_amount,
+                            status: "pending",
+                            address: order.address,
+                            items: order.items,
+                          })}
+                          className="flex items-center gap-2 rounded-xl border border-[#dfe6d9] bg-[#fafbf9] hover:bg-[#edf6e9] hover:border-[#2E6F40]/40 px-3 py-1.5 text-xs font-bold text-[#182216] card-shadow transition-all cursor-pointer text-left"
+                          title="Click to view produce photo and details"
                         >
-                          <Package size={13} className="text-[#2E6F40]" />
-                          <span>Qty: {it.quantity}</span>
-                        </span>
+                          {it.img ? (
+                            <img src={it.img} alt="" className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
+                          ) : (
+                            <Package size={13} className="text-[#2E6F40] flex-shrink-0" />
+                          )}
+                          <span>{it.name || "Vegetable Produce"}</span>
+                          <span className="text-[#2E6F40] font-black">· {it.quantity} {it.unit || "kg"}</span>
+                          <span className="text-[#556353] font-medium text-[11px]">({Number(it.total_price).toLocaleString()} KHR)</span>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -488,7 +516,7 @@ export default function DistributorOrdersPage() {
 
                     <div className="text-right">
                       <span className="text-xl sm:text-2xl font-black text-[#0A490A]">
-                        ${Number(order.total_amount).toFixed(2)}
+                        {Number(order.total_amount).toLocaleString()} KHR
                       </span>
                     </div>
                   </div>
@@ -519,6 +547,56 @@ export default function DistributorOrdersPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Produce items list */}
+                  {order.items && order.items.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-black text-[#52604f] uppercase tracking-wider">
+                          Produce to Deliver ({order.items.length} items):
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewOrder({
+                            orderId: order.id,
+                            totalAmount: order.total_amount,
+                            status: order.status,
+                            address: order.address,
+                            items: order.items,
+                          })}
+                          className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#2E6F40] hover:text-[#0A490A] hover:underline cursor-pointer"
+                        >
+                          <ImageIcon size={13} />
+                          <span>View Pictures</span>
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {order.items.map((it, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setPreviewOrder({
+                              orderId: order.id,
+                              totalAmount: order.total_amount,
+                              status: order.status,
+                              address: order.address,
+                              items: order.items,
+                            })}
+                            className="flex items-center gap-2 rounded-xl border border-[#dfe6d9] bg-[#fafbf9] hover:bg-[#edf6e9] hover:border-[#2E6F40]/40 px-3 py-1.5 text-xs font-bold text-[#182216] transition-all cursor-pointer text-left"
+                            title="Click to view produce photo and details"
+                          >
+                            {it.img ? (
+                              <img src={it.img} alt="" className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
+                            ) : (
+                              <Package size={13} className="text-[#2E6F40] flex-shrink-0" />
+                            )}
+                            <span>{it.name || "Vegetable Produce"}</span>
+                            <span className="text-[#2E6F40] font-black">· {it.quantity} {it.unit || "kg"}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Phone call pill */}
                   {phone && (
@@ -568,6 +646,12 @@ export default function DistributorOrdersPage() {
           )}
         </div>
       )}
+
+      {/* Produce Pictures and Details Modal */}
+      <OrderItemsPictureModal
+        order={previewOrder}
+        onClose={() => setPreviewOrder(null)}
+      />
     </div>
   );
 }

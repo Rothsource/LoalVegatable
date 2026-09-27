@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Trash2, ChevronRight, ShoppingBag, ArrowLeft, Plus, Minus, X, Star, Leaf, Box, Calendar, MapPin, Phone, CreditCard, CheckCircle2, ChevronLeft, Navigation, Search, Loader2, ExternalLink, Truck, Bell, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import CustomerOrderTrackingMap from '@/components/CustomerOrderTrackingMap';
-import { CircularLoader } from '@/components/CustomerSkeleton';
+import { CircularLoader, CartSkeleton } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
+import { isProductExpired } from '@/lib/expiry';
 
 
 interface CartProduct {
@@ -41,22 +42,37 @@ const CAMBODIA_PROVINCES = [
 ];
 
 // ── localStorage helpers — UNCHANGED ─────────────────────────────────────────
+const DEFAULT_VEG_IMG = 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop';
+
+function normalizeCartProduct(p: any): CartProduct {
+  return {
+    ...p,
+    qty: p.qty ?? 1,
+    img: p.img || DEFAULT_VEG_IMG,
+    shopAvatar: p.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`,
+  };
+}
+
 function readCart(): CartProduct[] {
   try {
     const raw = localStorage.getItem('cart-products');
     if (!raw) return [];
     const parsed = JSON.parse(raw);
+    let items: CartProduct[] = [];
     if (parsed && !Array.isArray(parsed) && typeof parsed === 'object') {
-      return Object.values(parsed as Record<string, CartProduct>).filter(
-        (p): p is CartProduct => p !== null && typeof p === 'object' && 'price' in p
-      );
-    }
-    if (Array.isArray(parsed)) {
-      return parsed
+      items = Object.values(parsed as Record<string, CartProduct>)
         .filter((p): p is CartProduct => p !== null && typeof p === 'object' && 'price' in p)
-        .map(p => ({ ...p, qty: p.qty ?? 1 }));
+        .map(normalizeCartProduct);
+    } else if (Array.isArray(parsed)) {
+      items = parsed
+        .filter((p): p is CartProduct => p !== null && typeof p === 'object' && 'price' in p)
+        .map(normalizeCartProduct);
     }
-    return [];
+    const unexpired = items.filter(p => !isProductExpired(p.sellByDate));
+    if (unexpired.length !== items.length) {
+      writeCart(unexpired);
+    }
+    return unexpired;
   } catch { return []; }
 }
 
@@ -97,7 +113,6 @@ function matchProvince(addr: any): string | null {
 
 function ABAQRCode({ amount }: { amount: number }) {
   const abaKHR = Math.round(amount);
-  const abaUSD = (amount / 4100).toFixed(2);
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{
@@ -156,14 +171,13 @@ function ABAQRCode({ amount }: { amount: number }) {
           <div style={{ marginTop: '8px', fontSize: '10px', color: '#0066b2', fontWeight: '800', letterSpacing: '0.5px' }}>KHQR OFFICIAL</div>
         </div>
 
-        <div style={{ background: '#f0f7ff', borderRadius: '14px', padding: '12px 20px', display: 'inline-block', marginBottom: '8px', border: '1.5px solid #cce0f5' }}>
+        <div style={{ background: '#f0f7ff', borderRadius: '14px', padding: '14px 24px', display: 'inline-block', marginBottom: '8px', border: '1.5px solid #cce0f5' }}>
           <div style={{ fontSize: '11px', color: '#0066b2', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Total Amount Due</div>
-          <div style={{ fontSize: '24px', fontWeight: '900', color: '#0066b2', marginTop: '2px' }}>${abaUSD} USD</div>
-          <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '700', marginTop: '2px' }}>{abaKHR.toLocaleString()} KHR</div>
+          <div style={{ fontSize: '28px', fontWeight: '900', color: '#0066b2', marginTop: '2px', letterSpacing: '-0.5px' }}>{abaKHR.toLocaleString()} KHR</div>
         </div>
 
         <p style={{ fontSize: '12px', color: '#64748b', margin: '10px 0 0', lineHeight: '1.5', fontWeight: '600' }}>
-          Open ABA Mobile on phone → Tap <strong>"Scan QR"</strong> → Confirm payment
+          Open ABA Mobile on phone → Tap <strong>"Scan QR"</strong> → Confirm payment in KHR
         </p>
       </div>
     </div>
@@ -199,19 +213,19 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
                   width: '38px', height: '38px', borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: '800', fontSize: '14px',
-                  background: isDone ? '#0DB30D' : isCurrent ? '#0A490A' : '#f3f4f6',
-                  color: isDone || isCurrent ? '#fff' : '#9ca3af',
-                  boxShadow: isCurrent ? '0 0 0 4px rgba(13, 179, 13, 0.2)' : 'none',
+                  background: isDone ? '#2d6a4f' : isCurrent ? '#1b4332' : '#f1f5f9',
+                  color: isDone || isCurrent ? '#fff' : '#64748b',
+                  boxShadow: isCurrent ? '0 0 0 4px rgba(45, 106, 79, 0.15)' : 'none',
                   transition: 'all 0.3s ease',
                   flexShrink: 0,
                 }}>
                   {isDone ? <CheckCircle2 size={18} color="#fff" /> : s.n}
                 </div>
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: isCurrent ? '#0A490A' : isDone ? '#0DB30D' : '#9ca3af', lineHeight: 1.2 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: isCurrent ? '#1b4332' : isDone ? '#2d6a4f' : '#64748b', lineHeight: 1.2 }}>
                     {s.label}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500' }}>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '500' }}>
                     {s.subtitle}
                   </div>
                 </div>
@@ -219,7 +233,7 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
               {i < steps.length - 1 && (
                 <div style={{
                   flex: 1, height: '2px',
-                  background: step > s.n ? '#0DB30D' : '#e5e7eb',
+                  background: step > s.n ? '#2d6a4f' : '#e2e8f0',
                   margin: '0 10px',
                   transition: 'background 0.3s ease',
                 }} />
@@ -234,6 +248,7 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
 
 export default function CartPage() {
   const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
+  const [loading, setLoading] = useState(true);
   const [flow, setFlow] = useState<'cart' | 'waiting-accept' | 'checkout-delivery' | 'checkout-payment' | 'waiting-delivery' | 'success'>('cart');
   const [activeOrderStatus, setActiveOrderStatus] = useState<'accepted' | 'out_for_delivery' | 'delivered'>('accepted');
   const [arrivedAtTime, setArrivedAtTime] = useState<string | null>(null);
@@ -278,11 +293,47 @@ export default function CartPage() {
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
 
-  useEffect(() => { setCartProducts(readCart()); }, []);
+  useEffect(() => {
+    (async () => {
+      const items = readCart();
+      if (items.length === 0) {
+        setCartProducts([]);
+        setLoading(false);
+        return;
+      }
+      try {
+        const productIds = items.map(p => p.id);
+        const { data: dbProducts } = await supabase
+          .from('products')
+          .select('id, is_active, expire_date')
+          .in('id', productIds);
+
+        if (dbProducts) {
+          const invalidSet = new Set(
+            dbProducts
+              .filter(dp => !dp.is_active || isProductExpired(dp.expire_date))
+              .map(dp => String(dp.id))
+          );
+          const validItems = items.filter(i => !invalidSet.has(String(i.id)) && !isProductExpired(i.sellByDate));
+          if (validItems.length !== items.length) {
+            writeCart(validItems);
+          }
+          setCartProducts(validItems);
+        } else {
+          setCartProducts(items);
+        }
+      } catch {
+        setCartProducts(items);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? (await supabase.auth.getUser()).data?.user;
       if (!user) return;
       let { data } = await supabase
         .from('addresses')
@@ -621,20 +672,24 @@ export default function CartPage() {
     );
   };
 
-  const updateQty = (productId: number, newQty: number) => {
+  const updateQty = (productId: string | number, newQty: number) => {
     if (newQty <= 0) { removeProduct(productId); return; }
-    const updated = cartProducts.map(p =>
-      p.id === productId ? { ...p, qty: Math.min(newQty, p.quantity) } : p
-    );
+    const updated = cartProducts.map(p => {
+      if (String(p.id) === String(productId)) {
+        const clamped = Math.max(1, Math.min(newQty, p.quantity));
+        return { ...p, qty: clamped };
+      }
+      return p;
+    });
     setCartProducts(updated);
     writeCart(updated);
   };
 
-  const removeProduct = (productId: number) => {
-    const updated = cartProducts.filter(p => p.id !== productId);
+  const removeProduct = (productId: string | number) => {
+    const updated = cartProducts.filter(p => String(p.id) !== String(productId));
     setCartProducts(updated);
     writeCart(updated);
-    if (selectedProduct?.id === productId) setSelectedProduct(null);
+    if (selectedProduct && String(selectedProduct.id) === String(productId)) setSelectedProduct(null);
   };
 
   const clearCart = () => {
@@ -667,6 +722,13 @@ export default function CartPage() {
   const handleProceedToCheckout = async () => {
     setCheckingOut(true);
     setCheckoutError('');
+
+    const currentItems = readCart();
+    if (currentItems.length === 0) {
+      setCheckoutError('Your cart is empty or contained expired products.');
+      setCheckingOut(false);
+      return;
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -741,62 +803,38 @@ export default function CartPage() {
       }
     }
 
-    const byShop = cartProducts.reduce((acc, p) => {
-      (acc[p.shopSlug] ??= []).push(p);
-      return acc;
-    }, {} as Record<string, CartProduct[]>);
-
-    const createdOrderIds: string[] = [];
-
-    for (const items of Object.values(byShop)) {
-      const orderTotal = items.reduce((s, p) => s + p.price * (p.qty ?? 1), 0);
-
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          address_id: addressId,
-          status: 'pending',
-          payment_status: 'pending',
-          total_amount: orderTotal,
-        })
-        .select('id')
-        .single();
-
-      if (orderError || !order) {
-        setCheckoutError(orderError?.message || 'Order request failed.');
-        setCheckingOut(false);
-        return;
-      }
-      createdOrderIds.push(order.id);
-
-      const { error: itemsError } = await supabase.from('order_items').insert(
-        items.map(p => ({
-          order_id: order.id,
-          product_id: String(p.id),
-          quantity: p.qty ?? 1,
-          unit_price: p.price,
-          total_price: p.price * (p.qty ?? 1),
-        }))
-      );
-
-      if (itemsError) {
-        setCheckoutError(itemsError.message);
-        setCheckingOut(false);
-        return;
-      }
-
-      // Send push notification to distributors!
-      fetch('/api/notify-distributors', {
+    try {
+      const res = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id }),
-      }).catch(() => { });
-    }
+        body: JSON.stringify({
+          userId: user.id,
+          addressId,
+          items: cartProducts.map(p => ({
+            id: String(p.id),
+            name: p.name,
+            qty: Math.max(1, p.qty ?? 1),
+            price: p.price,
+            unit: p.unit,
+            shopSlug: p.shopSlug,
+          })),
+        }),
+      });
 
-    setCheckingOut(false);
-    setWaitingOrderIds(createdOrderIds);
-    setFlow('waiting-accept');
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setCheckoutError(data.error || 'Failed to place order.');
+        setCheckingOut(false);
+        return;
+      }
+
+      setCheckingOut(false);
+      setWaitingOrderIds(data.createdOrderIds);
+      setFlow('waiting-accept');
+    } catch (err: any) {
+      setCheckoutError(err.message || 'Network error placing order.');
+      setCheckingOut(false);
+    }
   };
 
   const handleConfirmPayment = async () => {
@@ -869,7 +907,7 @@ export default function CartPage() {
           position: absolute;
           inset: 0;
           border-radius: 50%;
-          border: 2px solid #0DB30D;
+          border: 1.5px solid rgba(45, 106, 79, 0.32);
           animation: radarRipple 2.6s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
           pointer-events: none;
         }
@@ -883,11 +921,11 @@ export default function CartPage() {
           width: 72px;
           height: 72px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #0A490A 0%, #0DB30D 100%);
+          background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 10px 25px rgba(13, 179, 13, 0.35);
+          box-shadow: 0 8px 24px rgba(27, 67, 50, 0.22);
           z-index: 2;
           animation: softPulse 2s ease-in-out infinite;
         }
@@ -929,9 +967,9 @@ export default function CartPage() {
           <div
             onClick={e => e.stopPropagation()}
             style={{ background: '#fff', maxWidth: '520px', width: '100%', borderRadius: '32px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', maxHeight: '90vh', overflowY: 'auto', animation: 'modalIn 0.25s cubic-bezier(0.16,1,0.3,1)' }}>
-            <img src={selectedProduct.img} alt={selectedProduct.name}
+            <img src={selectedProduct.img || DEFAULT_VEG_IMG} alt={selectedProduct.name}
               style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              onError={e => { (e.target as HTMLImageElement).src = DEFAULT_VEG_IMG; }} />
             <button onClick={() => setSelectedProduct(null)}
               style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <X size={18} color="#fff" />
@@ -982,9 +1020,9 @@ export default function CartPage() {
               <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '18px', marginBottom: '20px' }}>
                 <p style={{ fontSize: '11px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px' }}>Sold By</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <img src={selectedProduct.shopAvatar} alt=""
+                  <img src={selectedProduct.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=0DB30D&color=fff&size=48`} alt=""
                     style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #eff6ef' }}
-                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName)}&background=0DB30D&color=fff&size=48`; }} />
+                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=0DB30D&color=fff&size=48`; }} />
                   <div>
                     <span style={{ fontWeight: '800', fontSize: '15px', color: deepGreen }}>{selectedProduct.shopName}</span>
                     {selectedProduct.shopLocation && (
@@ -1045,54 +1083,82 @@ export default function CartPage() {
           </div>
         </div>
 
-        {flow === 'waiting-accept' && (
-          <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '44px 36px', boxShadow: '0 12px 40px rgba(10, 73, 10, 0.07)', border: '1.5px solid #edf2ee', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
+        {loading ? (
+          <div className="space-y-6">
+            <div className="flex items-center justify-center py-4">
+              <CircularLoader size={38} label="Loading your basket…" />
+            </div>
+            <CartSkeleton />
+          </div>
+        ) : (
+          <>
+            {flow === 'waiting-accept' && (
+          <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '40px 32px', boxShadow: '0 16px 48px rgba(15, 23, 42, 0.08)', border: '1.5px solid #e2e8f0', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
             <StepIndicator step={2} />
 
-            {/* Radar Search Beacon */}
-            <div className="radar-box">
+            {/* Refined Radar Search Beacon */}
+            <div className="radar-box" style={{ margin: '10px auto 24px' }}>
               <div className="radar-ring" />
               <div className="radar-ring" />
               <div className="radar-ring" />
               <div className="radar-core">
-                <Navigation size={32} color="#fff" style={{ transform: 'rotate(-45deg)' }} />
+                <Navigation size={28} color="#fff" style={{ transform: 'rotate(-45deg)' }} />
               </div>
             </div>
 
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#eff6ef', border: '1px solid #d1ead1', padding: '6px 14px', borderRadius: '100px', marginBottom: '14px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0DB30D', display: 'inline-block', boxShadow: '0 0 0 3px rgba(13,179,13,0.25)' }} />
-              <span style={{ fontSize: '12px', fontWeight: '800', color: deepGreen, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                Nearby Distributors Notified
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: '6px 16px', borderRadius: '100px', marginBottom: '16px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', display: 'inline-block', boxShadow: '0 0 0 3px rgba(22,163,74,0.2)' }} />
+              <span style={{ fontSize: '12px', fontWeight: '800', color: '#1e293b', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                Connecting with Nearby Distributor
               </span>
             </div>
 
-            <h2 style={{ fontSize: '26px', fontWeight: '800', color: deepGreen, margin: '0 0 10px', letterSpacing: '-0.3px' }}>
-              Matching You with a Distributor…
+            <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px', letterSpacing: '-0.3px' }}>
+              Matching You with a Local Courier…
             </h2>
-            <p style={{ color: '#555', fontSize: '15px', lineHeight: '1.6', margin: '0 0 28px', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
-              We've dispatched your order details to available distributors in your area. As soon as a distributor accepts, the ABA PayWay QR code will unlock here automatically!
+            <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', margin: '0 auto 24px', maxWidth: '480px' }}>
+              Your order has been broadcasted to certified local distributors nearby. Once claimed, the ABA PayWay QR payment will unlock automatically right here.
             </p>
 
+            {/* 3-Step Live Dispatch Progress */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 14px', marginBottom: '22px', textAlign: 'left' }}>
+              <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '800', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✓ Step 1</div>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Order Dispatched</div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Broadcast to zone</div>
+              </div>
+              <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>● Step 2</div>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Courier Claim</div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Awaiting pickup</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>○ Step 3</div>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>ABA QR Unlock</div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Instant payment</div>
+              </div>
+            </div>
+
             {/* Destination summary card */}
-            <div style={{ background: '#f9fbf9', border: '1.5px solid #e3ede3', borderRadius: '18px', padding: '18px 22px', marginBottom: '24px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: '#eff6ef', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #d1ead1' }}>
-                <MapPin size={22} color={brandGreen} />
+            <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 20px', marginBottom: '20px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0', color: '#1e293b' }}>
+                <MapPin size={20} />
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: '11px', fontWeight: '800', color: brandGreen, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Target Delivery Location
                 </div>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '3px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
                   {address ? `${address}, ${province}` : province}
                 </div>
-                {phone && <div style={{ fontSize: '12px', color: '#666', marginTop: '3px', fontWeight: '600' }}>Contact phone: <strong>{phone}</strong></div>}
+                {phone && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', fontWeight: '600' }}>Contact phone: <strong style={{ color: '#0f172a' }}>{phone}</strong></div>}
               </div>
             </div>
 
             {/* Live pulsating banner */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fdfbf7', border: '1.5px solid #fae8c8', padding: '12px 20px', borderRadius: '14px', marginBottom: '28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fffbeb', border: '1.5px solid #fef3c7', padding: '12px 18px', borderRadius: '14px', marginBottom: '24px' }}>
               <Loader2 size={16} color="#d97706" style={{ animation: 'spin 1.2s linear infinite' }} />
-              <span style={{ fontSize: '13px', fontWeight: '700', color: '#92400e' }}>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
                 Please stay on this page — usually confirmed in 1–3 minutes
               </span>
             </div>
@@ -1110,11 +1176,11 @@ export default function CartPage() {
                 setFlow('cart');
               }}
               style={{
-                padding: '12px 26px',
+                padding: '11px 24px',
                 borderRadius: '12px',
-                border: '1.5px solid #e5e7eb',
+                border: '1.5px solid #e2e8f0',
                 background: '#fff',
-                color: '#6b7280',
+                color: '#64748b',
                 fontWeight: '700',
                 fontSize: '13px',
                 cursor: 'pointer',
@@ -1129,8 +1195,8 @@ export default function CartPage() {
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget as HTMLButtonElement;
-                el.style.borderColor = '#e5e7eb';
-                el.style.color = '#6b7280';
+                el.style.borderColor = '#e2e8f0';
+                el.style.color = '#64748b';
                 el.style.background = '#fff';
               }}
             >
@@ -1392,8 +1458,8 @@ export default function CartPage() {
                 const itemQty = product.qty ?? 1;
                 return (
                   <div key={product.id} className="cart-card" onClick={() => setSelectedProduct(product)}>
-                    <img src={product.img} style={{ width: '90px', height: '90px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0 }} alt={product.name}
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    <img src={product.img || DEFAULT_VEG_IMG} style={{ width: '90px', height: '90px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0 }} alt={product.name}
+                      onError={e => { (e.target as HTMLImageElement).src = DEFAULT_VEG_IMG; }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: '11px', fontWeight: '700', color: brandGreen }}>{product.category}</span>
                       <h4 style={{ margin: '2px 0 4px', fontSize: '16px', fontWeight: '800', color: '#111' }}>{product.name}</h4>
@@ -1423,8 +1489,8 @@ export default function CartPage() {
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                        <img src={product.shopAvatar} style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} alt=""
-                          onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName)}&background=0DB30D&color=fff&size=18`; }} />
+                        <img src={product.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=0DB30D&color=fff&size=18`} style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} alt=""
+                          onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=0DB30D&color=fff&size=18`; }} />
                         <Link href={`/shop/${product.shopSlug}`} style={{ fontSize: '12px', color: '#888', textDecoration: 'none', fontWeight: '600' }}>
                           {product.shopName}
                         </Link>
@@ -1909,6 +1975,8 @@ export default function CartPage() {
             <MiniOrderSummary cartProducts={cartProducts} total={total} />
           </div>
         )}
+          </>
+        )}
       </main>
     </div>
   );
@@ -1925,8 +1993,8 @@ function MiniOrderSummary({ cartProducts, total }: { cartProducts: CartProduct[]
           const q = p.qty ?? 1;
           return (
             <div key={p.id} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <img src={p.img} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} alt=""
-                onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=eff6ef&color=0A490A`; }} />
+              <img src={p.img || DEFAULT_VEG_IMG} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} alt=""
+                onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'Produce')}&background=eff6ef&color=0A490A`; }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
                 <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>×{q} · {p.price.toLocaleString()} KHR</p>

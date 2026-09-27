@@ -4,10 +4,12 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { 
   Package, Search, Filter, Clock, CheckCircle2, AlertCircle, 
-  MapPin, Phone, User, RefreshCw, ChevronRight, Truck, DollarSign,
-  ArrowUpRight, ShoppingBag
+  MapPin, Phone, User, RefreshCw, ChevronRight, Truck, CreditCard,
+  ArrowUpRight, ShoppingBag, Image as ImageIcon
 } from "lucide-react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { supabase } from "@/lib/supabase";
+import OrderItemsPictureModal, { OrderPreviewModalData } from "@/components/OrderItemsPictureModal";
 
 interface OrderItem {
   id: string;
@@ -17,6 +19,7 @@ interface OrderItem {
   product_id: string;
   product_name?: string;
   unit?: string;
+  img?: string;
 }
 
 interface MerchantOrder {
@@ -38,6 +41,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<OrderPreviewModalData | null>(null);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -48,77 +52,12 @@ export default function OrdersPage() {
         return;
       }
 
-      // 1. Get products owned by this merchant
-      const { data: products } = await supabase
-        .from("products")
-        .select("id, name, unit")
-        .eq("merchant_id", user.id);
-
-      if (!products || products.length === 0) {
-        setOrders([]);
-        setLoading(false);
-        return;
+      const res = await fetch(`/api/merchant/orders?merchantId=${user.id}`);
+      if (!res.ok) {
+        throw new Error("Failed to load orders");
       }
-
-      const productMap = new Map(products.map(p => [p.id, p]));
-      const productIds = products.map(p => p.id);
-
-      // 2. Query order items for these products
-      const { data: items, error: itemsError } = await supabase
-        .from("order_items")
-        .select("id, order_id, product_id, quantity, unit_price, total_price")
-        .in("product_id", productIds);
-
-      if (itemsError || !items || items.length === 0) {
-        setOrders([]);
-        setLoading(false);
-        return;
-      }
-
-      const orderIds = [...new Set(items.map(i => i.order_id))];
-
-      // 3. Query the parent orders with address details
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          id, created_at, status, payment_status, total_amount, user_id, address_id,
-          addresses ( street, province, phone )
-        `)
-        .in("id", orderIds)
-        .order("created_at", { ascending: false });
-
-      if (ordersError || !ordersData) {
-        setOrders([]);
-        setLoading(false);
-        return;
-      }
-
-      // 4. Assemble clean MerchantOrder objects
-      const compiled: MerchantOrder[] = ordersData.map((o: any) => {
-        const orderItems = items
-          .filter(i => i.order_id === o.id)
-          .map(i => ({
-            ...i,
-            product_name: productMap.get(i.product_id)?.name || "Vegetable Item",
-            unit: productMap.get(i.product_id)?.unit || "kg",
-          }));
-
-        const addr = Array.isArray(o.addresses) ? o.addresses[0] : o.addresses;
-
-        return {
-          id: o.id,
-          created_at: o.created_at,
-          status: o.status || "pending",
-          payment_status: o.payment_status || "pending",
-          total_amount: o.total_amount || 0,
-          customer_phone: addr?.phone || "",
-          address_street: addr?.street || "",
-          address_province: addr?.province || "",
-          items: orderItems,
-        };
-      });
-
-      setOrders(compiled);
+      const data = await res.json();
+      setOrders(data.orders || []);
     } catch (err) {
       console.error("Error loading merchant orders:", err);
     } finally {
@@ -128,6 +67,15 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchOrders();
+
+    const channel = supabase
+      .channel("merchant-orders-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchOrders())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
@@ -196,74 +144,71 @@ export default function OrdersPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:px-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-            Orders Dashboard
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Realtime customer orders for your fresh vegetables
-          </p>
-        </div>
-        <button 
-          onClick={fetchOrders}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition disabled:opacity-50"
-        >
-          <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-          Refresh
-        </button>
-      </div>
+      <PageHeading
+        eyebrow="Order Fulfillment"
+        title="Customer Orders"
+        description="Realtime customer orders, dispatch status, and verified ABA payments."
+        action={
+          <button 
+            onClick={fetchOrders}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#dfe6d9] text-sm font-bold text-[var(--foreground)] hover:bg-[#fafbf9] shadow-xs transition disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        }
+      />
 
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <div className="bg-white rounded-[22px] p-5 border border-[#dfe6d9] card-shadow">
           <div className="flex items-center justify-between text-gray-400 mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Orders</span>
-            <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#7d8b79]">Total Orders</span>
+            <div className="w-8 h-8 rounded-lg bg-[#edf6e9] text-[var(--leaf-dark)] flex items-center justify-center">
               <ShoppingBag size={16} />
             </div>
           </div>
-          <div className="text-2xl font-black text-gray-900">{stats.total}</div>
-          <div className="mt-1 text-xs text-gray-400">All recorded orders</div>
+          <div className="text-2xl font-black text-[var(--foreground)] font-heading">{stats.total}</div>
+          <div className="mt-1 text-xs text-[#7d8b79]">All recorded orders</div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <div className="bg-white rounded-[22px] p-5 border border-[#dfe6d9] card-shadow">
           <div className="flex items-center justify-between text-gray-400 mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider">Pending Action</span>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">Pending Action</span>
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
               <Clock size={16} />
             </div>
           </div>
-          <div className="text-2xl font-black text-amber-600">{stats.pending}</div>
-          <div className="mt-1 text-xs text-amber-500 font-semibold">Requires preparation</div>
+          <div className="text-2xl font-black text-amber-600 font-heading">{stats.pending}</div>
+          <div className="mt-1 text-xs text-amber-600 font-semibold">Requires preparation</div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <div className="bg-white rounded-[22px] p-5 border border-[#dfe6d9] card-shadow">
           <div className="flex items-center justify-between text-gray-400 mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider">In Transit</span>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">In Transit</span>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <Truck size={16} />
             </div>
           </div>
-          <div className="text-2xl font-black text-blue-600">{stats.delivering}</div>
-          <div className="mt-1 text-xs text-gray-400">With distributors</div>
+          <div className="text-2xl font-black text-blue-600 font-heading">{stats.delivering}</div>
+          <div className="mt-1 text-xs text-blue-600/80">With distributors</div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <div className="bg-white rounded-[22px] p-5 border border-[#dfe6d9] card-shadow">
           <div className="flex items-center justify-between text-gray-400 mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider">Paid Revenue</span>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--leaf-dark)]">Paid Revenue</span>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <DollarSign size={16} />
+              <CreditCard size={16} />
             </div>
           </div>
-          <div className="text-2xl font-black text-emerald-700">{stats.revenue.toLocaleString()} <span className="text-xs font-bold text-gray-500">KHR</span></div>
+          <div className="text-2xl font-black text-emerald-700 font-heading">{stats.revenue.toLocaleString()} <span className="text-xs font-bold text-gray-500">KHR</span></div>
           <div className="mt-1 text-xs text-emerald-600 font-semibold">Confirmed payments</div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white rounded-[22px] p-4 border border-[#dfe6d9] card-shadow mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Status Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
           {[
@@ -275,10 +220,10 @@ export default function OrdersPage() {
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
                 statusFilter === tab.id
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  ? "bg-[var(--leaf-dark)] text-white shadow-xs"
+                  : "bg-[#fafbf9] text-[#556353] border border-[#dfe6d9] hover:bg-[#edf6e9]"
               }`}
             >
               {tab.label}
@@ -344,14 +289,14 @@ export default function OrdersPage() {
             return (
               <div 
                 key={order.id}
-                className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow"
+                className="bg-white rounded-[24px] border border-[#dfe6d9] p-5 sm:p-6 card-shadow card-lift"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#dfe6d9] pb-4 mb-4">
                   <div className="flex items-center gap-3">
-                    <span className="font-black text-gray-900 text-sm">
+                    <span className="font-black text-[var(--foreground)] text-sm font-heading">
                       #{order.id.slice(0, 8)}
                     </span>
-                    <span className="text-xs text-gray-400 font-medium">{dateStr}</span>
+                    <span className="text-xs text-[#7d8b79] font-medium">{dateStr}</span>
                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badge.bg}`}>
                       {badge.icon} {badge.label}
                     </span>
@@ -374,19 +319,72 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Items List */}
                   <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block mb-2">
-                      Vegetables Ordered
-                    </span>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                        Vegetables Ordered ({order.items.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewOrder({
+                          orderId: order.id,
+                          totalAmount: order.total_amount,
+                          status: order.status,
+                          address: { province: order.address_province, street: order.address_street, phone: order.customer_phone },
+                          items: order.items.map(it => ({
+                            id: it.id,
+                            product_id: it.product_id,
+                            product_name: it.product_name,
+                            quantity: it.quantity,
+                            unit: it.unit,
+                            unit_price: it.unit_price,
+                            total_price: it.total_price,
+                            img: it.img,
+                          })),
+                        })}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 hover:underline cursor-pointer"
+                      >
+                        <ImageIcon size={12} />
+                        <span>View Pictures</span>
+                      </button>
+                    </div>
                     <div className="space-y-1.5">
                       {order.items.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-xl px-3 py-2">
-                          <span className="font-bold text-gray-800">
-                            {item.product_name} <span className="text-green-600 font-extrabold">×{item.quantity}</span>
-                          </span>
-                          <span className="text-gray-500 font-semibold">
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setPreviewOrder({
+                            orderId: order.id,
+                            totalAmount: order.total_amount,
+                            status: order.status,
+                            address: { province: order.address_province, street: order.address_street, phone: order.customer_phone },
+                            items: order.items.map(it => ({
+                              id: it.id,
+                              product_id: it.product_id,
+                              product_name: it.product_name,
+                              quantity: it.quantity,
+                              unit: it.unit,
+                              unit_price: it.unit_price,
+                              total_price: it.total_price,
+                              img: it.img,
+                            })),
+                          })}
+                          className="w-full flex items-center justify-between text-xs bg-gray-50 hover:bg-green-50/60 rounded-xl px-3 py-2 border border-transparent hover:border-green-200 transition-all cursor-pointer text-left"
+                          title="Click to view produce picture"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {item.img ? (
+                              <img src={item.img} alt="" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
+                            ) : (
+                              <Package size={14} className="text-green-600 flex-shrink-0" />
+                            )}
+                            <span className="font-bold text-gray-800 truncate">
+                              {item.product_name} <span className="text-green-600 font-extrabold">×{item.quantity} {item.unit || "kg"}</span>
+                            </span>
+                          </div>
+                          <span className="text-gray-500 font-semibold flex-shrink-0 ml-2">
                             {item.total_price.toLocaleString()} KHR
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -452,6 +450,12 @@ export default function OrdersPage() {
           })}
         </div>
       )}
+
+      {/* Interactive Produce Pictures Modal */}
+      <OrderItemsPictureModal
+        order={previewOrder}
+        onClose={() => setPreviewOrder(null)}
+      />
     </main>
   );
 }

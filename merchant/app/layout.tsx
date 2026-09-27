@@ -19,8 +19,16 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "LocalVeg Merchant",
-  description: "Merchant dashboard for LocalVeg",
+  title: "LocalVeg Merchant — Farm & Inventory Portal",
+  description: "Merchant and farm management dashboard for LocalVeg community marketplace",
+  icons: {
+    icon: [
+      { url: "/icon.png" },
+      { url: "/image/logo.png" },
+    ],
+    shortcut: "/icon.png",
+    apple: "/image/logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -237,13 +237,16 @@ export default function CustomerOrderTrackingMap({
           maxZoom: 19,
         }).addTo(map);
 
+        const courierInitialLat = pickLat - 0.010;
+        const courierInitialLng = pickLng - 0.009;
+
         // 1. Destination Marker (Green Customer Doorstep Pin)
         const destIcon = L.divIcon({
           className: 'customer-dest-pin',
           html: `
             <div style="position:relative;width:42px;height:42px;display:flex;align-items:center;justify-content:center;">
-              <div style="position:absolute;width:40px;height:40px;border-radius:50% 50% 50% 0;background:#0A490A;border:3px solid #ffffff;box-shadow:0 8px 24px rgba(10,73,10,0.4);transform:rotate(-45deg);"></div>
-              <div style="position:relative;z-index:2;width:12px;height:12px;border-radius:50%;background:#0DB30D;border:2px solid #ffffff;"></div>
+              <div style="position:absolute;width:40px;height:40px;border-radius:50% 50% 50% 0;background:#1b4332;border:3px solid #ffffff;box-shadow:0 8px 24px rgba(27,67,50,0.4);transform:rotate(-45deg);"></div>
+              <div style="position:relative;z-index:2;width:12px;height:12px;border-radius:50%;background:#ddb892;border:2px solid #ffffff;"></div>
             </div>
           `,
           iconSize: [42, 42],
@@ -254,52 +257,67 @@ export default function CustomerOrderTrackingMap({
         const destMarker = L.marker([destLat, destLng], { icon: destIcon }).addTo(map);
         destMarker.bindPopup(`
           <div style="padding:6px;font-family:system-ui,sans-serif;font-size:13px;color:#182216;">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#0DB30D;margin-bottom:3px;">Your Delivery Address</div>
-            <strong style="font-size:14px;color:#182216;">Delivery Destination</strong>
+            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;color:#1b4332;margin-bottom:3px;">Stop 3 • Delivery Address</div>
+            <strong style="font-size:14px;color:#1b4332;">Your Doorstep</strong>
             <p style="margin:4px 0 0 0;color:#556052;font-size:12px;line-height:1.4;">${destination.address}</p>
           </div>
         `);
 
-        // 2. Pickup Marker (Amber Farm / Distributor Pin)
+        // 2. Pickup Marker (Saddle Brown Farm / Distributor Pin)
         const pickupIcon = L.divIcon({
           className: 'farm-pickup-pin',
           html: `
-            <div style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;">
-              <div style="position:absolute;width:36px;height:36px;border-radius:50% 50% 50% 0;background:#b96a1d;border:3px solid #ffffff;box-shadow:0 8px 20px rgba(185,106,29,0.35);transform:rotate(-45deg);"></div>
-              <div style="position:relative;z-index:2;width:10px;height:10px;border-radius:50%;background:#ffe4af;border:1.5px solid #ffffff;"></div>
+            <div style="position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
+              <div style="position:absolute;width:38px;height:38px;border-radius:50% 50% 50% 0;background:#4a3525;border:3px solid #ffffff;box-shadow:0 8px 20px rgba(74,53,37,0.35);transform:rotate(-45deg);"></div>
+              <div style="position:relative;z-index:2;width:10px;height:10px;border-radius:50%;background:#ddb892;border:1.5px solid #ffffff;"></div>
             </div>
           `,
-          iconSize: [38, 38],
-          iconAnchor: [19, 36],
-          popupAnchor: [0, -34],
+          iconSize: [40, 40],
+          iconAnchor: [20, 38],
+          popupAnchor: [0, -36],
         });
 
         const pickupMarker = L.marker([pickLat, pickLng], { icon: pickupIcon }).addTo(map);
         pickupMarker.bindPopup(`
           <div style="padding:6px;font-family:system-ui,sans-serif;font-size:13px;color:#182216;">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#b96a1d;margin-bottom:3px;">Sourced From</div>
-            <strong style="font-size:14px;color:#182216;">${pickup?.label || 'Local Vegetable Farm & Hub'}</strong>
+            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;color:#935626;margin-bottom:3px;">Stop 2 • Farm / Hub</div>
+            <strong style="font-size:14px;color:#4a3525;">${pickup?.label || 'Local Vegetable Farm & Hub'}</strong>
             <p style="margin:4px 0 0 0;color:#556052;font-size:12px;line-height:1.4;">${pickup?.address || 'Fresh Harvest Center'}</p>
           </div>
         `);
 
-        // Full route polyline
-        const fullRoute = L.polyline(
+        // Leg 1: Courier -> Pickup (Brown dashed route)
+        L.polyline(
+          [
+            [courierInitialLat, courierInitialLng],
+            [pickLat, pickLng],
+          ],
+          {
+            color: '#935626',
+            weight: 3.5,
+            opacity: 0.85,
+            dashArray: '6, 8',
+          }
+        ).addTo(map);
+
+        // Leg 2: Pickup -> Consumer Destination (Deep Green route)
+        L.polyline(
           [
             [pickLat, pickLng],
             [destLat, destLng],
           ],
           {
-            color: '#a7d79b',
-            weight: 3.5,
-            opacity: 0.8,
-            dashArray: '5, 8',
+            color: '#1b4332',
+            weight: 4,
+            opacity: 0.9,
+            dashArray: '8, 6',
           }
         ).addTo(map);
 
-        // Fit both pins inside the camera view
+        // Fit all 3 pins inside camera view
         try {
           const bounds = L.latLngBounds([
+            [courierInitialLat, courierInitialLng],
             [pickLat, pickLng],
             [destLat, destLng],
           ]);
@@ -693,18 +711,18 @@ export default function CustomerOrderTrackingMap({
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#b96a1d' }} />
-              Farm
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1b4332' }} />
+              1. Courier
             </span>
-            <span style={{ color: '#c9d2c5' }}>•</span>
+            <span style={{ color: '#c9d2c5' }}>→</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A490A' }} />
-              Driver
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4a3525' }} />
+              2. Pickup Farm
             </span>
-            <span style={{ color: '#c9d2c5' }}>•</span>
+            <span style={{ color: '#c9d2c5' }}>→</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0DB30D' }} />
-              You
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2d6a4f' }} />
+              3. Destination (You)
             </span>
           </div>
         )}

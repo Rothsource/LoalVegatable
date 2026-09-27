@@ -582,19 +582,19 @@ export default function ProfilePage() {
                     <input type="text" value={streetNumber} onChange={e => setStreetNumber(e.target.value)} style={khmerInputStyle} placeholder="e.g. St 271" />
                   </div>
                   <div>
-                    <label style={khmerLabelStyle}>Village (ភូមិ)</label>
+                    <label style={khmerLabelStyle}>Village</label>
                     <input type="text" value={khmerAddr.phum} onChange={e => setKhmerAddr(p => ({ ...p, phum: e.target.value }))} style={khmerInputStyle} />
                   </div>
                   <div>
-                    <label style={khmerLabelStyle}>Sangkat (ឃុំ/សង្កាត់)</label>
+                    <label style={khmerLabelStyle}>Sangkat / Commune</label>
                     <input type="text" value={khmerAddr.khum} onChange={e => setKhmerAddr(p => ({ ...p, khum: e.target.value }))} style={khmerInputStyle} />
                   </div>
                   <div>
-                    <label style={khmerLabelStyle}>District (ស្រុក/ខណ្ឌ)</label>
+                    <label style={khmerLabelStyle}>District</label>
                     <input type="text" value={khmerAddr.srok} onChange={e => setKhmerAddr(p => ({ ...p, srok: e.target.value }))} style={khmerInputStyle} />
                   </div>
                   <div>
-                    <label style={khmerLabelStyle}>Province (ខេត្ត/រាជធានី)</label>
+                    <label style={khmerLabelStyle}>Province / City</label>
                     <input type="text" value={khmerAddr.khett} onChange={e => setKhmerAddr(p => ({ ...p, khett: e.target.value }))} style={khmerInputStyle} />
                   </div>
                 </div>

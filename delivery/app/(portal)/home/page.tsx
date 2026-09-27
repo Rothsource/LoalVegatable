@@ -14,7 +14,6 @@ import {
   Zap, 
   Leaf, 
   Sparkles, 
-  PhoneCall,
   MapPin
 } from "lucide-react";
 import { CurrentDeliveryCard } from "@/components/delivery/CurrentDeliveryCard";
@@ -201,85 +200,30 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2-Column Responsive Layout for Activity & Field Guidelines */}
-      <div className="grid gap-6 lg:grid-cols-12 items-start">
-        {/* Left Column (7 cols): Recent Completed Deliveries */}
-        <section className="lg:col-span-7 rounded-3xl bg-white border border-[#dfe6d9] p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-3 pb-3 border-b border-[#f2f4ef]">
-            <div>
-              <h2 className="text-base font-bold tracking-tight font-heading text-[var(--foreground)]">Recent Dispatches</h2>
-              <p className="mt-0.5 text-xs text-[#7d8b79]">Your latest completed farm-to-door deliveries</p>
-            </div>
-            <Link href="/history" className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--leaf-accent)] hover:underline">
-              View History <ArrowRight size={14} />
-            </Link>
+      {/* Recent Completed Deliveries (Full Width) */}
+      <section className="rounded-3xl bg-white border border-[#dfe6d9] p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3 pb-3 border-b border-[#f2f4ef]">
+          <div>
+            <h2 className="text-base font-bold tracking-tight font-heading text-[var(--foreground)]">Recent Dispatches</h2>
+            <p className="mt-0.5 text-xs text-[#7d8b79]">Your latest completed farm-to-door deliveries</p>
           </div>
-
-          {history.length === 0 ? (
-            <div className="py-8 text-center text-xs text-[#7d8b79]">
-              No past deliveries on record for this shift yet.
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {history.slice(0, 4).map((item) => (
-                <HistoryCard key={item.id} item={item} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Right Column (5 cols): Field Safety & Operational Hotline */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Fresh Produce Transport Protocol */}
-          <section className="rounded-3xl bg-white border border-[#dfe6d9] p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <Leaf size={18} className="text-[var(--leaf)]" />
-              <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--foreground)] font-heading">
-                Produce Transport Guidelines
-              </h3>
-            </div>
-            <p className="text-xs text-[#556353] leading-relaxed mb-4">
-              Local vegetables lose crispness under direct tropical sunlight. Follow standard handling protocols:
-            </p>
-
-            <ul className="space-y-2.5 text-xs text-[#556353]">
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-md bg-[#edf6e9] text-[var(--leaf-dark)] font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
-                <span>Keep produce box zipped in insulated courier bag during transit.</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-md bg-[#edf6e9] text-[var(--leaf-dark)] font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
-                <span>Handle leafy greens (Bok Choy, Morning Glory) upright without squishing.</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-md bg-[#edf6e9] text-[var(--leaf-dark)] font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
-                <span>Confirm customer arrival code or photo dropoff confirmation in app.</span>
-              </li>
-            </ul>
-          </section>
-
-          {/* Dispatch Hotline Help */}
-          <section className="rounded-3xl bg-[#faf7f0] border border-[#dfe6d9] p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[var(--leaf)] text-white flex items-center justify-center shadow-xs">
-                  <PhoneCall size={16} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-[var(--foreground)] font-heading">Central Dispatch Assistance</h4>
-                  <p className="text-[11px] text-[#7d8b79]">Issues with farm pickup or dropoff?</p>
-                </div>
-              </div>
-              <a
-                href="tel:+85512345678"
-                className="px-3 py-1.5 rounded-xl bg-white border border-[#dfe6d9] text-xs font-bold text-[var(--leaf-dark)] hover:bg-[#edf6e9] transition-colors shadow-2xs"
-              >
-                Call Hotline
-              </a>
-            </div>
-          </section>
+          <Link href="/history" className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--leaf-accent)] hover:underline">
+            View History <ArrowRight size={14} />
+          </Link>
         </div>
-      </div>
+
+        {history.length === 0 ? (
+          <div className="py-8 text-center text-xs text-[#7d8b79]">
+            No past deliveries on record for this shift yet.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {history.slice(0, 6).map((item) => (
+              <HistoryCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

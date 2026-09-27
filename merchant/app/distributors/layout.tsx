@@ -76,13 +76,14 @@ export default function DistributorLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
           {/* Brand Logo & Tag */}
           <Link href="/distributors/orders" className="flex items-center gap-3 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#0DB30D] text-white shadow-sm transition-transform group-hover:scale-105">
-              <Truck size={20} strokeWidth={2.5} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white p-1 border border-[#dfe6d9] shadow-sm transition-transform group-hover:scale-105">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/image/logo.png" alt="LocalVeg" className="h-full w-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold tracking-tight text-[#0A490A]">
-                  LocalVegetable
+                <span className="text-base font-black tracking-tight text-[#0A490A] font-heading">
+                  LocalVeg
                 </span>
                 <span className="rounded-full bg-[#e8f5e5] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#2E6F40] border border-[#cbe4c6]">
                   Distributor

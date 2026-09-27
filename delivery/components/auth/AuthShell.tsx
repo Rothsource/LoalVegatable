@@ -9,8 +9,11 @@ export function AuthShell({ children, step }: { children: React.ReactNode; step?
         <div className="absolute -bottom-32 -left-20 h-96 w-96 rounded-full bg-[#8fbd74]/10 blur-2xl" />
         <div className="relative">
           <div className="inline-flex items-center gap-2.5">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[var(--leaf)]"><Bike size={21} /></span>
-            <div><p className="font-black">Local Vegetable</p><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#cfe7c4]">Delivery portal</p></div>
+            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white p-1.5 shadow-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/image/logo.png" alt="Local Vegetable" className="h-full w-full object-contain" />
+            </span>
+            <div><p className="font-black text-white text-base">Local Vegetable</p><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#cfe7c4]">Delivery portal</p></div>
           </div>
           <div className="mt-20 max-w-lg">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-[#e3f1dd]"><ShieldCheck size={14} /> Authorized riders only</span>

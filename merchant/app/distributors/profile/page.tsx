@@ -55,6 +55,46 @@ export default function DistributorProfilePage() {
     isPushSubscribed().then(setSubscribed);
   }, []);
 
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  async function handleToggleDistributorStatus() {
+    if (!profile) return;
+    setTogglingStatus(true);
+    const nextIsOpen = profile.status !== "Active";
+    const nextStatus = nextIsOpen ? "Active" : "Inactive";
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch("/api/merchant/shop-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ isOpen: nextIsOpen }),
+      });
+
+      if (res.ok) {
+        setProfile((prev) => prev ? { ...prev, status: nextStatus } : prev);
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from("profile_distributors")
+            .update({ status: nextStatus })
+            .eq("id", user.id);
+          setProfile((prev) => prev ? { ...prev, status: nextStatus } : prev);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTogglingStatus(false);
+    }
+  }
+
   async function handleEnableNotifications() {
     setSubscribing(true);
     setPushError("");
@@ -98,8 +138,9 @@ export default function DistributorProfilePage() {
       {/* ── Main Profile Badge Card ── */}
       <div className="rounded-[26px] border-2 border-[#e2e8dd] bg-white p-6 sm:p-8 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left border-b border-[#f0f4ee] pb-6">
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#0DB30D] text-white shadow-md flex-shrink-0">
-            <User size={36} strokeWidth={2.5} />
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white p-2 border border-[#dfe6d9] shadow-md flex-shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/image/logo.png" alt="LocalVeg" className="h-full w-full object-contain" />
           </div>
 
           <div className="space-y-1.5 min-w-0">
@@ -107,12 +148,16 @@ export default function DistributorProfilePage() {
               <h2 className="text-xl sm:text-2xl font-black text-[#182216]">
                 {profile.full_name}
               </h2>
-              <span className="rounded-full bg-[#ecfdf5] border border-[#a7f3d0] px-3 py-0.5 text-xs font-black uppercase text-[#065f46]">
-                ✓ Active
+              <span className={`rounded-full px-3 py-0.5 text-xs font-black uppercase ${
+                profile.status === "Active" 
+                  ? "bg-[#ecfdf5] border border-[#a7f3d0] text-[#065f46]"
+                  : "bg-gray-100 border border-gray-300 text-gray-700"
+              }`}>
+                {profile.status === "Active" ? "✓ Open for Duty" : "Offline / Closed"}
               </span>
             </div>
             <p className="text-sm font-medium text-[#52604f] flex items-center justify-center sm:justify-start gap-2">
-              <Mail size={14} className="text-[#0DB30D]" />
+              <Mail size={14} className="text-[#1b4332]" />
               <span>{profile.email}</span>
             </p>
           </div>
@@ -140,6 +185,46 @@ export default function DistributorProfilePage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* ── Operations & Synchronized Shop Status Card ── */}
+      <div className="rounded-[26px] border-2 border-[#e2e8dd] bg-white p-6 sm:p-8 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#2E6F40]">Dispatch & Operating Status</p>
+            <h3 className="text-lg font-black text-[#182216]">
+              {profile.status === "Active" ? "Shop & Hub: Open" : "Shop & Hub: Closed"}
+            </h3>
+            <p className="text-xs text-[#52604f] mt-0.5">
+              {profile.status === "Active" 
+                ? "Your farm & distributor hub is accepting orders • Synchronized with partner farm." 
+                : "Shop is closed. Customer orders are paused and linked farm is marked closed."}
+            </p>
+          </div>
+
+          {/* Modern Interactive Toggle Switch */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={profile.status === "Active"}
+            onClick={handleToggleDistributorStatus}
+            disabled={togglingStatus}
+            className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              profile.status === "Active" ? "bg-emerald-600" : "bg-neutral-300"
+            } ${togglingStatus ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                profile.status === "Active" ? "translate-x-6" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
+
+        <p className="text-[11px] text-[#71826d] pt-2 border-t border-[#edf2ea] leading-relaxed">
+          ℹ️ <strong>Bidirectional Sync:</strong> Toggling your distributor status will also synchronize your partner farm (<strong>{profile.merchant_name}</strong>) and fellow distributor dispatches.
+        </p>
       </div>
 
       {/* ── Order Alert Notifications Card ── */}

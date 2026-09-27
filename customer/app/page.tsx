@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Leaf, Users, ShieldCheck, Search, ShoppingBasket, Truck, ArrowRight, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { CircularLoader } from '@/components/CustomerSkeleton';
+import { isProductExpired, getTodayDateString } from '@/lib/expiry';
 
 // ── Design tokens ──────────────────────────────────────────────
 // Pulled from real produce, not a generic SaaS gradient:
@@ -40,9 +41,15 @@ export default function Home() {
 
   useEffect(() => {
     async function loadHomeData() {
-      // ── Live stats: real counts, not placeholder numbers ──
+      const today = getTodayDateString();
+
+      // ── Live stats: real counts of unexpired active produce ──
       const [{ count: productCount }, { data: merchants }] = await Promise.all([
-        supabase.from('products').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true)
+          .or(`expire_date.is.null,expire_date.gte.${today}`),
         supabase.from('profile_merchants').select('id, province'),
       ]);
 
@@ -56,15 +63,20 @@ export default function Home() {
         provinces: provinceSet.size,
       });
 
-      // ── Featured products: most recently listed, real photos ──
+      // ── Featured products: most recently listed, real photos, non-expired ──
       const { data: products } = await supabase
         .from('products')
-        .select('id, name, price, unit, profile_pic_url, merchant_id, categories(name)')
+        .select('id, name, price, unit, profile_pic_url, merchant_id, expire_date, categories(name)')
         .eq('is_active', true)
+        .or(`expire_date.is.null,expire_date.gte.${today}`)
         .order('created_at', { ascending: false })
-        .limit(4);
+        .limit(10);
 
-      const merchantIds = [...new Set((products ?? []).map((p: any) => p.merchant_id).filter(Boolean))];
+      const validProducts = (products ?? [])
+        .filter((p: any) => !isProductExpired(p.expire_date))
+        .slice(0, 4);
+
+      const merchantIds = [...new Set(validProducts.map((p: any) => p.merchant_id).filter(Boolean))];
       const { data: merchantRows } = merchantIds.length
         ? await supabase.from('profile_merchants').select('id, full_name, community_name').in('id', merchantIds)
         : { data: [] as any[] };
@@ -73,7 +85,7 @@ export default function Home() {
       (merchantRows ?? []).forEach((m: any) => { merchantMap[m.id] = m; });
 
       setFeatured(
-        (products ?? []).map((p: any) => ({
+        validProducts.map((p: any) => ({
           id: p.id,
           name: p.name,
           category: p.categories?.name ?? 'Uncategorized',

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Truck, ArrowRight, Lock, Mail, RefreshCw, AlertCircle } from "lucide-react";
+import { ArrowRight, Lock, Mail, RefreshCw, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function DistributorLoginPage() {
@@ -62,8 +62,9 @@ export default function DistributorLoginPage() {
       <div className="w-full max-w-md rounded-[28px] border-2 border-[#dfe6d9] bg-white p-8 sm:p-10 shadow-[0_8px_30px_rgba(46,111,64,0.06)] space-y-6">
         {/* Brand header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0DB30D] text-white shadow-md">
-            <Truck size={28} strokeWidth={2.5} />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2 border border-[#dfe6d9] shadow-md">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/image/logo.png" alt="LocalVeg" className="h-full w-full object-contain" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-[#182216] tracking-tight">

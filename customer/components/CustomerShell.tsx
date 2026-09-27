@@ -53,7 +53,8 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
   // Sync active orders
   const syncOrders = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) {
         setActiveOrderCount(0);
         return;

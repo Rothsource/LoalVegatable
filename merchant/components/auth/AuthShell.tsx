@@ -23,8 +23,11 @@ export default function AuthShell({ eyebrow, title, description, children, foote
 
           <div className="relative z-10">
             <Link href="/auth/login" className="flex items-center gap-3 transition hover:opacity-90">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-sm font-black text-white shadow-lg shadow-emerald-500/30">LV</span>
-              <span className="text-xl font-black tracking-tight text-white">LocalVeg</span>
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white p-1.5 shadow-lg shadow-emerald-950/40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/image/logo.png" alt="LocalVeg" className="h-full w-full object-contain" />
+              </span>
+              <span className="text-xl font-black tracking-tight text-white font-heading">LocalVeg</span>
             </Link>
           </div>
           
@@ -58,8 +61,11 @@ export default function AuthShell({ eyebrow, title, description, children, foote
         <section className="flex items-center p-6 sm:p-10 lg:p-16">
           <div className="mx-auto w-full max-w-sm">
             <Link href="/auth/login" className="mb-10 flex items-center gap-3 font-black text-gray-900 lg:hidden">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-xs text-white shadow-lg shadow-emerald-500/30">LV</span>
-              <span className="text-xl">LocalVeg</span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1 border border-[#dfe6d9] shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/image/logo.png" alt="LocalVeg" className="h-full w-full object-contain" />
+              </span>
+              <span className="text-xl font-heading font-black">LocalVeg</span>
             </Link>
             
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-emerald-600">{eyebrow}</p>

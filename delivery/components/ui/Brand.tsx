@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Leaf } from "lucide-react";
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <Link href="/home" className="inline-flex items-center gap-2.5 no-underline" aria-label="Local Vegetable Delivery home">
-      <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-[var(--leaf)] text-white shadow-[0_8px_24px_rgba(46,111,64,0.2)]">
-        <Leaf size={20} strokeWidth={2.4} aria-hidden="true" />
-      </span>
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] bg-white p-1 border border-[var(--line)] shadow-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/image/logo.png" alt="Local Vegetable" className="h-full w-full object-contain" />
+      </div>
       {!compact && (
         <span className="leading-none">
           <span className="block text-[15px] font-extrabold tracking-[-0.02em] text-[var(--ink)]">Local Vegetable</span>

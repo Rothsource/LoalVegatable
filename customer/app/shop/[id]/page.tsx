@@ -5,6 +5,7 @@ import { Heart, Star, Leaf, X, Trash2, HeartOff, SlidersHorizontal, ChevronLeft,
 import { useAuth } from '@/lib/useAuth';
 import { CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
+import { isProductExpired, getTodayDateString } from '@/lib/expiry';
 
 interface Product {
   id: string;
@@ -159,26 +160,37 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isFavOpen, setIsFavOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isShopOpen, setIsShopOpen] = useState(true);
 
   const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
   const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
 
-  // Fetch shop + products — UNCHANGED
+  // Fetch shop + products
   useEffect(() => {
     async function fetchShopData() {
-      const { data: merchant } = await supabase
-        .from('profile_merchants')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const [merchantRes, statusRes] = await Promise.all([
+        supabase.from('profile_merchants').select('*').eq('id', id).single(),
+        fetch(`/api/shop-status?merchantId=${id}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+
+      const merchant = merchantRes.data;
+      if (statusRes?.is_open !== undefined) {
+        setIsShopOpen(Boolean(statusRes.is_open));
+      } else if (merchant?.is_open !== undefined) {
+        setIsShopOpen(Boolean(merchant.is_open));
+      }
+
+      const today = getTodayDateString();
 
       const { data: prods } = await supabase
         .from('products')
         .select('*, categories(name)')
         .eq('merchant_id', id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .or(`expire_date.is.null,expire_date.gte.${today}`);
 
-      const productIds = (prods ?? []).map((p: any) => p.id);
+      const validProds = (prods ?? []).filter((p: any) => !isProductExpired(p.expire_date));
+      const productIds = validProds.map((p: any) => p.id);
       let ratingMap: Record<string, number> = {};
 
       if (productIds.length > 0) {
@@ -203,7 +215,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
 
       setShop(merchant);
       setProducts(
-        (prods ?? []).map((p: any) => ({
+        validProds.map((p: any) => ({
           id: p.id,
           name: p.name,
           category: p.categories?.name ?? 'Uncategorized',
@@ -296,23 +308,30 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   // addToCart — UNCHANGED
   const addToCart = (product: Product, qty: number) => {
     if (!requireAuth()) return;
+    if (product.quantity <= 0) return;
+    const addAmount = Math.max(1, qty);
     const existing = cartItems[product.id];
-    const newQty = Math.min((existing?.qty ?? 0) + qty, product.quantity);
+    const newQty = Math.max(1, Math.min((existing?.qty ?? 0) + addAmount, product.quantity));
     setCartItems(prev => ({ ...prev, [product.id]: { ...product, qty: newQty } }));
     setPendingQty(prev => ({ ...prev, [product.id]: 1 }));
     try {
       const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
-      stored[product.id] = { ...product, qty: newQty, shopName: shop?.community_name ?? '', shopSlug: shop?.id ?? '', shopAvatar: shop?.profile_url ?? '' };
+      const sName = shop?.community_name ?? shop?.full_name ?? 'Local Farm';
+      const sAvatar = shop?.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sName)}&background=0DB30D&color=fff&size=50`;
+      stored[product.id] = { ...product, qty: newQty, shopName: sName, shopSlug: shop?.id ?? '', shopAvatar: sAvatar };
       localStorage.setItem('cart-products', JSON.stringify(stored));
     } catch (e) {}
   };
 
   const updateCartQty = (productId: string, newQty: number) => {
     if (newQty <= 0) { removeFromCart(productId); return; }
-    setCartItems(prev => ({ ...prev, [productId]: { ...prev[productId], qty: newQty } }));
+    const item = cartItems[productId];
+    const maxQty = item?.quantity ?? products.find(p => p.id === productId)?.quantity ?? 999;
+    const clamped = Math.max(1, Math.min(newQty, maxQty));
+    setCartItems(prev => ({ ...prev, [productId]: { ...prev[productId], qty: clamped } }));
     try {
       const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
-      if (stored[productId]) { stored[productId].qty = newQty; localStorage.setItem('cart-products', JSON.stringify(stored)); }
+      if (stored[productId]) { stored[productId].qty = clamped; localStorage.setItem('cart-products', JSON.stringify(stored)); }
     } catch (e) {}
   };
 
@@ -361,8 +380,8 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const shopName = shop.community_name ?? shop.full_name ?? 'Unknown Shop';
   const shopOwner = shop.full_name ?? '';
   const shopLocation = shop.province ?? '';
-  const shopAvatar = shop.profile_url ?? '';
-  const shopCover = shop.background_urls?.[0] ?? 'https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&w=1200&q=80';
+  const shopAvatar = shop.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(shopName)}&background=0DB30D&color=fff&size=80`;
+  const shopCover = shop.background_urls?.[0] || 'https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&w=1200&q=80';
   const shopVerified = shop.is_verified ?? false;
 
   return (
@@ -373,7 +392,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
       {selectedProduct && (
         <div className="info-modal-overlay" onClick={() => setSelectedProduct(null)}>
           <div className="info-modal-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <img src={selectedProduct.img} style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }} alt="" />
+            <img src={selectedProduct.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'} style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }} alt="" />
             <button onClick={() => setSelectedProduct(null)} style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <X size={18} color="#fff" />
             </button>
@@ -437,13 +456,13 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                   style={{ padding: '10px 12px', borderRadius: '12px', border: '2px solid #f0f0f0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Heart size={20} fill={favorites.includes(selectedProduct.id) ? "#ef4444" : "none"} color={favorites.includes(selectedProduct.id) ? "#ef4444" : "#333"} />
                 </button>
-                {selectedProduct.isAvailable && (
+                {selectedProduct.isAvailable && isShopOpen && (
                   <QtyStepper value={modalQty} onChange={setModalQty} max={selectedProduct.quantity} size="md" />
                 )}
-                <button disabled={!selectedProduct.isAvailable}
+                <button disabled={!selectedProduct.isAvailable || !isShopOpen}
                   onClick={() => { addToCart(selectedProduct, modalQty); setModalQty(1); setSelectedProduct(null); }}
-                  style={{ flex: 1, backgroundColor: selectedProduct.isAvailable ? brandGreen : '#f3f4f6', color: selectedProduct.isAvailable ? '#fff' : '#9ca3af', border: 'none', padding: '13px', borderRadius: '12px', fontWeight: '700', cursor: selectedProduct.isAvailable ? 'pointer' : 'not-allowed', fontSize: '14px', fontFamily: 'inherit' }}>
-                  {selectedProduct.isAvailable ? `Add${modalQty > 1 ? ` ${modalQty}` : ''} to Basket` : 'Out of Stock'}
+                  style={{ flex: 1, backgroundColor: !isShopOpen ? '#fee2e2' : selectedProduct.isAvailable ? brandGreen : '#f3f4f6', color: !isShopOpen ? '#b91c1c' : selectedProduct.isAvailable ? '#fff' : '#9ca3af', border: !isShopOpen ? '1px solid #fecdd3' : 'none', padding: '13px', borderRadius: '12px', fontWeight: '800', cursor: selectedProduct.isAvailable && isShopOpen ? 'pointer' : 'not-allowed', fontSize: '14px', fontFamily: 'inherit' }}>
+                  {!isShopOpen ? 'Shop Closed' : selectedProduct.isAvailable ? `Add${modalQty > 1 ? ` ${modalQty}` : ''} to Basket` : 'Out of Stock'}
                 </button>
               </div>
             </div>
@@ -468,7 +487,7 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                 </div>
               ) : cartList.map(item => (
                 <div key={item.id} style={{ display: 'flex', gap: '12px', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' }}>
-                  <img src={item.img} style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} alt="" />
+                  <img src={item.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'} style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} alt="" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h5 style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: '700', color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</h5>
                     <p style={{ margin: '0 0 8px', color: '#9ca3af', fontSize: '12px' }}>{item.price.toLocaleString()} KHR / {item.unit}</p>
@@ -631,12 +650,43 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
               <h2 style={{ margin: 0, fontSize: '26px', fontWeight: '800', color: deepGreen }}>{shopName}</h2>
               {shopVerified && <ShieldCheck size={20} color={brandGreen} />}
+              {!isShopOpen ? (
+                <span style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '3px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>
+                  ● Shop Closed
+                </span>
+              ) : (
+                <span style={{ backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '3px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>
+                  ● Open for Orders
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', fontSize: '14px', marginBottom: '16px' }}>
               <MapPin size={14} />
               <span>{shopLocation}</span>
               {shopOwner && <><span style={{ marginLeft: '8px', color: '#ccc' }}>·</span><span style={{ marginLeft: '8px' }}>by {shopOwner}</span></>}
             </div>
+
+            {!isShopOpen && (
+              <div style={{
+                marginTop: '12px',
+                backgroundColor: '#fff1f2',
+                border: '1.5px solid #fecdd3',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                color: '#9f1239'
+              }}>
+                <span style={{ fontSize: '22px' }}>🚪</span>
+                <div>
+                  <div style={{ fontWeight: '800', fontSize: '14px' }}>Farm Shop Temporarily Closed</div>
+                  <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>
+                    This local grower has paused operations for today. You can still browse the harvest catalog, but new orders cannot be placed at this time.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -694,13 +744,16 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                     style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10, backgroundColor: surfaceWhite, border: 'none', borderRadius: '50%', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <Heart size={18} fill={favorites.includes(veg.id) ? "#ef4444" : "none"} color={favorites.includes(veg.id) ? "#ef4444" : "#333"} />
                   </button>
-                  {!veg.isAvailable && (
+                  {!isShopOpen ? (
+                    <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, backgroundColor: '#991b1b', color: '#fff', fontSize: '10px', fontWeight: '800', padding: '4px 10px', borderRadius: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.25)', letterSpacing: '0.04em' }}>
+                      SHOP CLOSED
+                    </div>
+                  ) : !veg.isAvailable ? (
                     <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, backgroundColor: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '100px' }}>Out of Stock</div>
-                  )}
-                  {veg.isAvailable && inCart && (
+                  ) : inCart ? (
                     <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, backgroundColor: deepGreen, color: '#fff', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '100px' }}>{inCart.qty} in basket</div>
-                  )}
-                  <img src={veg.img} style={{ width: '100%', height: '190px', objectFit: 'cover', opacity: veg.isAvailable ? 1 : 0.55 }} alt={veg.name} />
+                  ) : null}
+                  <img src={veg.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'} style={{ width: '100%', height: '190px', objectFit: 'cover', opacity: !isShopOpen ? 0.65 : veg.isAvailable ? 1 : 0.55 }} alt={veg.name} />
                   <div style={{ padding: '18px' }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: brandGreen }}>{veg.category}</span>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 6px' }}>
@@ -731,7 +784,11 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
                       <Leaf size={12} color={brandGreen} />
                       <span style={{ fontSize: '12px', fontWeight: '700', color: deepGreen }}>{veg.benefit}</span>
                     </div>
-                    {veg.isAvailable ? (
+                    {!isShopOpen ? (
+                      <button disabled style={{ width: '100%', backgroundColor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '10px', borderRadius: '10px', fontWeight: '700', cursor: 'not-allowed', fontSize: '12px', fontFamily: 'inherit' }}>
+                        Closed (Temporarily)
+                      </button>
+                    ) : veg.isAvailable ? (
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                         <QtyStepper value={pQty} onChange={v => setPendingQty(prev => ({ ...prev, [veg.id]: v }))} max={veg.quantity} size="sm" />
                         <button onClick={e => { e.stopPropagation(); addToCart(veg, pQty); }}

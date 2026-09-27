@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: "LocalVegetable — Farm Fresh, Delivered",
   description:
     "Discover seasonal vegetables sourced directly from local farmers. Fresh, organic, and delivered to your door.",
+  icons: {
+    icon: "/image/logo.png",
+    shortcut: "/image/logo.png",
+    apple: "/image/logo.png",
+  },
 };
 
 export default function RootLayout({

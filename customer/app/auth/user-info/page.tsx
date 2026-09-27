@@ -573,28 +573,28 @@ export default function UserInfoPage() {
               </p>
               <div className="khmer-grid">
                 <div>
-                  <label style={khmerLabelStyle}>លេខផ្ទះ (House No.) Optional</label>
+                  <label style={khmerLabelStyle}>House No. (Optional)</label>
                   <input type="text" placeholder="e.g. #123" value={houseNumber} onChange={e => setHouseNumber(e.target.value)} style={khmerInputStyle} />
                 </div>
                 <div>
-                  <label style={khmerLabelStyle}>លេខផ្លូវ (Street No.) Optional</label>
+                  <label style={khmerLabelStyle}>Street No. (Optional)</label>
                   <input type="text" placeholder="e.g. St 271" value={streetNumber} onChange={e => setStreetNumber(e.target.value)} style={khmerInputStyle} />
                 </div>
                 <div>
-                  <label style={khmerLabelStyle}>ភូមិ (Village)</label>
-                  <input type="text" value={khmerAddr.phum} onChange={e => setKhmerAddr(p => ({ ...p, phum: e.target.value }))} placeholder="ភូមិ" style={khmerInputStyle} />
+                  <label style={khmerLabelStyle}>Village</label>
+                  <input type="text" value={khmerAddr.phum} onChange={e => setKhmerAddr(p => ({ ...p, phum: e.target.value }))} placeholder="Village" style={khmerInputStyle} />
                 </div>
                 <div>
-                  <label style={khmerLabelStyle}>ឃុំ/សង្កាត់ (Sangkat)</label>
-                  <input type="text" value={khmerAddr.khum} onChange={e => setKhmerAddr(p => ({ ...p, khum: e.target.value }))} placeholder="ឃុំ/សង្កាត់" style={khmerInputStyle} />
+                  <label style={khmerLabelStyle}>Sangkat / Commune</label>
+                  <input type="text" value={khmerAddr.khum} onChange={e => setKhmerAddr(p => ({ ...p, khum: e.target.value }))} placeholder="Sangkat / Commune" style={khmerInputStyle} />
                 </div>
                 <div>
-                  <label style={khmerLabelStyle}>ស្រុក/ខណ្ឌ (District)</label>
-                  <input type="text" value={khmerAddr.srok} onChange={e => setKhmerAddr(p => ({ ...p, srok: e.target.value }))} placeholder="ស្រុក/ខណ្ឌ" style={khmerInputStyle} />
+                  <label style={khmerLabelStyle}>District</label>
+                  <input type="text" value={khmerAddr.srok} onChange={e => setKhmerAddr(p => ({ ...p, srok: e.target.value }))} placeholder="District" style={khmerInputStyle} />
                 </div>
                 <div>
-                  <label style={khmerLabelStyle}>ខេត្ត/រាជធានី (Province)</label>
-                  <input type="text" value={khmerAddr.khett} onChange={e => setKhmerAddr(p => ({ ...p, khett: e.target.value }))} placeholder="ខេត្ត/រាជធានី" style={khmerInputStyle} />
+                  <label style={khmerLabelStyle}>Province / City</label>
+                  <input type="text" value={khmerAddr.khett} onChange={e => setKhmerAddr(p => ({ ...p, khett: e.target.value }))} placeholder="Province / City" style={khmerInputStyle} />
                 </div>
               </div>
             </div>

@@ -29,12 +29,15 @@ export default function DistributorShell({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f9f3] text-gray-900">
-      <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 shadow-sm backdrop-blur-xl">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <header className="sticky top-0 z-40 border-b border-[#dfe6d9] bg-[#faf7f0]/90 shadow-2xs backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/delivery/orders" className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-green-600 text-xs font-black text-white">LV</span>
-            <span className="truncate text-sm font-black">LocalVeg <span className="font-semibold text-green-600">Delivery</span></span>
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl overflow-hidden bg-white p-1 border border-[#dfe6d9] shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/image/logo.png" alt="LocalVeg" className="h-full w-full object-contain" />
+            </span>
+            <span className="truncate text-base font-black font-heading">LocalVeg <span className="font-extrabold text-[var(--leaf-dark)] text-xs uppercase tracking-wider ml-1 px-2 py-0.5 rounded-full bg-[#edf6e9] border border-[#c8dfc5]">Delivery</span></span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex" aria-label="Distributor navigation">
             {links.map((link) => {
