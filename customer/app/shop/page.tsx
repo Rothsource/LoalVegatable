@@ -3,8 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Search, Star, Heart, ShoppingBasket, Store, ChevronDown, SlidersHorizontal, X, RotateCcw, Plus, Minus, Leaf, Box, Calendar, MapPin, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import { ProductGridSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 
@@ -358,13 +357,6 @@ export default function ShopPage() {
     }
   }, [allProducts, search, selectedCategory, sortBy, showOnlyAvailable, minPrice, maxPrice]);
 
-  // ── Loading state — UNCHANGED ───────────────────────────────────────────
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Plus Jakarta Sans', sans-serif", color: deepGreen, fontWeight: '700', fontSize: '16px' }}>
-      Loading products…
-    </div>
-  );
-
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fafafa', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <style>{`
@@ -610,8 +602,6 @@ export default function ShopPage() {
         </div>
       )}
 
-      <Navbar />
-
       {/* ── FLOATING CART BUTTON (NEW) ── */}
       <button
         className="float-cart-btn"
@@ -677,8 +667,15 @@ export default function ShopPage() {
           Showing <span style={{ color: deepGreen, fontWeight: '800' }}>{processed.length}</span> of {allProducts.length} products
         </p>
 
-        {/* ── Product Grid — UNCHANGED ── */}
-        {processed.length === 0 ? (
+        {/* ── Product Grid ── */}
+        {loading ? (
+          <div className="mb-20 space-y-6">
+            <div className="flex items-center justify-center py-2">
+              <CircularLoader size={40} />
+            </div>
+            <ProductGridSkeleton count={8} />
+          </div>
+        ) : processed.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#999' }}>
             <p style={{ fontSize: '18px', fontWeight: '600' }}>No products match your filters.</p>
             <button onClick={() => { setSelectedCategory('All'); setMinPrice(''); setMaxPrice(''); setShowOnlyAvailable(false); setSearch(''); }}
@@ -768,8 +765,6 @@ export default function ShopPage() {
           </div>
         )}
       </main>
-
-      <Footer />
     </div>
   );
 }

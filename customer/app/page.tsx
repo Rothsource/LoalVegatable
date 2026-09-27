@@ -3,9 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Leaf, Users, ShieldCheck, Search, ShoppingBasket, Truck, ArrowRight, ChevronDown } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 
 // ── Design tokens ──────────────────────────────────────────────
 // Pulled from real produce, not a generic SaaS gradient:
@@ -301,8 +300,6 @@ export default function Home() {
         }
       `}</style>
 
-      <Navbar />
-
       {/* ── Hero — full-width text, no illustration ── */}
       <section style={{ position: 'relative', overflow: 'hidden', backgroundColor: paper, padding: '0 0 96px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '80px 5% 0', position: 'relative', zIndex: 1 }}>
@@ -418,6 +415,12 @@ export default function Home() {
               View all vegetables <ArrowRight size={16} />
             </Link>
           </div>
+
+          {loadingFeatured && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+              <CircularLoader size={42} label="Fetching fresh harvest" />
+            </div>
+          )}
 
           <div className="featured-grid reveal-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
             {loadingFeatured
@@ -561,8 +564,6 @@ export default function Home() {
           </a>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 }

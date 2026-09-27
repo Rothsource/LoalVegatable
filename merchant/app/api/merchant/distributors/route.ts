@@ -1,21 +1,21 @@
+// app/api/merchant/distributors/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin, getRequestUser } from "@/lib/supabaseAdmin";
+import {
+  mapDistributorRow,
+  sanitizeDistributorForm,
+  validateDistributorForm,
+} from "@/lib/distributors";
+import { createSupabaseAdmin, getRequestMerchant } from "@/lib/supabaseAdmin";
 
 type DistributorBody = {
   name?: string;
   email?: string;
-  phone?: string;
-  deliveryArea?: string;
-  password?: string;
 };
 
-function text(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
+const DISTRIBUTOR_COLUMNS = "id, merchant_id, full_name, email, status, created_at";
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const admin = createSupabaseAdmin();
-
   if (!admin) {
     return NextResponse.json(
       { error: "Distributor accounts need SUPABASE_SERVICE_ROLE_KEY on the merchant server." },
@@ -23,68 +23,79 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const auth = await getRequestUser(request, admin);
-  if (!auth.user) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const auth = await getRequestMerchant(request, admin);
+  if (!auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const { data, error } = await admin
+    .from("profile_distributors")
+    .select(DISTRIBUTOR_COLUMNS)
+    .eq("merchant_id", auth.user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ distributors: (data ?? []).map(mapDistributorRow) });
+}
+
+export async function POST(request: NextRequest) {
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Distributor accounts need SUPABASE_SERVICE_ROLE_KEY on the merchant server." },
+      { status: 501 }
+    );
   }
 
-  const body = (await request.json()) as DistributorBody;
-  const name = text(body.name);
-  const email = text(body.email);
-  const phone = text(body.phone);
-  const deliveryArea = text(body.deliveryArea);
-  const password = text(body.password);
+  const auth = await getRequestMerchant(request, admin);
+  if (!auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  if (!name || !email || !password) {
-    return NextResponse.json({ error: "Name, email, and temporary password are required." }, { status: 400 });
+  let body: DistributorBody;
+  try {
+    body = (await request.json()) as DistributorBody;
+  } catch {
+    return NextResponse.json({ error: "Invalid distributor details." }, { status: 400 });
   }
 
-  if (password.length < 8) {
-    return NextResponse.json({ error: "Temporary password must be at least 8 characters." }, { status: 400 });
-  }
+  const input = sanitizeDistributorForm(body);
+  const validationError = validateDistributorForm(input);
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
+  // No password set here — distributor claims their account via magic link after admin approval.
   const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+    email: input.email,
+    email_confirm: false,
     user_metadata: {
       role: "distributor",
-      full_name: name,
-      phone,
-      delivery_area: deliveryArea,
+      full_name: input.name,
       merchant_id: auth.user.id,
+      status: "pending",
     },
   });
 
   if (error || !data.user) {
-    return NextResponse.json({ error: error?.message ?? "Could not create distributor account." }, { status: 400 });
+    return NextResponse.json(
+      { error: error?.message ?? "Could not create distributor account." },
+      { status: 400 }
+    );
   }
 
   const distributor = {
     id: data.user.id,
     merchant_id: auth.user.id,
-    full_name: name,
-    email,
-    phone,
-    delivery_area: deliveryArea,
-    status: "Active",
+    full_name: input.name,
+    email: input.email,
+    status: "pending",
     created_at: new Date().toISOString(),
   };
 
   const { error: profileError } = await admin.from("profile_distributors").insert(distributor);
 
-  return NextResponse.json({
-    ok: true,
-    distributor: {
-      id: data.user.id,
-      name,
-      email,
-      phone,
-      deliveryArea,
-      status: "Active",
-    },
-    warning: profileError
-      ? `Distributor login created, but profile table sync failed: ${profileError.message}`
-      : null,
-  });
+  if (profileError) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    return NextResponse.json(
+      { error: `Could not save the distributor profile: ${profileError.message}` },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json({ ok: true, distributor: mapDistributorRow(distributor) });
 }

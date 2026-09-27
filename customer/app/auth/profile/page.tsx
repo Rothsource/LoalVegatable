@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapPin, Navigation, Search, Loader2, ExternalLink, Pencil } from 'lucide-react';
+import { PageSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 
 // ── Same design tokens as the rest of the app ──
@@ -317,6 +318,45 @@ export default function ProfilePage() {
 
       if (profileError) throw profileError;
 
+      // Also save as the customer's default address, so checkout can find it
+      // (customer/app/cart/page.tsx reads addresses where is_default = true).
+      // No unique constraint on user_id, so check-then-write instead of upsert.
+      if (editingLocation && khmerAddr.lat != null && khmerAddr.lng != null) {
+        const streetCombined = [houseNumber, streetNumber, khmerAddr.phum, khmerAddr.khum, khmerAddr.srok]
+          .filter(Boolean)
+          .join(', ');
+
+        const { data: existingAddr } = await supabase
+          .from('addresses')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_default', true)
+          .maybeSingle();
+
+        if (existingAddr) {
+          await supabase
+            .from('addresses')
+            .update({
+              street: streetCombined,
+              province: khmerAddr.khett,
+              lat: khmerAddr.lat,
+              lng: khmerAddr.lng,
+            })
+            .eq('id', existingAddr.id);
+        } else {
+          await supabase
+            .from('addresses')
+            .insert({
+              user_id: userId,
+              street: streetCombined,
+              province: khmerAddr.khett,
+              lat: khmerAddr.lat,
+              lng: khmerAddr.lng,
+              is_default: true,
+            });
+        }
+      }
+
       // Auth fields — only send what actually changed
       const authUpdate: { email?: string; password?: string } = {};
       const { data: { user } } = await supabase.auth.getUser();
@@ -366,16 +406,18 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", color: soil, fontWeight: '700', fontSize: '16px', backgroundColor: paper }}>
-        Loading your profile...
+      <div style={{ minHeight: '100vh', backgroundColor: paper, padding: '40px 0' }}>
+        <div className="flex justify-center pb-4">
+          <CircularLoader size={42} />
+        </div>
+        <PageSkeleton />
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: paper, fontFamily: "'Inter', sans-serif" }}>
+    <div className="enter-up" style={{ minHeight: '100vh', backgroundColor: paper, fontFamily: "'Inter', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700;800&display=swap');
         .profile-veg-heading { font-family: 'Fraunces', serif; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .leaflet-container { font-family: Inter, sans-serif !important; }
@@ -509,8 +551,8 @@ export default function ProfilePage() {
                 <div style={{ border: '1px solid #e4dccb', borderRadius: '12px', overflow: 'hidden', position: 'relative', marginBottom: '10px' }}>
                   <div ref={mapRef} className="profile-map-box" style={{ width: '100%', background: '#eef1ee' }}>
                     {!mapLoaded && (
-                      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: leaf, fontSize: '13px', fontWeight: '600' }}>
-                        Loading map…
+                      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CircularLoader size={34} />
                       </div>
                     )}
                   </div>
@@ -527,7 +569,7 @@ export default function ProfilePage() {
                 </div>
 
                 <p style={{ fontSize: '11.5px', color: '#8a7d6f', fontWeight: '600', margin: '0 0 12px' }}>
-                  {pickedLabel ? `📍 ${pickedLabel}` : 'Type to search, or click on the map to drop a pin'}
+                  {pickedLabel ? pickedLabel : 'Type to search, or click on the map to drop a pin'}
                 </p>
 
                 <div className="khmer-grid">

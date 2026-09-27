@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPasswordPage() {
@@ -75,7 +75,9 @@ export default function ResetPasswordPage() {
         <div className="rp-form-inner">
           {success ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#eff6ef', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#2e7d32' }}>
+                <CheckCircle2 size={36} />
+              </div>
               <h2 style={{ color: '#2e7d32', fontWeight: 800, fontSize: '28px', marginBottom: '12px' }}>
                 Password updated!
               </h2>

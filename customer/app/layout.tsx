@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
+import CustomerShell from "@/components/CustomerShell";
 
 export const metadata: Metadata = {
   title: "LocalVegetable — Farm Fresh, Delivered",
@@ -14,7 +16,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <CustomerShell>{children}</CustomerShell>
+      </body>
     </html>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -100,7 +101,9 @@ export default function RegisterPage() {
         <div className="register-form-inner">
           {success ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📬</div>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#eff6ef', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#2e7d32' }}>
+                <Mail size={32} />
+              </div>
               <h2 style={{ color: '#2e7d32', fontWeight: '800', fontSize: '28px', marginBottom: '12px' }}>Check your email!</h2>
               <p style={{ color: '#666', fontSize: '15px', lineHeight: '1.6' }}>
                 We sent a confirmation link to <strong>{email}</strong>.<br />Click it to activate your account.
@@ -138,8 +141,13 @@ export default function RegisterPage() {
                     <input type="checkbox" checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} style={{ accentColor: '#2e7d32' }} /> Subscribe to our newsletter
                   </label>
                 </div>
-                <button onClick={handleRegister} disabled={loading} style={{ ...btnPrimaryStyle, opacity: loading ? 0.7 : 1 }}>
-                  {loading ? 'Creating account...' : 'Create account'}
+                <button onClick={handleRegister} disabled={loading} style={{ ...btnPrimaryStyle, opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {loading ? (
+                    <>
+                      <CircularLoader size={18} strokeWidth={2.5} />
+                      <span>Creating account…</span>
+                    </>
+                  ) : 'Create account'}
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', margin: '15px 0' }}>
                   <div style={{ flex: 1, height: '1px', backgroundColor: '#eee' }}></div>

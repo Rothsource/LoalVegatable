@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Star, ShoppingBasket, Plus, Minus } from 'lucide-react';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import { ProductGridSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 
 const brandGreen = '#0DB30D';
@@ -131,16 +130,9 @@ export default function FavoritesPage() {
     } catch (e) {}
   };
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Plus Jakarta Sans', sans-serif", color: deepGreen, fontWeight: '700', fontSize: '16px' }}>
-      Loading favorites…
-    </div>
-  );
-
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fafafa', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         .qty-stepper { display: inline-flex; align-items: center; border: 2px solid #e5e7eb; border-radius: 10px; overflow: hidden; height: 34px; }
         .qty-btn { width: 32px; height: 34px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border: none; cursor: pointer; transition: background 0.15s; }
         .qty-btn:hover:not(:disabled) { background: #eff6ef; }
@@ -149,9 +141,8 @@ export default function FavoritesPage() {
         .fav-card { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: relative; transition: transform 0.2s, box-shadow 0.2s; }
         .fav-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
       `}</style>
-      <Navbar />
 
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '50px 5%' }}>
+      <main className="enter-up" style={{ maxWidth: '1100px', margin: '0 auto', padding: '50px 5%' }}>
         <div style={{ marginBottom: '36px' }}>
           <span style={{ color: brandGreen, fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '2px' }}>Saved</span>
           <h2 style={{ fontSize: '36px', fontWeight: '800', color: deepGreen, margin: '8px 0 8px' }}>My Favorites</h2>
@@ -162,9 +153,18 @@ export default function FavoritesPage() {
           </p>
         </div>
 
-        {favProducts.length === 0 ? (
+        {loading ? (
+          <div className="space-y-6">
+            <div className="flex items-center justify-center py-2">
+              <CircularLoader size={38} />
+            </div>
+            <ProductGridSkeleton count={4} />
+          </div>
+        ) : favProducts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '100px 0' }}>
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🤍</div>
+            <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#fff1f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#f43f5e' }}>
+              <Heart size={36} fill="#fda4af" color="#f43f5e" />
+            </div>
             <h3 style={{ fontSize: '22px', fontWeight: '800', color: deepGreen, margin: '0 0 10px' }}>No favorites yet</h3>
             <p style={{ color: '#bbb', fontWeight: '600', fontSize: '15px', marginBottom: '24px' }}>
               Browse shops and tap the heart on any product to save it here.
@@ -248,8 +248,6 @@ export default function FavoritesPage() {
           </div>
         )}
       </main>
-
-      <Footer />
     </div>
   );
 }

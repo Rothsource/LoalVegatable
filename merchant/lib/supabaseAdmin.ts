@@ -33,3 +33,27 @@ export async function getRequestUser(
 
   return { user: data.user, error: null, status: 200 };
 }
+
+export async function getRequestMerchant(
+  request: NextRequest,
+  admin: NonNullable<ReturnType<typeof createSupabaseAdmin>>
+) {
+  const auth = await getRequestUser(request, admin);
+  if (!auth.user) return auth;
+
+  const { data, error } = await admin
+    .from("profile_merchants")
+    .select("id")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      user: null,
+      error: "Only merchant accounts can manage distributors.",
+      status: 403,
+    };
+  }
+
+  return auth;
+}

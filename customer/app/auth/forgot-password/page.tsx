@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { Mail } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function ForgotPasswordPage() {
@@ -38,7 +39,9 @@ export default function ForgotPasswordPage() {
         <div className="fp-form-inner">
           {sent ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📬</div>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#eff6ef', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#2e7d32' }}>
+                <Mail size={32} />
+              </div>
               <h2 style={{ color: '#2e7d32', fontWeight: 800, fontSize: '28px', marginBottom: '12px' }}>
                 Check your email!
               </h2>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapPin, Navigation, Search, Loader2, ExternalLink, Copy } from 'lucide-react';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 
 // ── Cambodian address state ───────────────────────────────────────────────────
@@ -261,10 +262,34 @@ export default function UserInfoPage() {
     ].filter(Boolean);
     const location = locationParts.join(', ');
 
-    const { error } = await supabase
+    // 1. profile_users
+    const { error: profileError } = await supabase
       .from('profile_users')
       .upsert({ id: user.id, first_name: firstName, last_name: lastName, location });
 
+    if (profileError) { setError(profileError.message); setLoading(false); return; }
+
+    // 2. addresses — the actual blocker fix
+    const street = [houseNumber, streetNumber, khmerAddr.phum].filter(Boolean).join(' ');
+    const city = khmerAddr.khum || null;
+    const province = [khmerAddr.srok, khmerAddr.khett].filter(Boolean).join(', ') || null;
+
+    const { error: addressError } = await supabase
+      .from('addresses')
+      .insert({
+        user_id: user.id,
+        street: street || null,
+        city,
+        province,
+        lat: khmerAddr.lat,
+        lng: khmerAddr.lng,
+        note: note || null,
+        is_default: true,
+      });
+
+    if (addressError) { setError(addressError.message); setLoading(false); return; }
+
+    // 3. favourite_vegetables
     if (favVeg) {
       const vegNames = favVeg.split(',').map(v => v.trim()).filter(Boolean);
       const products = await supabase.from('products').select('id, name').in('name', vegNames);
@@ -275,7 +300,7 @@ export default function UserInfoPage() {
       }
     }
 
-    if (error) { setError(error.message); setLoading(false); return; }
+    setLoading(false);
     router.push('/');
   };
 
@@ -461,7 +486,7 @@ export default function UserInfoPage() {
                   border: '1.5px solid #fde68a', borderRadius: '12px', padding: '14px',
                 }}>
                   <p style={{ margin: '0 0 6px', fontSize: '12px', fontWeight: '800', color: '#92400e' }}>
-                    📋 Paste your location from Google Maps
+                    Paste your location from Google Maps
                   </p>
                   <p style={{ margin: '0 0 10px', fontSize: '11px', color: '#a16207', lineHeight: '1.5' }}>
                     In Google Maps: long-press your location → copy the coordinates shown → paste below
@@ -484,7 +509,7 @@ export default function UserInfoPage() {
                         fontSize: '13px', whiteSpace: 'nowrap',
                       }}
                     >
-                      ✓ Go
+                      Go
                     </button>
                     <button
                       onClick={() => { setShowCoordsBox(false); setCoordsInput(''); setCoordsError(''); }}
@@ -510,11 +535,8 @@ export default function UserInfoPage() {
               <div style={{ border: '1px solid #e0e0e0', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
                 <div ref={mapRef} className="userinfo-map-box" style={{ width: '100%', background: '#eef1ee' }}>
                   {!mapLoaded && (
-                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf0' }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '24px' }}>🗺️</div>
-                        <p style={{ fontSize: '13px', color: '#2e7d32', fontWeight: '600', margin: '6px 0 0' }}>Loading map…</p>
-                      </div>
+                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f9f4' }}>
+                      <CircularLoader size={34} />
                     </div>
                   )}
                 </div>
@@ -539,7 +561,7 @@ export default function UserInfoPage() {
                 <MapPin size={11} color="#2e7d32" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <span>
                   {pickedLabel
-                    ? `📍 ${pickedLabel.length > 55 ? pickedLabel.slice(0, 55) + '…' : pickedLabel}`
+                    ? (pickedLabel.length > 55 ? pickedLabel.slice(0, 55) + '…' : pickedLabel)
                     : 'Type to search, or click directly on the map'}
                 </span>
               </p>
@@ -547,7 +569,7 @@ export default function UserInfoPage() {
 
             <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <p style={{ margin: 0, fontSize: '12px', fontWeight: '800', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                📍 {khmerAddr.phum || khmerAddr.khum ? 'Cambodian Address (auto-filled)' : 'Cambodian Address — click map to auto-fill'}
+                {khmerAddr.phum || khmerAddr.khum ? 'Cambodian Address (auto-filled)' : 'Cambodian Address — click map to auto-fill'}
               </p>
               <div className="khmer-grid">
                 <div>
@@ -585,9 +607,14 @@ export default function UserInfoPage() {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              style={{ width: '100%', padding: '16px', borderRadius: '12px', backgroundColor: '#2e7d32', color: '#fff', border: 'none', fontWeight: '700', fontSize: '16px', cursor: 'pointer', marginTop: '10px', opacity: loading ? 0.7 : 1 }}
+              style={{ width: '100%', padding: '16px', borderRadius: '12px', backgroundColor: '#0DB30D', color: '#fff', border: 'none', fontWeight: '700', fontSize: '16px', cursor: 'pointer', marginTop: '10px', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             >
-              {loading ? 'Saving...' : 'Confirm & Start Shopping'}
+              {loading ? (
+                <>
+                  <CircularLoader size={18} strokeWidth={2.5} />
+                  <span>Saving details…</span>
+                </>
+              ) : 'Confirm & Start Shopping'}
             </button>
 
           </div>

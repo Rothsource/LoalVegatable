@@ -22,10 +22,19 @@ export default function DeliveryMap({ onAddressSelect, initialLat, initialLng }:
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
-    if (!mapRef.current || leafletMapRef.current) return;
+    if (!mapRef.current) return;
+    // Guard: container already has a Leaflet map attached (Strict Mode re-run)
+    if ((mapRef.current as any)._leaflet_id) return;
+
+    let cancelled = false;
 
     // Dynamically import Leaflet (avoids SSR issues in Next.js)
     import('leaflet').then((L) => {
+      if (cancelled || !mapRef.current) return;
+      // Re-check after the async import resolves — the DOM node may have
+      // already been claimed by a map created in an earlier effect run.
+      if ((mapRef.current as any)._leaflet_id) return;
+
       // Fix default icon URLs broken by webpack
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -93,7 +102,7 @@ export default function DeliveryMap({ onAddressSelect, initialLat, initialLng }:
         // Add new marker
         markerRef.current = L.marker([lat, lng], { icon: greenIcon })
           .addTo(map)
-          .bindPopup('📍 Fetching address...')
+          .bindPopup('Fetching address...')
           .openPopup();
 
         setIsLoading(true);
@@ -120,14 +129,14 @@ export default function DeliveryMap({ onAddressSelect, initialLat, initialLng }:
             : data.display_name?.split(',').slice(0, 3).join(',').trim() ?? '';
 
           setPickedAddress(formatted);
-          markerRef.current?.setPopupContent(`📍 ${formatted || 'Location selected'}`);
+          markerRef.current?.setPopupContent(formatted || 'Location selected');
 
           // Pass address + coords up to parent
           onAddressSelect(formatted, lat, lng);
         } catch {
           const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
           setPickedAddress(fallback);
-          markerRef.current?.setPopupContent('📍 Location selected');
+          markerRef.current?.setPopupContent('Location selected');
           onAddressSelect(fallback, lat, lng);
         } finally {
           setIsLoading(false);
@@ -140,6 +149,7 @@ export default function DeliveryMap({ onAddressSelect, initialLat, initialLng }:
 
     // Cleanup on unmount
     return () => {
+      cancelled = true;
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;

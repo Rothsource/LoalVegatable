@@ -2,9 +2,8 @@
 
 import React, { useState, useMemo, use, useCallback, useEffect } from 'react';
 import { Heart, Star, Leaf, X, Trash2, HeartOff, SlidersHorizontal, ChevronLeft, MapPin, ShieldCheck, Package, Calendar, Box, RotateCcw, Plus, Minus, ShoppingBasket } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { useAuth } from '@/lib/useAuth';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 
 interface Product {
@@ -348,8 +347,8 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const getPendingQty = (pid: string) => pendingQty[pid] ?? 1;
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Plus Jakarta Sans', sans-serif", color: deepGreen, fontWeight: '700', fontSize: '16px' }}>
-      Loading shop...
+    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularLoader size={48} />
     </div>
   );
 
@@ -588,8 +587,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
-      <Navbar />
-
       {/* ── FLOATING CART BUTTON (NEW) ── */}
       <button
         className="float-cart-btn"
@@ -754,8 +751,6 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
           </section>
         )}
       </main>
-
-      <Footer />
     </div>
   );
 }

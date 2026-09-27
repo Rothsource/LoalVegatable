@@ -3,6 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
+import AuthShell from "@/components/auth/AuthShell";
+
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -29,69 +31,74 @@ export default function RegisterPage() {
     setLoading(false);
   };
 
-  if (success) return (
-    <div className="min-h-screen bg-green-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md text-center">
-        <div className="text-5xl mb-4">📬</div>
-        <h2 className="text-2xl font-bold text-green-700 mb-2">Check your email!</h2>
-        <p className="text-gray-500 text-sm">
-          We sent a confirmation link to <strong>{form.email}</strong>.
-          Click it to activate your account.
-        </p>
-        <p className="text-gray-400 text-xs mt-6">
-          Already confirmed?{" "}
-          <Link href="/auth/login" className="text-green-600 font-medium hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </div>
-  );
+  if (success) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-neutral-50 p-4">
+        <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-300 rounded-[2.5rem] border border-gray-100 bg-white p-10 text-center shadow-2xl shadow-emerald-900/5">
+          <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-50">
+            <span className="text-5xl">📬</span>
+          </div>
+          <h2 className="mb-3 text-3xl font-black tracking-tight text-gray-900">Check your email!</h2>
+          <p className="text-base leading-relaxed text-gray-500">
+            We sent a confirmation link to <strong className="font-semibold text-gray-900">{form.email}</strong>.
+            Click it to activate your account.
+          </p>
+          <div className="mt-8 flex justify-center">
+            <Link href="/auth/login" className="rounded-xl bg-gray-50 px-6 py-3.5 text-sm font-bold text-gray-700 transition-all hover:bg-gray-100 hover:text-gray-900">
+              Return to login
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const inputClass = "mt-2 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 hover:border-gray-300 hover:bg-gray-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10";
 
   return (
-    <div className="min-h-screen bg-green-50 flex items-center justify-center py-10">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold text-green-700 mb-2">Join as Merchant</h1>
-        <p className="text-gray-500 mb-6 text-sm">Create your local vegetable merchant account</p>
+    <AuthShell 
+      eyebrow="Join LocalVeg" 
+      title="Create account" 
+      description="Set up your merchant workspace to start managing deliveries."
+      footer={<span>Already have an account? <Link href="/auth/login" className="font-bold text-emerald-600 transition hover:text-emerald-700 hover:underline">Sign in</Link></span>}
+    >
+      {error && (
+        <div role="alert" className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+          </svg>
+          {error}
+        </div>
+      )}
 
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {[
+          { label: "Full Name",  name: "name",     type: "text",     placeholder: "E.g. Dara Chan" },
+          { label: "Email address",      name: "email",    type: "email",    placeholder: "name@example.com" },
+          { label: "Password",   name: "password", type: "password", placeholder: "Choose a secure password" },
+        ].map((field) => (
+          <div key={field.name}>
+            <label className="text-sm font-semibold text-gray-700">{field.label}</label>
+            <input
+              type={field.type}
+              name={field.name}
+              value={form[field.name as keyof typeof form]}
+              onChange={handleChange}
+              placeholder={field.placeholder}
+              required
+              className={inputClass}
+            />
+          </div>
+        ))}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Only 3 fields now */}
-          {[
-            { label: "Full Name",  name: "name",     type: "text",     placeholder: "Dara Chan" },
-            { label: "Email",      name: "email",    type: "email",    placeholder: "you@gmail.com" },
-            { label: "Password",   name: "password", type: "password", placeholder: "••••••••" },
-          ].map((field) => (
-            <div key={field.name}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
-              <input
-                type={field.type}
-                name={field.name}
-                value={form[field.name as keyof typeof form]}
-                onChange={handleChange}
-                placeholder={field.placeholder}
-                required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-400"
-              />
-            </div>
-          ))}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition"
-            style={{ opacity: loading ? 0.7 : 1 }}
-          >
-            {loading ? "Creating account..." : "Create Account"}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="text-green-600 font-medium hover:underline">Sign In</Link>
-        </p>
-      </div>
-    </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-2 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:translate-y-[-1px] hover:from-emerald-500 hover:to-emerald-400 hover:shadow-xl hover:shadow-emerald-500/30 disabled:pointer-events-none disabled:opacity-70"
+        >
+          {loading ? "Creating account..." : "Create Account"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

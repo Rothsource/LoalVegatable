@@ -1,6 +1,8 @@
 "use client";
-import { useState } from "react";
+
 import Link from "next/link";
+import { useState } from "react";
+import AuthShell from "@/components/auth/AuthShell";
 import { supabase } from "@/lib/supabase";
 
 export default function ForgotPasswordPage() {
@@ -9,45 +11,39 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setLoading(true);
     setError("");
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const normalizedEmail = email.trim().toLowerCase();
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
     });
-
-    if (error) { setError(error.message); setLoading(false); return; }
-    setSent(true);
+    if (resetError) setError(resetError.message);
+    else { setEmail(normalizedEmail); setSent(true); }
     setLoading(false);
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-green-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold text-green-700 mb-2">Forgot Password</h1>
-        {sent ? (
-          <div className="text-center py-4">
-            <div className="text-5xl mb-4">📧</div>
-            <p className="text-gray-500 text-sm">We sent a reset link to <strong>{email}</strong>. Check your inbox!</p>
-          </div>
-        ) : (
-          <>
-            <p className="text-gray-500 mb-6 text-sm">Enter your email to receive a reset link</p>
-            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@gmail.com" required className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-400" />
-              <button type="submit" disabled={loading} className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition" style={{ opacity: loading ? 0.7 : 1 }}>
-                {loading ? "Sending..." : "Send Reset Link"}
-              </button>
-            </form>
-          </>
-        )}
-        <p className="text-center text-sm text-gray-500 mt-6">
-          <Link href="/auth/login" className="text-green-600 hover:underline">Back to Sign In</Link>
-        </p>
-      </div>
-    </div>
+    <AuthShell eyebrow="Account recovery" title={sent ? "Check your inbox" : "Reset your password"}
+      description={sent ? `We sent a secure reset link to ${email}.` : "Enter the email associated with your account and we’ll send a secure reset link."}
+      footer={<Link href="/auth/login" className="font-black text-green-600 hover:underline">← Back to sign in</Link>}>
+      {sent ? (
+        <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-600 text-white" aria-hidden="true">✓</span>
+          <p className="mt-4 text-sm font-black text-green-900">Reset link sent</p>
+          <p className="mt-1 text-sm leading-6 text-green-700">The link expires for security. Check spam if it does not arrive within a few minutes.</p>
+          <button type="button" onClick={() => setSent(false)} className="mt-4 text-xs font-black text-green-700 hover:underline">Use a different email</button>
+        </div>
+      ) : (
+        <>
+          {error && <div role="alert" className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</div>}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div><label htmlFor="recovery-email" className="text-sm font-bold text-gray-700">Email address</label><input id="recovery-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" className="mt-1.5 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-green-400 focus:ring-4 focus:ring-green-100" /></div>
+            <button type="submit" disabled={loading} className="w-full rounded-xl bg-green-600 py-3 text-sm font-black text-white hover:bg-green-700 disabled:opacity-60">{loading ? "Sending…" : "Send reset link"}</button>
+          </form>
+        </>
+      )}
+    </AuthShell>
   );
 }

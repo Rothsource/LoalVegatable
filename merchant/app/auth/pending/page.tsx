@@ -1,10 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import AuthShell from "@/components/auth/AuthShell";
 import { supabase } from "@/lib/supabase";
 
 export default function PendingPage() {
-  const [checking, setChecking] = useState(true);
-
   useEffect(() => {
     // poll every 5 seconds to check if approved
     const interval = setInterval(async () => {
@@ -23,7 +22,6 @@ export default function PendingPage() {
       }
     }, 5000);
 
-    setChecking(false);
     return () => clearInterval(interval);
   }, []);
 
@@ -33,27 +31,14 @@ export default function PendingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-green-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md text-center">
-        <div className="text-5xl mb-4">⏳</div>
-        <h2 className="text-2xl font-bold text-green-700 mb-2">Waiting for Approval</h2>
-        <p className="text-gray-500 text-sm mb-6">
-          Your account is under review by our admin team. We'll notify you by email once approved. This page checks automatically every 5 seconds.
-        </p>
-        {!checking && (
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-6">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            Checking approval status...
-          </div>
-        )}
-        <p className="text-gray-400 text-xs mb-4">
-          Questions? Contact us at support@localveg.com
-        </p>
-        <button onClick={handleLogout}
-          className="text-sm text-red-500 hover:underline font-semibold">
-          Logout
-        </button>
+    <AuthShell eyebrow="Merchant review" title="Your account is under review" description="We’ll open your merchant workspace as soon as the admin team approves your details.">
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400 text-xl" aria-hidden="true">⌛</span>
+        <p className="mt-4 text-sm font-black text-amber-900">No action needed</p>
+        <p className="mt-1 text-sm leading-6 text-amber-800">This page checks your approval status every 5 seconds and continues automatically when access is ready.</p>
+        <div className="mt-4 flex items-center gap-2 text-xs font-bold text-amber-700"><span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />Checking approval status…</div>
       </div>
-    </div>
+      <div className="mt-6 flex items-center justify-between gap-4 text-xs text-gray-400"><span>Questions? Contact support.</span><button onClick={handleLogout} className="font-black text-red-500 hover:underline">Sign out</button></div>
+    </AuthShell>
   );
 }

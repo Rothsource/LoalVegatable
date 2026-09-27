@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import NotificationBell from "@/components/NotificationBell";
 
 type LowStockItem = {
   id?: string | number;
@@ -39,6 +40,11 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6m-6 4h6m-6 4h4m-6 8h10a2 2 0 002-2V7a2 2 0 00-2-2h-1a2 2 0 00-2-2h-4a2 2 0 00-2 2H7a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
   ),
+  Distributor: () => (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 1v6m3-3h-6" />
+    </svg>
+  ),
   Profile: () => (
     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m14-11a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -65,6 +71,7 @@ const NAV: NavItem[] = [
   { label: "Home", href: "/home", icon: <Icon.Home /> },
   { label: "Product", href: "/product", icon: <Icon.Product /> },
   { label: "Order", href: "/order", icon: <Icon.Order /> },
+  { label: "Distributor", href: "/distributor", icon: <Icon.Distributor /> },
   { label: "Profile", href: "/profile", icon: <Icon.Profile /> },
 ];
 
@@ -272,18 +279,18 @@ export default function Header({ lowStock = [], merchantName = "Merchant", profi
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 shadow-sm backdrop-blur-xl">
-      <div className="mx-auto grid h-16 max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-[#dfe6d9] bg-[#faf7f0]/90 shadow-2xs backdrop-blur-xl">
+      <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 sm:px-6 lg:px-8">
         <Link href="/home" className="flex min-w-0 items-center gap-2.5 justify-self-start">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-green-600 shadow">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--leaf)] shadow-[0_4px_14px_rgba(13,179,13,0.3)]">
             <span className="text-xs font-black text-white">LV</span>
           </div>
-          <span className="hidden truncate text-sm font-bold tracking-tight text-gray-900 lg:block">
-            LocalVeg <span className="font-medium text-green-500">Merchant</span>
+          <span className="hidden truncate text-base font-bold tracking-tight text-[var(--foreground)] font-heading lg:block">
+            LocalVeg <span className="font-bold text-[var(--leaf-accent)] font-sans text-xs uppercase tracking-wider ml-1 px-2 py-0.5 rounded-full bg-[#edf6e9] border border-[#c8dfc5]">Merchant</span>
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Merchant navigation">
+        <nav className="hidden items-center gap-1.5 md:flex" aria-label="Merchant navigation">
           {NAV.map((item) => {
             const active = isActivePath(pathname, item.href);
             return (
@@ -291,11 +298,11 @@ export default function Header({ lowStock = [], merchantName = "Merchant", profi
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex w-[92px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold transition-colors ${
-                  active ? "bg-green-50 text-green-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                className={`flex w-[104px] items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-bold transition-all ${
+                  active ? "bg-[var(--leaf)] text-white shadow-sm" : "text-[#556353] hover:bg-[#edf5e8] hover:text-[var(--foreground)]"
                 }`}
               >
-                <span className={active ? "text-green-600" : "text-gray-400"}>{item.icon}</span>
+                <span className={active ? "text-white" : "text-[#7a8c76]"}>{item.icon}</span>
                 {item.label}
               </Link>
             );
@@ -303,16 +310,19 @@ export default function Header({ lowStock = [], merchantName = "Merchant", profi
         </nav>
 
         <div className="flex items-center gap-2 justify-self-end">
+          {/* Order notifications (pending/accepted orders) — separate from the low-stock bell below */}
+          <NotificationBell role="merchant" />
+
           <div className="relative">
             <button
               type="button"
               onClick={toggleNotifications}
               aria-label={`${lowStock.length} low-stock alerts`}
               aria-expanded={notificationOpen}
-              className={`relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+              className={`relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors cursor-pointer ${
                 lowStock.length > 0
-                  ? "border-amber-200 bg-amber-50 text-amber-500 hover:bg-amber-100"
-                  : "border-gray-200 bg-gray-50 text-gray-400 hover:bg-gray-100"
+                  ? "border-[#f4dfab] bg-[#fef8ea] text-[#935b0b] hover:bg-amber-100"
+                  : "border-[#dfe6d9] bg-white text-[#556353] hover:bg-[#fafbf9]"
               }`}
             >
               <Icon.Bell />
@@ -330,7 +340,7 @@ export default function Header({ lowStock = [], merchantName = "Merchant", profi
               type="button"
               onClick={toggleAccount}
               aria-expanded={accountOpen}
-              className="flex h-9 max-w-40 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2.5 text-gray-700 transition-colors hover:border-green-200 hover:bg-green-50"
+              className="flex h-9 max-w-44 items-center gap-2 rounded-xl border border-[#dfe6d9] bg-white px-2.5 text-[var(--foreground)] transition-colors hover:border-[#c8dfc5] hover:bg-[#f8faf6] cursor-pointer"
             >
               <MerchantAvatar
                 key={resolvedProfileUrl || "initial"}
@@ -338,8 +348,8 @@ export default function Header({ lowStock = [], merchantName = "Merchant", profi
                 initial={initial}
                 className="h-5 w-5 rounded-md text-[10px]"
               />
-              <span className="hidden max-w-24 truncate text-sm font-semibold sm:block">{merchantName}</span>
-              <span className={`text-gray-400 transition-transform ${accountOpen ? "rotate-180" : ""}`}>
+              <span className="hidden max-w-28 truncate text-xs font-bold sm:block">{merchantName}</span>
+              <span className={`text-[#7d8b79] transition-transform ${accountOpen ? "rotate-180" : ""}`}>
                 <Icon.Chevron />
               </span>
             </button>
@@ -355,7 +365,7 @@ export default function Header({ lowStock = [], merchantName = "Merchant", profi
         </div>
       </div>
 
-      <nav className="grid grid-cols-4 border-t border-gray-100 md:hidden" aria-label="Mobile merchant navigation">
+      <nav className="grid grid-cols-5 border-t border-[#dfe6d9] bg-white/95 md:hidden" aria-label="Mobile merchant navigation">
         {NAV.map((item) => {
           const active = isActivePath(pathname, item.href);
           return (
@@ -363,8 +373,8 @@ export default function Header({ lowStock = [], merchantName = "Merchant", profi
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
-                active ? "bg-green-50/70 text-green-700" : "text-gray-400 hover:text-green-600"
+              className={`flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold transition-colors ${
+                active ? "bg-[#edf6e9] text-[var(--leaf-dark)]" : "text-[#7d8b79] hover:text-[var(--foreground)]"
               }`}
             >
               <span>{item.icon}</span>

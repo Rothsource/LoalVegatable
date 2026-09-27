@@ -1,20 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Trash2, ChevronRight, ShoppingBag, ArrowLeft, Plus, Minus, X, Star, Leaf, Box, Calendar, MapPin, Phone, CreditCard, CheckCircle2, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ShoppingCart, Trash2, ChevronRight, ShoppingBag, ArrowLeft, Plus, Minus, X, Star, Leaf, Box, Calendar, MapPin, Phone, CreditCard, CheckCircle2, ChevronLeft, Navigation, Search, Loader2, ExternalLink, Truck, Bell, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import dynamic from 'next/dynamic';
+import CustomerOrderTrackingMap from '@/components/CustomerOrderTrackingMap';
+import { CircularLoader } from '@/components/CustomerSkeleton';
+import { supabase } from '@/lib/supabase';
 
-const DeliveryMap = dynamic(() => import('@/components/DeliveryMap'), { ssr: false });
 
 interface CartProduct {
   id: number;
   name: string;
   category: string;
   price: number;
-  unit: string;   
+  unit: string;
   benefit: string;
   img: string;
   rating: number;
@@ -67,120 +66,561 @@ function writeCart(items: CartProduct[]) {
   localStorage.setItem('cart-products', JSON.stringify(obj));
 }
 
-// ── ABA QR generator (static demo — replace with real ABA API in production) ─
+// ── Parse lat/lng out of a pasted Google Maps link or raw "lat, lng" ────────
+function parseMapsCoords(raw: string): { lat: number; lng: number } | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const plain = trimmed.match(/(-?\d+\.\d+)\s*[,\s]\s*(-?\d+\.\d+)/);
+  if (plain) {
+    const lat = parseFloat(plain[1]);
+    const lng = parseFloat(plain[2]);
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
+  }
+
+  const atMatch = trimmed.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+
+  const qMatch = trimmed.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+
+  return null;
+}
+
+function matchProvince(addr: any): string | null {
+  const candidates = [addr.state, addr.city, addr.county, addr.region].filter(Boolean).map((s: string) => s.toLowerCase());
+  for (const p of CAMBODIA_PROVINCES) {
+    if (candidates.some(c => c.includes(p.toLowerCase()) || p.toLowerCase().includes(c))) return p;
+  }
+  return null;
+}
+
 function ABAQRCode({ amount }: { amount: number }) {
-  // In production, generate a real ABA QR via ABA PayWay API.
-  // This renders a visual placeholder matching ABA's brand style.
   const abaKHR = Math.round(amount);
   const abaUSD = (amount / 4100).toFixed(2);
   return (
     <div style={{ textAlign: 'center' }}>
-      {/* ABA Logo bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '16px' }}>
-        <div style={{ background: '#0066b2', borderRadius: '8px', padding: '6px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ color: '#fff', fontWeight: '800', fontSize: '15px', letterSpacing: '-0.5px' }}>ABA</span>
-          <span style={{ color: '#7ec8f7', fontWeight: '600', fontSize: '11px' }}>BANK</span>
-        </div>
-        <span style={{ color: '#555', fontWeight: '600', fontSize: '13px' }}>Scan to Pay</span>
-      </div>
-
-      {/* QR placeholder — replace with <img src={realQrUrl} /> */}
       <div style={{
-        width: '180px', height: '180px', margin: '0 auto 14px',
-        border: '3px solid #0066b2', borderRadius: '16px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        background: '#f0f7ff', position: 'relative', overflow: 'hidden',
+        background: 'linear-gradient(135deg, #004b87 0%, #0066b2 100%)',
+        borderRadius: '16px 16px 0 0',
+        padding: '16px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        color: '#fff',
+        boxShadow: '0 4px 14px rgba(0,102,178,0.25)',
       }}>
-        {/* QR corner marks */}
-        {[
-          { top: 10, left: 10 }, { top: 10, right: 10 },
-          { bottom: 10, left: 10 }, { bottom: 10, right: 10 },
-        ].map((pos, i) => (
-          <div key={i} style={{
-            position: 'absolute', width: 28, height: 28,
-            borderColor: '#0066b2', borderStyle: 'solid',
-            borderWidth: i === 0 ? '3px 0 0 3px' : i === 1 ? '3px 3px 0 0' : i === 2 ? '0 0 3px 3px' : '0 3px 3px 0',
-            borderRadius: i === 0 ? '4px 0 0 0' : i === 1 ? '0 4px 0 0' : i === 2 ? '0 0 0 4px' : '0 0 4px 0',
-            ...pos,
-          }} />
-        ))}
-        {/* QR dots pattern (decorative) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,14px)', gap: '4px', opacity: 0.55 }}>
-          {Array.from({ length: 49 }).map((_, i) => (
-            <div key={i} style={{ width: 10, height: 10, borderRadius: '2px', background: [0,1,2,6,7,13,14,42,43,44,45,46,48].includes(i) ? '#0066b2' : Math.random() > 0.5 ? '#0066b2' : 'transparent' }} />
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: '#fff', borderRadius: '6px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center' }}>
+            <span style={{ color: '#0066b2', fontWeight: '900', fontSize: '13px', letterSpacing: '-0.3px' }}>ABA</span>
+          </div>
+          <span style={{ color: '#e0f2fe', fontWeight: '700', fontSize: '12px', letterSpacing: '0.5px' }}>PAYWAY KHQR</span>
         </div>
-        <div style={{ marginTop: '8px', fontSize: '10px', color: '#0066b2', fontWeight: '700' }}>ABA PayWay</div>
+        <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', padding: '3px 10px', borderRadius: '100px', fontWeight: '700' }}>
+          Scan & Pay
+        </div>
       </div>
 
-      {/* Amount */}
-      <div style={{ background: '#f0f7ff', borderRadius: '12px', padding: '12px 20px', display: 'inline-block', marginBottom: '10px', border: '1.5px solid #cce0f5' }}>
-        <div style={{ fontSize: '11px', color: '#0066b2', fontWeight: '700', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Amount Due</div>
-        <div style={{ fontSize: '22px', fontWeight: '800', color: '#0066b2' }}>${abaUSD} USD</div>
-        <div style={{ fontSize: '12px', color: '#888', fontWeight: '600', marginTop: '2px' }}>{abaKHR.toLocaleString()} KHR</div>
-      </div>
+      <div style={{
+        background: '#fff',
+        border: '2px solid #e0f0fe',
+        borderTop: 'none',
+        borderRadius: '0 0 16px 16px',
+        padding: '24px 20px 20px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
+      }}>
+        <div style={{
+          width: '190px', height: '190px', margin: '0 auto 18px',
+          border: '3px solid #0066b2', borderRadius: '18px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: '#f8fbff', position: 'relative', overflow: 'hidden',
+          boxShadow: '0 4px 16px rgba(0,102,178,0.12)',
+        }}>
+          {[
+            { top: 10, left: 10 }, { top: 10, right: 10 },
+            { bottom: 10, left: 10 }, { bottom: 10, right: 10 },
+          ].map((pos, i) => (
+            <div key={i} style={{
+              position: 'absolute', width: 28, height: 28,
+              borderColor: '#0066b2', borderStyle: 'solid',
+              borderWidth: i === 0 ? '3px 0 0 3px' : i === 1 ? '3px 3px 0 0' : i === 2 ? '0 0 3px 3px' : '0 3px 3px 0',
+              borderRadius: i === 0 ? '4px 0 0 0' : i === 1 ? '0 4px 0 0' : i === 2 ? '0 0 0 4px' : '0 0 4px 0',
+              ...pos,
+            }} />
+          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,14px)', gap: '4px', opacity: 0.65 }}>
+            {Array.from({ length: 49 }).map((_, i) => (
+              <div key={i} style={{ width: 10, height: 10, borderRadius: '2px', background: [0, 1, 2, 6, 7, 13, 14, 42, 43, 44, 45, 46, 48].includes(i) ? '#0066b2' : Math.random() > 0.5 ? '#0066b2' : 'transparent' }} />
+            ))}
+          </div>
+          <div style={{ marginTop: '8px', fontSize: '10px', color: '#0066b2', fontWeight: '800', letterSpacing: '0.5px' }}>KHQR OFFICIAL</div>
+        </div>
 
-      <p style={{ fontSize: '12px', color: '#aaa', margin: '8px 0 0', lineHeight: '1.5' }}>
-        Open ABA Mobile → Scan QR → Confirm payment
-      </p>
+        <div style={{ background: '#f0f7ff', borderRadius: '14px', padding: '12px 20px', display: 'inline-block', marginBottom: '8px', border: '1.5px solid #cce0f5' }}>
+          <div style={{ fontSize: '11px', color: '#0066b2', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Total Amount Due</div>
+          <div style={{ fontSize: '24px', fontWeight: '900', color: '#0066b2', marginTop: '2px' }}>${abaUSD} USD</div>
+          <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '700', marginTop: '2px' }}>{abaKHR.toLocaleString()} KHR</div>
+        </div>
+
+        <p style={{ fontSize: '12px', color: '#64748b', margin: '10px 0 0', lineHeight: '1.5', fontWeight: '600' }}>
+          Open ABA Mobile on phone → Tap <strong>"Scan QR"</strong> → Confirm payment
+        </p>
+      </div>
     </div>
   );
 }
 
-// ── Step indicator ────────────────────────────────────────────────────────────
-function StepIndicator({ step }: { step: 1 | 2 }) {
+function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
   const steps = [
-    { n: 1, label: 'Delivery' },
-    { n: 2, label: 'Payment' },
+    { n: 1, label: 'Delivery Details', subtitle: 'Where to deliver' },
+    { n: 2, label: 'Distributor Match', subtitle: 'Nearby driver' },
+    { n: 3, label: 'Payment', subtitle: 'ABA PayWay' },
+    { n: 4, label: 'Live Delivery', subtitle: 'Driver arrival' },
   ];
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: '32px' }}>
-      {steps.map((s, i) => (
-        <React.Fragment key={s.n}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-            <div style={{
-              width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: '800', fontSize: '14px',
-              background: step >= s.n ? deepGreen : '#e5e7eb',
-              color: step >= s.n ? '#fff' : '#9ca3af',
-              transition: 'all 0.3s',
-            }}>
-              {step > s.n ? <CheckCircle2 size={18} color="#fff" /> : s.n}
-            </div>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: step >= s.n ? deepGreen : '#9ca3af' }}>{s.label}</span>
-          </div>
-          {i < steps.length - 1 && (
-            <div style={{ flex: 1, height: '2px', background: step > 1 ? deepGreen : '#e5e7eb', margin: '0 8px', marginBottom: '20px', transition: 'background 0.3s' }} />
-          )}
-        </React.Fragment>
-      ))}
+    <div style={{
+      maxWidth: '740px',
+      margin: '0 auto 36px',
+      background: 'rgba(255, 255, 255, 0.85)',
+      backdropFilter: 'blur(12px)',
+      border: '1.5px solid #edf2ee',
+      borderRadius: '24px',
+      padding: '16px 24px',
+      boxShadow: '0 4px 18px rgba(10, 73, 10, 0.04)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+        {steps.map((s, i) => {
+          const isDone = step > s.n;
+          const isCurrent = step === s.n;
+          return (
+            <React.Fragment key={s.n}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', zIndex: 2 }}>
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: '800', fontSize: '14px',
+                  background: isDone ? '#0DB30D' : isCurrent ? '#0A490A' : '#f3f4f6',
+                  color: isDone || isCurrent ? '#fff' : '#9ca3af',
+                  boxShadow: isCurrent ? '0 0 0 4px rgba(13, 179, 13, 0.2)' : 'none',
+                  transition: 'all 0.3s ease',
+                  flexShrink: 0,
+                }}>
+                  {isDone ? <CheckCircle2 size={18} color="#fff" /> : s.n}
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: isCurrent ? '#0A490A' : isDone ? '#0DB30D' : '#9ca3af', lineHeight: 1.2 }}>
+                    {s.label}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500' }}>
+                    {s.subtitle}
+                  </div>
+                </div>
+              </div>
+              {i < steps.length - 1 && (
+                <div style={{
+                  flex: 1, height: '2px',
+                  background: step > s.n ? '#0DB30D' : '#e5e7eb',
+                  margin: '0 10px',
+                  transition: 'background 0.3s ease',
+                }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-// ── Main CartPage ─────────────────────────────────────────────────────────────
 export default function CartPage() {
   const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
-  // flow: 'cart' | 'checkout-delivery' | 'checkout-payment' | 'success'
-  const [flow, setFlow] = useState<'cart' | 'checkout-delivery' | 'checkout-payment' | 'success'>('cart');
+  const [flow, setFlow] = useState<'cart' | 'waiting-accept' | 'checkout-delivery' | 'checkout-payment' | 'waiting-delivery' | 'success'>('cart');
+  const [activeOrderStatus, setActiveOrderStatus] = useState<'accepted' | 'out_for_delivery' | 'delivered'>('accepted');
+  const [arrivedAtTime, setArrivedAtTime] = useState<string | null>(null);
+  const [waitingOrderIds, setWaitingOrderIds] = useState<string[]>([]);
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<CartProduct | null>(null);
-
-  // Delivery form state
   const [province, setProvince] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [placing, setPlacing] = useState(false);
+  const [placeError, setPlaceError] = useState('');
+
+  const [savedAddress, setSavedAddress] = useState<{
+    id: number; street: string | null; province: string | null;
+    phone: string | null; lat: number | null; lng: number | null;
+  } | null>(null);
+  const [useSaved, setUseSaved] = useState(true);
+  const [pickedLat, setPickedLat] = useState<number | null>(null);
+  const [pickedLng, setPickedLng] = useState<number | null>(null);
+
+  // NEW — lets the customer choose whether a freshly-entered address becomes
+  // their new default for next time. Defaults to checked (most people want
+  // their address remembered).
+  const [saveAsDefault, setSaveAsDefault] = useState(true);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [pickedLabel, setPickedLabel] = useState('');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchingAuto, setSearchingAuto] = useState(false);
+  const searchDebounceRef = useRef<any>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const [showCoordsBox, setShowCoordsBox] = useState(false);
+  const [coordsInput, setCoordsInput] = useState('');
+  const [coordsError, setCoordsError] = useState('');
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
 
   useEffect(() => { setCartProducts(readCart()); }, []);
 
-  // Close modal on Escape — UNCHANGED
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      let { data } = await supabase
+        .from('addresses')
+        .select('id, street, province, phone, lat, lng')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .maybeSingle();
+
+      if (!data) {
+        const { data: anyAddr } = await supabase
+          .from('addresses')
+          .select('id, street, province, phone, lat, lng')
+          .eq('user_id', user.id)
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        data = anyAddr;
+      }
+
+      if (data) {
+        setSavedAddress(data);
+        setProvince(data.province || '');
+        setAddress(data.street || '');
+        if (data.phone) setPhone(data.phone);
+        if (data.lat != null) setPickedLat(data.lat);
+        if (data.lng != null) setPickedLng(data.lng);
+        setUseSaved(true);
+      } else {
+        const { data: profile } = await supabase
+          .from('profile_users')
+          .select('location')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (profile?.location) {
+          setAddress(profile.location);
+        }
+        setUseSaved(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (flow !== 'waiting-accept' || waitingOrderIds.length === 0) return;
+
+    let cancelled = false;
+
+    const checkStatuses = async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, status')
+        .in('id', waitingOrderIds);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('waiting-accept: could not read order status', error);
+        setCheckoutError(`Could not check order status: ${error.message}`);
+        return;
+      }
+      if (!data || data.length === 0) {
+        console.warn('waiting-accept: no rows returned for', waitingOrderIds, '— check the SELECT RLS policy on orders');
+        return;
+      }
+
+      const anyCancelled = data.some(o => o.status === 'cancelled');
+      if (anyCancelled) { setCheckoutError('A distributor declined your order. Please try again.'); setFlow('cart'); return; }
+
+      const allAccepted = waitingOrderIds.every(
+        id => data.find(o => o.id === id)?.status === 'accepted'
+      );
+      if (allAccepted) setFlow('checkout-payment');
+    };
+
+    checkStatuses();
+
+    const channel = supabase
+      .channel(`waiting-accept-${waitingOrderIds.join('-')}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (waitingOrderIds.includes((payload.new as any).id)) checkStatuses();
+        }
+      )
+      .subscribe();
+
+    const pollId = setInterval(checkStatuses, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollId);
+      supabase.removeChannel(channel);
+    };
+  }, [flow, waitingOrderIds]);
+
+  // Listen for real-time delivery rider progression and arrival confirmation
+  useEffect(() => {
+    if (flow !== 'waiting-delivery' || waitingOrderIds.length === 0) return;
+
+    let cancelled = false;
+
+    const checkDeliveryStatus = async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, status, arrived_at, completed_at')
+        .in('id', waitingOrderIds);
+
+      if (cancelled || error || !data || data.length === 0) return;
+
+      const latest = data[0];
+      if (latest.status === 'delivered' || latest.arrived_at) {
+        setActiveOrderStatus('delivered');
+        setArrivedAtTime(latest.arrived_at || latest.completed_at || new Date().toISOString());
+      } else if (latest.status === 'out_for_delivery' || latest.status === 'delivering') {
+        setActiveOrderStatus('out_for_delivery');
+      } else if (latest.status === 'accepted') {
+        setActiveOrderStatus('accepted');
+      }
+    };
+
+    checkDeliveryStatus();
+
+    const channel = supabase
+      .channel(`waiting-delivery-${waitingOrderIds.join('-')}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (waitingOrderIds.includes((payload.new as any).id)) {
+            checkDeliveryStatus();
+          }
+        }
+      )
+      .subscribe();
+
+    const pollId = setInterval(checkDeliveryStatus, 3500);
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollId);
+      supabase.removeChannel(channel);
+    };
+  }, [flow, waitingOrderIds]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedProduct(null); };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, []);
 
-  // ── Cart mutations — ALL UNCHANGED ─────────────────────────────────────
+  useEffect(() => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if ((window as any).L) { setMapLoaded(true); return; }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => setMapLoaded(true);
+    document.head.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (useSaved || !mapLoaded || !mapRef.current || flow !== 'checkout-delivery') return;
+    const L = (window as any).L;
+    if (!L) return;
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+
+    const initialLat = pickedLat ?? 11.5564;
+    const initialLng = pickedLng ?? 104.9282;
+
+    const map = L.map(mapRef.current, {
+      center: [initialLat, initialLng],
+      zoom: 13,
+      zoomControl: true,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    map.on('click', (e: any) => { placePin(e.latlng.lat, e.latlng.lng); });
+
+    mapInstanceRef.current = map;
+
+    if (pickedLat != null && pickedLng != null) {
+      map.setView([pickedLat, pickedLng], 16);
+      placePin(pickedLat, pickedLng, true);
+    }
+
+    setTimeout(() => map.invalidateSize(), 150);
+    const resizeHandler = () => map.invalidateSize();
+    window.addEventListener('resize', resizeHandler);
+
+    return () => {
+      window.removeEventListener('resize', resizeHandler);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useSaved, mapLoaded, flow]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const getGreenIcon = () => {
+    const L = (window as any).L;
+    return L.divIcon({
+      html: `<div style="width:32px;height:32px;background:#0A490A;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 12px rgba(10,73,10,0.45);display:flex;align-items:center;justify-content:center;"><div style="width:10px;height:10px;background:#0DB30D;border-radius:50%;transform:rotate(45deg);"></div></div>`,
+      className: '',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+    });
+  };
+
+  const placePin = async (lat: number, lng: number, silent = false) => {
+    const L = (window as any).L;
+    if (!mapInstanceRef.current) return;
+
+    if (markerRef.current) markerRef.current.remove();
+    markerRef.current = L.marker([lat, lng], { icon: getGreenIcon(), draggable: true })
+      .addTo(mapInstanceRef.current);
+
+    markerRef.current.on('dragend', (e: any) => {
+      const pos = e.target.getLatLng();
+      placePin(pos.lat, pos.lng);
+    });
+
+    setPickedLat(lat);
+    setPickedLng(lng);
+    setFormErrors(prev => ({ ...prev, address: '' }));
+
+    if (!silent) setIsGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const data = await res.json();
+      const a = data.address ?? {};
+      const parts = [a.house_number, a.road || a.pedestrian, a.village || a.hamlet || a.neighbourhood || a.quarter, a.suburb || a.city_district].filter(Boolean);
+      const label = parts.join(', ') || data.display_name?.split(',').slice(0, 3).join(',') || '';
+      setAddress(label);
+      setPickedLabel(label);
+      const matched = matchProvince(a);
+      if (matched) setProvince(matched);
+    } catch {
+      setPickedLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setShowSuggestions(false);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!val.trim() || val.length < 3) { setSuggestions([]); return; }
+
+    searchDebounceRef.current = setTimeout(async () => {
+      setSearchingAuto(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val + ' Cambodia')}&format=json&limit=5&accept-language=en`
+        );
+        const results = await res.json();
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearchingAuto(false);
+      }
+    }, 400);
+  };
+
+  const handleSuggestionPick = (s: any) => {
+    const lat = parseFloat(s.lat);
+    const lng = parseFloat(s.lon);
+    setSearchQuery(s.display_name.split(',').slice(0, 2).join(','));
+    setShowSuggestions(false);
+    setSuggestions([]);
+    mapInstanceRef.current?.setView([lat, lng], 16);
+    placePin(lat, lng);
+  };
+
+  const handleOpenGoogleMaps = () => {
+    const query = searchQuery.trim()
+      ? encodeURIComponent(searchQuery + ' Cambodia')
+      : '11.5564,104.9282';
+    window.open(`https://www.google.com/maps/search/${query}`, '_blank');
+    setShowCoordsBox(true);
+  };
+
+  const handleCoordsSubmit = () => {
+    setCoordsError('');
+    const coords = parseMapsCoords(coordsInput);
+    if (coords) {
+      mapInstanceRef.current?.setView([coords.lat, coords.lng], 17);
+      placePin(coords.lat, coords.lng);
+      setCoordsInput('');
+      setShowCoordsBox(false);
+      return;
+    }
+    setCoordsError('Could not read coordinates. Try: 11.123456, 104.567890');
+  };
+
+  const handleMyLocation = () => {
+    if (!navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        mapInstanceRef.current?.setView([latitude, longitude], 17);
+        placePin(latitude, longitude);
+        setIsLocating(false);
+      },
+      () => { setIsLocating(false); }
+    );
+  };
+
   const updateQty = (productId: number, newQty: number) => {
     if (newQty <= 0) { removeProduct(productId); return; }
     const updated = cartProducts.map(p =>
@@ -202,29 +642,191 @@ export default function CartPage() {
     localStorage.setItem('cart-products', JSON.stringify({}));
   };
 
-  // ── Checkout steps ──────────────────────────────────────────────────────
   const validateDelivery = () => {
     const errors: Record<string, string> = {};
+
+    if (useSaved && savedAddress) {
+      if (!savedAddress.street || !savedAddress.province) {
+        errors.address = 'Saved address is missing details. Please deliver somewhere else.';
+      }
+      if (!phone.trim() || !/^[0-9+\s\-]{8,15}$/.test(phone.trim())) {
+        errors.phone = 'Please enter a valid phone number';
+      }
+      setFormErrors(errors);
+      return Object.keys(errors).length === 0;
+    }
+
     if (!province) errors.province = 'Please select your province';
-    if (!address.trim() || address.trim().length < 5) errors.address = 'Please enter a full delivery address';
+    if (!address.trim() || address.trim().length < 3) errors.address = 'Please enter a full delivery address';
     if (!phone.trim() || !/^[0-9+\s\-]{8,15}$/.test(phone.trim())) errors.phone = 'Please enter a valid phone number';
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleDeliveryNext = () => {
-    if (validateDelivery()) setFlow('checkout-payment');
+  const handleProceedToCheckout = async () => {
+    setCheckingOut(true);
+    setCheckoutError('');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setCheckoutError('Please log in before proceeding to checkout.');
+      setCheckingOut(false);
+      return;
+    }
+
+    setCheckingOut(false);
+    setFlow('checkout-delivery');
   };
 
-  const handleConfirmPayment = () => {
+  const handleRequestDistributor = async () => {
+    if (!validateDelivery()) return;
+
+    setCheckingOut(true);
+    setCheckoutError('');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setCheckoutError('Not logged in. Please sign in to continue.');
+      setCheckingOut(false);
+      return;
+    }
+
+    let addressId: number;
+
+    if (useSaved && savedAddress) {
+      addressId = savedAddress.id;
+      if (phone.trim() && phone.trim() !== savedAddress.phone) {
+        await supabase.from('addresses').update({ phone: phone.trim() }).eq('id', savedAddress.id);
+      }
+    } else {
+      if (saveAsDefault) {
+        await supabase
+          .from('addresses')
+          .update({ is_default: false })
+          .eq('user_id', user.id)
+          .eq('is_default', true);
+      }
+
+      const { data: addr, error: addrError } = await supabase
+        .from('addresses')
+        .insert({
+          user_id: user.id,
+          street: address.trim(),
+          province,
+          phone: phone.trim(),
+          lat: pickedLat,
+          lng: pickedLng,
+          is_default: saveAsDefault,
+        })
+        .select('id')
+        .single();
+
+      if (addrError || !addr) {
+        setCheckoutError(addrError?.message || 'Address save failed. Please check your delivery details.');
+        setCheckingOut(false);
+        return;
+      }
+      addressId = addr.id;
+
+      if (saveAsDefault) {
+        setSavedAddress({
+          id: addr.id,
+          street: address.trim(),
+          province,
+          phone: phone.trim(),
+          lat: pickedLat,
+          lng: pickedLng,
+        });
+      }
+    }
+
+    const byShop = cartProducts.reduce((acc, p) => {
+      (acc[p.shopSlug] ??= []).push(p);
+      return acc;
+    }, {} as Record<string, CartProduct[]>);
+
+    const createdOrderIds: string[] = [];
+
+    for (const items of Object.values(byShop)) {
+      const orderTotal = items.reduce((s, p) => s + p.price * (p.qty ?? 1), 0);
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          address_id: addressId,
+          status: 'pending',
+          payment_status: 'pending',
+          total_amount: orderTotal,
+        })
+        .select('id')
+        .single();
+
+      if (orderError || !order) {
+        setCheckoutError(orderError?.message || 'Order request failed.');
+        setCheckingOut(false);
+        return;
+      }
+      createdOrderIds.push(order.id);
+
+      const { error: itemsError } = await supabase.from('order_items').insert(
+        items.map(p => ({
+          order_id: order.id,
+          product_id: String(p.id),
+          quantity: p.qty ?? 1,
+          unit_price: p.price,
+          total_price: p.price * (p.qty ?? 1),
+        }))
+      );
+
+      if (itemsError) {
+        setCheckoutError(itemsError.message);
+        setCheckingOut(false);
+        return;
+      }
+
+      // Send push notification to distributors!
+      fetch('/api/notify-distributors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id }),
+      }).catch(() => { });
+    }
+
+    setCheckingOut(false);
+    setWaitingOrderIds(createdOrderIds);
+    setFlow('waiting-accept');
+  };
+
+  const handleConfirmPayment = async () => {
+    setPlacing(true);
+    setPlaceError('');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setPlaceError('Not logged in.'); setPlacing(false); return; }
+
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({ payment_status: 'paid' })
+      .in('id', waitingOrderIds);
+
+    if (updateError) {
+      setPlaceError(updateError.message);
+      setPlacing(false);
+      return;
+    }
+
     clearCart();
-    setFlow('success');
+    setCartProducts([]);
+    setPlacing(false);
+    setActiveOrderStatus('accepted');
+    setFlow('waiting-delivery');
   };
 
   const totalQty = cartProducts.reduce((s, p) => s + (p.qty ?? 1), 0);
   const total = cartProducts.reduce((s, p) => s + p.price * (p.qty ?? 1), 0);
 
-  // ── Input style helper ──────────────────────────────────────────────────
   const inputStyle = (hasError: boolean): React.CSSProperties => ({
     width: '100%', boxSizing: 'border-box',
     border: `2px solid ${hasError ? '#ef4444' : '#e5e7eb'}`,
@@ -240,25 +842,86 @@ export default function CartPage() {
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        .checkout-btn { width: 100%; padding: 18px; background: #0A490A; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
-        .checkout-btn:hover { background: #0DB30D; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(13,179,13,0.3); }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes radarRipple {
+          0% { transform: scale(0.85); opacity: 0.9; }
+          60% { opacity: 0.35; }
+          100% { transform: scale(2.4); opacity: 0; }
+        }
+        @keyframes radarPing {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.08); opacity: 0.85; }
+        }
+        @keyframes softPulse {
+          0%, 100% { opacity: 1; transform: translateY(0); }
+          50% { opacity: 0.85; transform: translateY(-4px); }
+        }
+        .radar-box {
+          position: relative;
+          width: 120px;
+          height: 120px;
+          margin: 0 auto 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .radar-ring {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          border: 2px solid #0DB30D;
+          animation: radarRipple 2.6s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+          pointer-events: none;
+        }
+        .radar-ring:nth-child(2) {
+          animation-delay: 0.8s;
+        }
+        .radar-ring:nth-child(3) {
+          animation-delay: 1.6s;
+        }
+        .radar-core {
+          width: 72px;
+          height: 72px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #0A490A 0%, #0DB30D 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 10px 25px rgba(13, 179, 13, 0.35);
+          z-index: 2;
+          animation: softPulse 2s ease-in-out infinite;
+        }
+        .checkout-btn { width: 100%; padding: 18px; background: #0A490A; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+        .checkout-btn:hover { background: #0DB30D; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,179,13,0.3); }
+        .checkout-btn:active { transform: scale(0.98); }
         .checkout-btn:disabled { background: #d1d5db; cursor: not-allowed; transform: none; box-shadow: none; }
-        .remove-btn { background: #fff5f5; border: none; border-radius: 10px; padding: 10px; cursor: pointer; color: #ef4444; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
-        .remove-btn:hover { background: #fee2e2; }
-        .qty-stepper { display: inline-flex; align-items: center; border: 2px solid #e5e7eb; border-radius: 10px; overflow: hidden; height: 36px; }
-        .qty-btn { width: 34px; height: 36px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border: none; cursor: pointer; transition: background 0.15s; }
+        .remove-btn { background: #fff5f5; border: none; border-radius: 10px; padding: 10px; cursor: pointer; color: #ef4444; display: flex; align-items: center; justify-content: center; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); flex-shrink: 0; }
+        .remove-btn:hover { background: #fee2e2; transform: translateY(-1px); }
+        .remove-btn:active { transform: scale(0.94); }
+        .qty-stepper { display: inline-flex; align-items: center; border: 2px solid #e5e7eb; border-radius: 10px; overflow: hidden; height: 36px; transition: border-color 0.2s; }
+        .qty-btn { width: 34px; height: 36px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border: none; cursor: pointer; transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
         .qty-btn:hover:not(:disabled) { background: #eff6ef; }
-        .qty-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .qty-btn:active:not(:disabled) { transform: scale(0.92); }
         .qty-val { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #111; border-left: 1.5px solid #e5e7eb; border-right: 1.5px solid #e5e7eb; }
-        .cart-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); display: flex; gap: 16px; align-items: flex-start; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-        .cart-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+        .cart-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); display: flex; gap: 16px; align-items: flex-start; cursor: pointer; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        .cart-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(10,73,10,0.08); }
         .form-input:focus { border-color: #0A490A !important; background: #fff !important; }
         .province-select:focus { border-color: #0A490A !important; outline: none; }
-        .pay-confirm-btn { width: 100%; padding: 18px; background: #0066b2; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; }
-        .pay-confirm-btn:hover { background: #0052a3; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,102,178,0.35); }
+        .pay-confirm-btn { width: 100%; padding: 18px; background: #0066b2; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+        .pay-confirm-btn:hover { background: #0052a3; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,102,178,0.35); }
+        .pay-confirm-btn:active { transform: scale(0.98); }
+        .leaflet-container { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+        .leaflet-popup-content-wrapper { border-radius: 12px !important; font-size: 13px; font-weight: 600; }
+        .suggestion-item:hover { background: #f0fdf0 !important; }
+        .cart-map-box { height: 220px; }
+        .search-row { display: flex; gap: 8px; }
+        @media (max-width: 520px) {
+          .cart-map-box { height: 170px; }
+          .search-row { flex-direction: column; }
+          .search-row > button { width: 100%; justify-content: center; }
+        }
       `}</style>
 
-      {/* ── Product Detail Modal — UNCHANGED ── */}
       {selectedProduct && (
         <div
           onClick={() => setSelectedProduct(null)}
@@ -365,9 +1028,7 @@ export default function CartPage() {
         </div>
       )}
 
-      <Navbar />
-
-      <main style={{ maxWidth: '960px', margin: '0 auto', padding: '50px 5%' }}>
+      <main className="enter-up" style={{ maxWidth: '960px', margin: '0 auto', padding: '50px 5%' }}>
         <Link href="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#666', fontWeight: '600', fontSize: '14px', marginBottom: '24px' }}>
           <ArrowLeft size={16} /> Back to Shops
         </Link>
@@ -384,34 +1045,268 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* ════════════════════════════════════════════════════
-            FLOW: SUCCESS
-        ════════════════════════════════════════════════════ */}
-        {flow === 'success' && (
-          <div style={{ textAlign: 'center', padding: '80px 20px', backgroundColor: '#fff', borderRadius: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', animation: 'fadeUp 0.4s ease' }}>
-            <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
-            <h2 style={{ fontSize: '28px', fontWeight: '800', color: deepGreen, margin: '0 0 12px' }}>Order Placed!</h2>
-            <p style={{ color: '#666', fontSize: '16px', marginBottom: '8px' }}>Thank you for supporting local Cambodian farmers.</p>
-            <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '32px' }}>
-              Delivering to <strong style={{ color: deepGreen }}>{province}</strong> · {phone}
-            </p>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#eff6ef', padding: '10px 20px', borderRadius: '10px', marginBottom: '32px' }}>
-              <CheckCircle2 size={16} color={brandGreen} />
-              <span style={{ fontSize: '13px', fontWeight: '700', color: deepGreen }}>Payment confirmed via ABA Bank</span>
+        {flow === 'waiting-accept' && (
+          <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '44px 36px', boxShadow: '0 12px 40px rgba(10, 73, 10, 0.07)', border: '1.5px solid #edf2ee', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
+            <StepIndicator step={2} />
+
+            {/* Radar Search Beacon */}
+            <div className="radar-box">
+              <div className="radar-ring" />
+              <div className="radar-ring" />
+              <div className="radar-ring" />
+              <div className="radar-core">
+                <Navigation size={32} color="#fff" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
             </div>
-            <br />
-            <Link href="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: deepGreen, color: '#fff', padding: '16px 32px', borderRadius: '14px', fontWeight: '700', fontSize: '15px', textDecoration: 'none' }}>
-              Continue Shopping <ChevronRight size={18} />
-            </Link>
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#eff6ef', border: '1px solid #d1ead1', padding: '6px 14px', borderRadius: '100px', marginBottom: '14px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0DB30D', display: 'inline-block', boxShadow: '0 0 0 3px rgba(13,179,13,0.25)' }} />
+              <span style={{ fontSize: '12px', fontWeight: '800', color: deepGreen, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+                Nearby Distributors Notified
+              </span>
+            </div>
+
+            <h2 style={{ fontSize: '26px', fontWeight: '800', color: deepGreen, margin: '0 0 10px', letterSpacing: '-0.3px' }}>
+              Matching You with a Distributor…
+            </h2>
+            <p style={{ color: '#555', fontSize: '15px', lineHeight: '1.6', margin: '0 0 28px', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+              We've dispatched your order details to available distributors in your area. As soon as a distributor accepts, the ABA PayWay QR code will unlock here automatically!
+            </p>
+
+            {/* Destination summary card */}
+            <div style={{ background: '#f9fbf9', border: '1.5px solid #e3ede3', borderRadius: '18px', padding: '18px 22px', marginBottom: '24px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: '#eff6ef', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #d1ead1' }}>
+                <MapPin size={22} color={brandGreen} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: brandGreen, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  Target Delivery Location
+                </div>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '3px' }}>
+                  {address ? `${address}, ${province}` : province}
+                </div>
+                {phone && <div style={{ fontSize: '12px', color: '#666', marginTop: '3px', fontWeight: '600' }}>Contact phone: <strong>{phone}</strong></div>}
+              </div>
+            </div>
+
+            {/* Live pulsating banner */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fdfbf7', border: '1.5px solid #fae8c8', padding: '12px 20px', borderRadius: '14px', marginBottom: '28px' }}>
+              <Loader2 size={16} color="#d97706" style={{ animation: 'spin 1.2s linear infinite' }} />
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#92400e' }}>
+                Please stay on this page — usually confirmed in 1–3 minutes
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await supabase.rpc('cancel_pending_order', { p_order_id: waitingOrderIds[0] });
+                } catch { }
+                try {
+                  await supabase.from('orders').update({ status: 'cancelled' }).in('id', waitingOrderIds);
+                } catch { }
+                setWaitingOrderIds([]);
+                setFlow('cart');
+              }}
+              style={{
+                padding: '12px 26px',
+                borderRadius: '12px',
+                border: '1.5px solid #e5e7eb',
+                background: '#fff',
+                color: '#6b7280',
+                fontWeight: '700',
+                fontSize: '13px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.borderColor = '#ef4444';
+                el.style.color = '#ef4444';
+                el.style.background = '#fff5f5';
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.borderColor = '#e5e7eb';
+                el.style.color = '#6b7280';
+                el.style.background = '#fff';
+              }}
+            >
+              Cancel delivery request
+            </button>
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════
-            FLOW: EMPTY CART
-        ════════════════════════════════════════════════════ */}
+        {(flow === 'waiting-delivery' || flow === 'success') && (
+          <div style={{ maxWidth: '820px', margin: '0 auto', animation: 'fadeUp 0.4s ease' }}>
+            <StepIndicator step={4} />
+
+            <div style={{
+              backgroundColor: '#fff',
+              borderRadius: '28px',
+              padding: '36px 30px',
+              boxShadow: '0 12px 40px rgba(10, 73, 10, 0.07)',
+              border: '1.5px solid #edf2ee',
+              marginBottom: '24px',
+            }}>
+              {/* Header Status Row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', borderBottom: '1.5px solid #f3f5f0', paddingBottom: '22px', marginBottom: '22px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: '5px 14px', borderRadius: '100px',
+                      fontSize: '12px', fontWeight: '800',
+                      background: activeOrderStatus === 'delivered' ? '#ecfdf5' : activeOrderStatus === 'out_for_delivery' ? '#eff6ef' : '#fefce8',
+                      color: activeOrderStatus === 'delivered' ? '#065f46' : activeOrderStatus === 'out_for_delivery' ? deepGreen : '#854d0e',
+                      border: `1px solid ${activeOrderStatus === 'delivered' ? '#a7f3d0' : activeOrderStatus === 'out_for_delivery' ? '#cce8cc' : '#fef08a'}`,
+                    }}>
+                      {activeOrderStatus === 'delivered' ? (
+                        <>
+                          <CheckCircle2 size={15} color="#059669" />
+                          Delivery Arrived & Confirmed
+                        </>
+                      ) : activeOrderStatus === 'out_for_delivery' ? (
+                        <>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0DB30D', animation: 'pulse 1.5s infinite' }} />
+                          <Truck size={15} color={deepGreen} />
+                          Driver On The Way
+                        </>
+                      ) : (
+                        <>
+                          <Loader2 size={15} color="#ca8a04" style={{ animation: 'spin 1.2s linear infinite' }} />
+                          Farm Packaging Produce
+                        </>
+                      )}
+                    </span>
+                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#182216' }}>
+                      Order #{waitingOrderIds[0]?.slice(0, 8)}
+                    </span>
+                  </div>
+
+                  <h2 style={{ fontSize: '24px', fontWeight: '800', color: deepGreen, margin: '8px 0 6px' }}>
+                    {activeOrderStatus === 'delivered'
+                      ? 'Your Driver Has Arrived!'
+                      : activeOrderStatus === 'out_for_delivery'
+                      ? 'Vegetables En Route to Your Doorstep'
+                      : 'Distributor Confirmed & Packaging Order'}
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#556052', maxWidth: '520px', lineHeight: 1.5 }}>
+                    {activeOrderStatus === 'delivered'
+                      ? `Delivery arrival was confirmed by courier${arrivedAtTime ? ` at ${new Date(arrivedAtTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}. Please check your doorstep or meet your rider.`
+                      : activeOrderStatus === 'out_for_delivery'
+                      ? 'Your courier has collected your vegetables and is driving to your address. You can trace the live moving delivery pin below in real time.'
+                      : 'Payment is confirmed via ABA Bank. The distributor is packing your fresh vegetables. Once the rider departs, the live moving pin will activate below.'}
+                  </p>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    fontSize: '11px', fontWeight: '800',
+                    padding: '4px 12px', borderRadius: '8px',
+                    background: '#eff6ef', color: deepGreen,
+                    border: '1px solid #cce8cc',
+                    marginBottom: '4px',
+                  }}>
+                    Paid in Full (ABA KHQR)
+                  </span>
+                  <div style={{ fontSize: '20px', fontWeight: '900', color: deepGreen }}>
+                    {total.toLocaleString()} KHR
+                  </div>
+                </div>
+              </div>
+
+              {/* Embedded Live Tracking Map */}
+              <div style={{ marginBottom: '24px' }}>
+                <CustomerOrderTrackingMap
+                  orderId={waitingOrderIds[0] || 'active-order'}
+                  status={activeOrderStatus}
+                  destination={{
+                    address: [address, province].filter(Boolean).join(', ') || 'Your delivery location',
+                    lat: pickedLat,
+                    lng: pickedLng,
+                  }}
+                  pickup={{
+                    label: 'Local Organic Farm Hub',
+                    address: 'Cambodia Harvest Depot',
+                  }}
+                />
+              </div>
+
+              {/* Delivery Details Breakdown */}
+              <div style={{
+                background: '#f9fbf9',
+                borderRadius: '18px',
+                border: '1.5px solid #e3ede3',
+                padding: '18px 22px',
+                marginBottom: '24px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '14px',
+                fontSize: '13px',
+              }}>
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#889584', display: 'block', marginBottom: '3px' }}>
+                    Delivery Destination
+                  </span>
+                  <strong style={{ color: '#182216' }}>{address ? `${address}, ` : ''}{province}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#889584', display: 'block', marginBottom: '3px' }}>
+                    Recipient Phone
+                  </span>
+                  <strong style={{ color: '#182216' }}>{phone || 'Saved customer phone'}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#889584', display: 'block', marginBottom: '3px' }}>
+                    Status Timeline
+                  </span>
+                  <strong style={{ color: activeOrderStatus === 'delivered' ? '#059669' : deepGreen }}>
+                    {activeOrderStatus === 'delivered' ? 'Completed & Handed Over' : 'Waiting for Delivery Driver Arrival'}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <Link
+                  href="/notifications"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                    padding: '13px 24px', borderRadius: '12px',
+                    background: '#eff6ef', color: deepGreen,
+                    fontWeight: '800', fontSize: '14px',
+                    textDecoration: 'none', border: '1px solid #cce8cc',
+                  }}
+                >
+                  <Bell size={16} /> Track All Orders in Notifications
+                </Link>
+
+                <Link
+                  href="/shop"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                    padding: '13px 26px', borderRadius: '12px',
+                    background: deepGreen, color: '#fff',
+                    fontWeight: '800', fontSize: '14px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Continue Shopping <ChevronRight size={16} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {flow === 'cart' && cartProducts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '80px 20px', backgroundColor: '#fff', borderRadius: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
-            <div style={{ fontSize: '64px', marginBottom: '20px' }}>🛒</div>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#f6f8f3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <ShoppingBag size={40} color="#889584" />
+            </div>
             <h2 style={{ fontSize: '24px', fontWeight: '800', color: deepGreen, margin: '0 0 12px' }}>Your basket is empty</h2>
             <p style={{ color: '#888', fontSize: '15px', marginBottom: '32px' }}>Browse shops and add vegetables to get started.</p>
             <Link href="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: deepGreen, color: '#fff', padding: '16px 32px', borderRadius: '14px', fontWeight: '700', fontSize: '15px', textDecoration: 'none' }}>
@@ -420,14 +1315,79 @@ export default function CartPage() {
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════
-            FLOW: CART VIEW
-        ════════════════════════════════════════════════════ */}
         {flow === 'cart' && cartProducts.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '30px', alignItems: 'start' }}>
-
-            {/* Product list — UNCHANGED */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Delivery Destination Card */}
+              <div style={{
+                background: '#fff',
+                borderRadius: '20px',
+                padding: '20px 24px',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                border: '1.5px solid #edf2ee',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '14px',
+                    background: '#eff6ef',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <MapPin size={22} color={deepGreen} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: brandGreen, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                        Delivery Destination
+                      </span>
+                      {useSaved && savedAddress && (
+                        <span style={{ fontSize: '10px', background: '#eff6ef', color: deepGreen, padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                          Saved Address
+                        </span>
+                      )}
+                    </div>
+                    <div style={{
+                      fontSize: '15px', fontWeight: '800', color: '#111',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px',
+                    }}>
+                      {address ? `${address}${province ? `, ${province}` : ''}` : 'No delivery location selected yet'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                      {phone ? `Contact: ${phone}` : 'Select your location so our rider knows where to deliver'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFlow('checkout-delivery')}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '12px',
+                    border: `1.5px solid ${deepGreen}`,
+                    background: '#eff6ef',
+                    color: deepGreen,
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#e2f0e2'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ef'; }}
+                >
+                  {address ? 'Change' : '+ Add Location'}
+                </button>
+              </div>
+
               {cartProducts.map(product => {
                 const itemQty = product.qty ?? 1;
                 return (
@@ -456,10 +1416,10 @@ export default function CartPage() {
                       </div>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                         <span style={{ fontSize: '11px', backgroundColor: '#f0faf0', color: deepGreen, padding: '3px 8px', borderRadius: '6px', fontWeight: '600' }}>
-                          🌱 Harvested: {product.harvestDate}
+                          Harvested: {product.harvestDate}
                         </span>
                         <span style={{ fontSize: '11px', backgroundColor: '#fff5f5', color: '#ef4444', padding: '3px 8px', borderRadius: '6px', fontWeight: '600' }}>
-                          ⏱ Sell by: {product.sellByDate}
+                          Sell by: {product.sellByDate}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
@@ -485,7 +1445,6 @@ export default function CartPage() {
               </button>
             </div>
 
-            {/* Order summary — UNCHANGED except button text */}
             <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '28px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', position: 'sticky', top: '90px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '800', color: deepGreen, margin: '0 0 24px' }}>Order Summary</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
@@ -499,7 +1458,7 @@ export default function CartPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#555' }}>
                   <span>Delivery fee</span>
-                  <span style={{ fontWeight: '700', color: brandGreen }}>Free 🎉</span>
+                  <span style={{ fontWeight: '700', color: brandGreen }}>Free</span>
                 </div>
                 <div style={{ height: '1px', backgroundColor: '#f0f0f0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '17px' }}>
@@ -507,6 +1466,47 @@ export default function CartPage() {
                   <span style={{ fontWeight: '800', color: deepGreen }}>{total.toLocaleString()} KHR</span>
                 </div>
               </div>
+
+              {/* Delivery destination preview in summary */}
+              <div style={{
+                backgroundColor: '#f9fdf9',
+                border: '1.5px solid #dcf0dc',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                  <MapPin size={16} color={brandGreen} style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#888', textTransform: 'uppercase' }}>Deliver To</div>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: deepGreen, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {address ? `${address}${province ? `, ${province}` : ''}` : 'Location not selected'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFlow('checkout-delivery')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: deepGreen,
+                    fontWeight: '800',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    textDecoration: 'underline',
+                    flexShrink: 0,
+                  }}
+                >
+                  {address ? 'Edit' : 'Add'}
+                </button>
+              </div>
+
               <div style={{ backgroundColor: '#f9fdf9', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
                 {cartProducts.map(p => {
                   const q = p.qty ?? 1;
@@ -522,20 +1522,17 @@ export default function CartPage() {
                   );
                 })}
               </div>
-              {/* Now starts checkout flow instead of confirming directly */}
-              <button className="checkout-btn" onClick={() => setFlow('checkout-delivery')}>
-                <ShoppingBag size={18} /> Proceed to Checkout
+              <button className="checkout-btn" onClick={handleProceedToCheckout} disabled={checkingOut}>
+                <ShoppingBag size={18} /> {checkingOut ? 'Checking…' : 'Proceed to Checkout'}
               </button>
+              {checkoutError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px', textAlign: 'center' }}>{checkoutError}</p>}
               <p style={{ textAlign: 'center', fontSize: '12px', color: '#aaa', marginTop: '14px', lineHeight: '1.5' }}>
-                Supporting local Cambodian farmers 🌱
+                Supporting local Cambodian farmers
               </p>
             </div>
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════
-            FLOW: CHECKOUT — STEP 1: DELIVERY
-        ════════════════════════════════════════════════════ */}
         {flow === 'checkout-delivery' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '30px', alignItems: 'start', animation: 'fadeUp 0.3s ease' }}>
             <div style={{ backgroundColor: '#fff', borderRadius: '24px', padding: '36px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
@@ -544,46 +1541,232 @@ export default function CartPage() {
               <h2 style={{ fontSize: '22px', fontWeight: '800', color: deepGreen, margin: '0 0 6px' }}>Delivery Details</h2>
               <p style={{ color: '#888', fontSize: '14px', margin: '0 0 28px' }}>Where should we deliver your vegetables?</p>
 
-              {/* Province */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
-                  <MapPin size={14} color={deepGreen} /> Province / City
-                </label>
-                <select
-                  className="province-select"
-                  value={province}
-                  onChange={e => { setProvince(e.target.value); setFormErrors(prev => ({ ...prev, province: '' })); }}
-                  style={{ ...inputStyle(!!formErrors.province), appearance: 'none', cursor: 'pointer', color: province ? '#111' : '#9ca3af' }}
-                >
-                  <option value="" disabled>Select your province…</option>
-                  {CAMBODIA_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-                {formErrors.province && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600', margin: '6px 0 0' }}>{formErrors.province}</p>}
-              </div>
+              {savedAddress && (
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: useSaved ? '12px' : 0 }}>
+                    <button
+                      onClick={() => setUseSaved(true)}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '12px', cursor: 'pointer', fontFamily: 'inherit',
+                        border: `2px solid ${useSaved ? deepGreen : '#e5e7eb'}`,
+                        background: useSaved ? '#f0fdf0' : '#fff',
+                        color: useSaved ? deepGreen : '#555', fontWeight: '700', fontSize: '13px',
+                      }}
+                    >
+                      Use my saved address
+                    </button>
+                    <button
+                      onClick={() => setUseSaved(false)}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '12px', cursor: 'pointer', fontFamily: 'inherit',
+                        border: `2px solid ${!useSaved ? deepGreen : '#e5e7eb'}`,
+                        background: !useSaved ? '#f0fdf0' : '#fff',
+                        color: !useSaved ? deepGreen : '#555', fontWeight: '700', fontSize: '13px',
+                      }}
+                    >
+                      Deliver somewhere else
+                    </button>
+                  </div>
 
-              {/* Address */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
-                  <MapPin size={14} color={deepGreen} /> Street Address
-                </label>
-                <DeliveryMap
-                  onAddressSelect={(addr) => {
-                  setAddress(addr);
-                  setFormErrors(prev => ({ ...prev, address: '' }));
-                    }}
-                  />
-                <textarea
-                  className="form-input"
-                  placeholder="House number, street, village, commune…"
-                  value={address}
-                  rows={3}
-                  onChange={e => { setAddress(e.target.value); setFormErrors(prev => ({ ...prev, address: '' })); }}
-                  style={{ ...inputStyle(!!formErrors.address), resize: 'vertical', lineHeight: '1.5' }}
-                />
-                {formErrors.address && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600', margin: '6px 0 0' }}>{formErrors.address}</p>}
-              </div>
+                  {useSaved && (
+                    <div style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb', borderRadius: '12px', padding: '14px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#111' }}>{savedAddress.province}</div>
+                      <div style={{ fontSize: '13px', color: '#666', marginTop: '2px' }}>{savedAddress.street}</div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', marginTop: '8px', color: savedAddress.lat ? brandGreen : '#d97706' }}>
+                        {savedAddress.lat ? 'Map location on file' : 'No exact map pin saved — the delivery map may not show this address precisely'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {/* Phone */}
+              {!useSaved && (
+                <>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
+                      <MapPin size={14} color={deepGreen} /> Province / City
+                    </label>
+                    <select
+                      className="province-select"
+                      value={province}
+                      onChange={e => { setProvince(e.target.value); setFormErrors(prev => ({ ...prev, province: '' })); }}
+                      style={{ ...inputStyle(!!formErrors.province), appearance: 'none', cursor: 'pointer', color: province ? '#111' : '#9ca3af' }}
+                    >
+                      <option value="" disabled>Select your province…</option>
+                      {CAMBODIA_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    {formErrors.province && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600', margin: '6px 0 0' }}>{formErrors.province}</p>}
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
+                      <MapPin size={14} color={deepGreen} /> Delivery Location
+                    </label>
+
+                    <div className="search-row" style={{ marginBottom: '10px' }}>
+                      <div ref={suggestionsRef} style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+                        <Search size={16} color="#999" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                        {searchingAuto && (
+                          <Loader2 size={15} color={deepGreen} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', animation: 'spin 1s linear infinite' }} />
+                        )}
+                        <input
+                          className="form-input"
+                          type="text"
+                          value={searchQuery}
+                          onChange={e => handleSearchChange(e.target.value)}
+                          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                          placeholder="Type a place, building, street…"
+                          style={{ ...inputStyle(false), paddingLeft: '38px', paddingRight: '36px' }}
+                        />
+
+                        {showSuggestions && suggestions.length > 0 && (
+                          <div style={{
+                            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                            background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '12px',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
+                            overflow: 'hidden', maxHeight: '220px', overflowY: 'auto',
+                          }}>
+                            {suggestions.map((s, i) => {
+                              const parts = s.display_name.split(',');
+                              const title = parts[0];
+                              const subtitle = parts.slice(1, 3).join(',').trim();
+                              return (
+                                <div
+                                  key={i}
+                                  className="suggestion-item"
+                                  onClick={() => handleSuggestionPick(s)}
+                                  style={{
+                                    padding: '10px 14px', cursor: 'pointer',
+                                    borderBottom: i < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
+                                    display: 'flex', gap: '10px', alignItems: 'flex-start',
+                                    background: '#fff', transition: 'background 0.15s',
+                                  }}
+                                >
+                                  <MapPin size={14} color={deepGreen} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#111' }}>{title}</div>
+                                    <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{subtitle}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handleOpenGoogleMaps}
+                        title="Open in Google Maps"
+                        style={{
+                          padding: '12px 14px', borderRadius: '12px',
+                          backgroundColor: deepGreen, color: '#fff',
+                          border: 'none', fontWeight: '600', cursor: 'pointer',
+                          fontSize: '13px', display: 'flex', alignItems: 'center',
+                          gap: '5px', whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        <ExternalLink size={14} /> Google Maps
+                      </button>
+                    </div>
+
+                    {showCoordsBox && (
+                      <div style={{
+                        marginBottom: '10px', background: '#fffbeb',
+                        border: '1.5px solid #fde68a', borderRadius: '12px', padding: '14px',
+                      }}>
+                        <p style={{ margin: '0 0 6px', fontSize: '12px', fontWeight: '800', color: '#92400e' }}>
+                          Paste your location from Google Maps
+                        </p>
+                        <p style={{ margin: '0 0 10px', fontSize: '11px', color: '#a16207', lineHeight: '1.5' }}>
+                          In Google Maps: long-press your location → copy the coordinates shown → paste below
+                        </p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          <input
+                            type="text"
+                            placeholder="e.g. 11.123456, 104.567890  or paste Google Maps link"
+                            value={coordsInput}
+                            onChange={e => { setCoordsInput(e.target.value); setCoordsError(''); }}
+                            onKeyDown={e => e.key === 'Enter' && handleCoordsSubmit()}
+                            style={{ ...inputStyle(false), fontSize: '12px', border: '1px solid #fde68a', background: '#fff', flex: '1 1 180px', minWidth: 0 }}
+                          />
+                          <button
+                            onClick={handleCoordsSubmit}
+                            style={{
+                              padding: '10px 16px', borderRadius: '10px',
+                              background: '#d97706', color: '#fff',
+                              border: 'none', fontWeight: '700', cursor: 'pointer',
+                              fontSize: '13px', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Go
+                          </button>
+                          <button
+                            onClick={() => { setShowCoordsBox(false); setCoordsInput(''); setCoordsError(''); }}
+                            style={{
+                              padding: '10px 12px', borderRadius: '10px',
+                              background: '#f3f4f6', color: '#666',
+                              border: 'none', fontWeight: '600', cursor: 'pointer', fontSize: '13px',
+                            }}
+                          >✕</button>
+                        </div>
+                        {coordsError && (
+                          <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#dc2626', fontWeight: '600' }}>{coordsError}</p>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+                      <div ref={mapRef} className="cart-map-box" style={{ width: '100%', background: '#eef1ee' }}>
+                        {!mapLoaded && (
+                          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f9f4' }}>
+                            <CircularLoader size={36} />
+                          </div>
+                        )}
+                      </div>
+
+                      {isGeocoding && (
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', zIndex: 1000 }}>
+                          <Loader2 size={18} color={deepGreen} style={{ animation: 'spin 1s linear infinite' }} />
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: deepGreen }}>Getting address…</span>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={handleMyLocation}
+                        title="Use my current location"
+                        style={{ position: 'absolute', bottom: '10px', right: '10px', zIndex: 900, width: '36px', height: '36px', borderRadius: '50%', background: '#fff', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+                      >
+                        <Navigation size={16} color={deepGreen} fill={isLocating ? deepGreen : 'none'} />
+                      </button>
+                    </div>
+
+                    <p style={{ fontSize: '12px', color: '#888', fontWeight: '600', margin: '8px 0 0', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                      <MapPin size={11} color={deepGreen} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span>
+                        {pickedLabel
+                          ? (pickedLabel.length > 55 ? pickedLabel.slice(0, 55) + '…' : pickedLabel)
+                          : 'Type to search, or click directly on the map'}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
+                      <MapPin size={14} color={deepGreen} /> Street Address
+                    </label>
+                    <textarea
+                      className="form-input"
+                      placeholder="House number, street, village, commune…"
+                      value={address}
+                      rows={3}
+                      onChange={e => { setAddress(e.target.value); setFormErrors(prev => ({ ...prev, address: '' })); }}
+                      style={{ ...inputStyle(!!formErrors.address), resize: 'vertical', lineHeight: '1.5' }}
+                    />
+                    {formErrors.address && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600', margin: '6px 0 0' }}>{formErrors.address}</p>}
+                  </div>
+                </>
+              )}
+
               <div style={{ marginBottom: '32px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
                   <Phone size={14} color={deepGreen} /> Phone Number
@@ -599,53 +1782,102 @@ export default function CartPage() {
                 {formErrors.phone && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600', margin: '6px 0 0' }}>{formErrors.phone}</p>}
               </div>
 
-              {/* Nav buttons */}
+              {/* NEW — only relevant when entering a fresh address */}
+              {!useSaved && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '32px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={saveAsDefault}
+                    onChange={e => setSaveAsDefault(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: deepGreen, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#555' }}>
+                    Save this as my default delivery address
+                  </span>
+                </label>
+              )}
+
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
+                  type="button"
                   onClick={() => setFlow('cart')}
                   style={{ flex: 1, padding: '15px', border: '2px solid #e5e7eb', borderRadius: '14px', background: '#fff', fontWeight: '700', fontSize: '15px', color: '#555', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                   <ChevronLeft size={16} /> Back
                 </button>
                 <button
+                  type="button"
                   className="checkout-btn"
                   style={{ flex: 2 }}
-                  onClick={handleDeliveryNext}>
-                  Continue to Payment <ChevronRight size={16} />
+                  onClick={handleRequestDistributor}
+                  disabled={checkingOut}
+                >
+                  {checkingOut ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Notifying distributors…
+                    </>
+                  ) : (
+                    <>
+                      Request Distributor <ChevronRight size={16} />
+                    </>
+                  )}
                 </button>
               </div>
+              {checkoutError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px', textAlign: 'center' }}>{checkoutError}</p>}
             </div>
 
-            {/* Mini order summary sidebar */}
             <MiniOrderSummary cartProducts={cartProducts} total={total} />
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════
-            FLOW: CHECKOUT — STEP 2: PAYMENT (ABA)
-        ════════════════════════════════════════════════════ */}
         {flow === 'checkout-payment' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '30px', alignItems: 'start', animation: 'fadeUp 0.3s ease' }}>
             <div style={{ backgroundColor: '#fff', borderRadius: '24px', padding: '36px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
-              <StepIndicator step={2} />
+              <StepIndicator step={3} />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#eff6ef', border: '1.5px solid #cce8cc', borderRadius: '12px', padding: '12px 16px', marginBottom: '20px' }}>
+                <CheckCircle2 size={18} color={brandGreen} style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: '700', color: deepGreen }}>
+                  Distributor accepted your request! Complete payment to confirm order.
+                </span>
+              </div>
 
               <h2 style={{ fontSize: '22px', fontWeight: '800', color: deepGreen, margin: '0 0 6px' }}>Pay with ABA Bank</h2>
               <p style={{ color: '#888', fontSize: '14px', margin: '0 0 28px' }}>Scan the QR code with your ABA Mobile app to complete payment.</p>
 
-              {/* Delivery summary pill */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#f0fdf0', border: '1.5px solid #d1fae5', borderRadius: '12px', padding: '12px 16px', marginBottom: '28px' }}>
-                <MapPin size={15} color={brandGreen} />
-                <div>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: deepGreen }}>{province}</span>
-                  <span style={{ fontSize: '12px', color: '#888', marginLeft: '8px' }}>{address.length > 40 ? address.slice(0, 40) + '…' : address}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', backgroundColor: '#f0fdf0', border: '1.5px solid #d1fae5', borderRadius: '14px', padding: '14px 18px', marginBottom: '28px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                  <MapPin size={18} color={brandGreen} style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: deepGreen }}>
+                      {province || 'Delivery Location'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                      {address}
+                    </div>
+                    {phone && (
+                      <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>
+                        Contact: {phone}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setFlow('checkout-delivery')}
+                  style={{
+                    background: '#fff', border: '1px solid #c1ecc1', borderRadius: '8px',
+                    color: deepGreen, fontWeight: '700', fontSize: '12px', padding: '6px 12px',
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}
+                >
+                  Change
+                </button>
               </div>
 
-              {/* ABA QR */}
               <div style={{ border: '2px solid #cce0f5', borderRadius: '20px', padding: '28px', marginBottom: '28px', backgroundColor: '#f8fbff' }}>
                 <ABAQRCode amount={total} />
               </div>
 
-              {/* How to pay steps */}
               <div style={{ backgroundColor: '#f9fafb', borderRadius: '14px', padding: '18px', marginBottom: '28px' }}>
                 <p style={{ fontSize: '12px', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 12px' }}>How to pay</p>
                 {[
@@ -661,31 +1893,27 @@ export default function CartPage() {
                 ))}
               </div>
 
-              {/* Nav buttons */}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
                   onClick={() => setFlow('checkout-delivery')}
                   style={{ flex: 1, padding: '15px', border: '2px solid #e5e7eb', borderRadius: '14px', background: '#fff', fontWeight: '700', fontSize: '15px', color: '#555', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                   <ChevronLeft size={16} /> Back
                 </button>
-                <button className="pay-confirm-btn" style={{ flex: 2 }} onClick={handleConfirmPayment}>
-                  <CheckCircle2 size={18} /> I've Paid
+                <button className="pay-confirm-btn" style={{ flex: 2 }} onClick={handleConfirmPayment} disabled={placing}>
+                  <CheckCircle2 size={18} /> {placing ? 'Placing order...' : "I've Paid"}
                 </button>
+                {placeError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px' }}>{placeError}</p>}
               </div>
             </div>
 
-            {/* Mini order summary sidebar */}
             <MiniOrderSummary cartProducts={cartProducts} total={total} />
           </div>
         )}
       </main>
-
-      <Footer />
     </div>
   );
 }
 
-// ── Mini order summary (reused in both checkout steps) ───────────────────────
 function MiniOrderSummary({ cartProducts, total }: { cartProducts: CartProduct[]; total: number }) {
   const deepGreen = '#0A490A';
   const brandGreen = '#0DB30D';
@@ -714,8 +1942,8 @@ function MiniOrderSummary({ cartProducts, total }: { cartProducts: CartProduct[]
         <span style={{ fontSize: '16px', fontWeight: '800', color: deepGreen }}>{total.toLocaleString()} KHR</span>
       </div>
       <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#f0fdf0', padding: '10px 12px', borderRadius: '10px' }}>
-        <span style={{ fontSize: '12px' }}>🎉</span>
-        <span style={{ fontSize: '12px', fontWeight: '600', color: deepGreen }}>Free delivery</span>
+        <CheckCircle2 size={14} color={deepGreen} />
+        <span style={{ fontSize: '12px', fontWeight: '700', color: deepGreen }}>Free delivery</span>
       </div>
     </div>
   );

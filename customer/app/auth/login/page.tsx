@@ -5,6 +5,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 
 function LoginForm() {
   const router = useRouter();
@@ -123,8 +124,13 @@ function LoginForm() {
                 </div>
               </div>
             </div>
-            <button onClick={handleLogin} disabled={loading} className="login-btn-primary" style={{ opacity: loading ? 0.7 : 1 }}>
-              {loading ? 'Signing in...' : 'Sign in'}
+            <button onClick={handleLogin} disabled={loading} className="login-btn-primary" style={{ opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              {loading ? (
+                <>
+                  <CircularLoader size={18} strokeWidth={2.5} />
+                  <span>Signing in…</span>
+                </>
+              ) : 'Sign in'}
             </button>
             <div className="login-divider">
               <div className="login-divider-line" />

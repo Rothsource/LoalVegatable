@@ -13,8 +13,6 @@ export default function Footer() {
   return (
     <footer className="footer-root">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700;800&display=swap');
-
         .footer-veg-heading { font-family: 'Fraunces', serif; }
 
         .footer-root {

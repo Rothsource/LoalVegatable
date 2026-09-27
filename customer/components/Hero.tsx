@@ -234,7 +234,7 @@ export default function Hero() {
             </div>
             <div>
               <div className="hero-float-card-label">Today's Pick</div>
-              <div className="hero-float-card-value">Morning Glory 🥬</div>
+              <div className="hero-float-card-value">Morning Glory</div>
             </div>
           </div>
 
@@ -244,7 +244,7 @@ export default function Hero() {
             </div>
             <div>
               <div className="hero-float-card-label">Delivery</div>
-              <div className="hero-float-card-value">Right to your door🚚</div>
+              <div className="hero-float-card-value">Right to your door</div>
             </div>
           </div>
         </div>

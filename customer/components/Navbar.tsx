@@ -16,7 +16,50 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+  const [activeOrderCount, setActiveOrderCount] = useState(0);
   const pathname = usePathname();
+
+  const updateCartCount = () => {
+    try {
+      const raw = localStorage.getItem('cart-products');
+      if (!raw) { setCartCount(0); return; }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setCartCount(parsed.reduce((sum, item) => sum + (item.qty || 1), 0));
+      } else if (typeof parsed === 'object') {
+        const values = Object.values(parsed) as any[];
+        setCartCount(values.reduce((sum, item) => sum + (item.qty || 1), 0));
+      }
+    } catch {
+      setCartCount(0);
+    }
+  };
+
+  useEffect(() => {
+    updateCartCount();
+    window.addEventListener('storage', updateCartCount);
+    const interval = setInterval(updateCartCount, 1500);
+    return () => {
+      window.removeEventListener('storage', updateCartCount);
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) { setActiveOrderCount(0); return; }
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data?.user) return;
+      supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', data.user.id)
+        .in('status', ['pending', 'accepted', 'out_for_delivery', 'delivering'])
+        .then(({ count }) => {
+          if (count !== null) setActiveOrderCount(count);
+        });
+    });
+  }, [isLoggedIn, pathname]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -59,8 +102,6 @@ export default function Navbar() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Inter:wght@400;500;600;700;800&display=swap');
-
         .nav-veg-heading { font-family: 'Fraunces', serif; }
 
         .nav-root {
@@ -234,13 +275,55 @@ export default function Navbar() {
 
           {/* Desktop links */}
           <ul className="nav-links">
-            {navLinks.map(({ href, label, icon }) => (
-              <li key={href}>
-                <Link href={href} className={`nav-link${isActive(href) ? " active" : ""}`}>
-                  {icon} {label}
-                </Link>
-              </li>
-            ))}
+            {navLinks.map(({ href, label, icon }) => {
+              const isCart = href === "/cart";
+              const isNotif = href === "/notifications";
+              return (
+                <li key={href}>
+                  <Link href={href} className={`nav-link${isActive(href) ? " active" : ""}`} style={{ position: 'relative' }}>
+                    {icon} {label}
+                    {isCart && cartCount > 0 && (
+                      <span style={{
+                        background: '#0DB30D',
+                        color: '#fff',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        borderRadius: '100px',
+                        padding: '1px 6px',
+                        minWidth: '18px',
+                        height: '18px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: '4px',
+                        boxShadow: '0 2px 6px rgba(13,179,13,0.3)',
+                      }}>
+                        {cartCount}
+                      </span>
+                    )}
+                    {isNotif && activeOrderCount > 0 && (
+                      <span style={{
+                        background: '#d97706',
+                        color: '#fff',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        borderRadius: '100px',
+                        padding: '1px 6px',
+                        minWidth: '18px',
+                        height: '18px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: '4px',
+                        boxShadow: '0 2px 6px rgba(217,119,6,0.3)',
+                      }}>
+                        {activeOrderCount}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
 
           {/* Right side */}
@@ -271,13 +354,43 @@ export default function Navbar() {
         {/* Mobile menu */}
         {menuOpen && (
           <div className="mobile-menu">
-            {navLinks.map(({ href, label, icon }) => (
-              <Link key={href} href={href}
-                className={`mobile-link${isActive(href) ? " active" : ""}`}
-                onClick={() => setMenuOpen(false)}>
-                {icon} {label}
-              </Link>
-            ))}
+            {navLinks.map(({ href, label, icon }) => {
+              const isCart = href === "/cart";
+              const isNotif = href === "/notifications";
+              return (
+                <Link key={href} href={href}
+                  className={`mobile-link${isActive(href) ? " active" : ""}`}
+                  onClick={() => setMenuOpen(false)}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                    {icon} {label}
+                  </span>
+                  {isCart && cartCount > 0 && (
+                    <span style={{
+                      background: '#0DB30D',
+                      color: '#fff',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      borderRadius: '100px',
+                      padding: '2px 8px',
+                    }}>
+                      {cartCount} items
+                    </span>
+                  )}
+                  {isNotif && activeOrderCount > 0 && (
+                    <span style={{
+                      background: '#d97706',
+                      color: '#fff',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      borderRadius: '100px',
+                      padding: '2px 8px',
+                    }}>
+                      {activeOrderCount} active
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
             {isLoggedIn ? (
               <Link href="/auth/profile" className="mobile-link-profile" onClick={() => setMenuOpen(false)}>
                 <div className="nav-profile-avatar">

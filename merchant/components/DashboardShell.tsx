@@ -76,9 +76,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <div className="min-h-screen bg-[#f5f9f3] text-gray-900">
+      <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <Header lowStock={lowStock} merchantName={merchantName} profileUrl={profileUrl} />
-        {children}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">{children}</main>
       </div>
     </DashboardContext.Provider>
   );
