@@ -1,5 +1,5 @@
 // app/api/products/route.ts
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 
 export async function GET() {

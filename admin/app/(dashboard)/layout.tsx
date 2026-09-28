@@ -43,6 +43,9 @@ export default function DashboardLayout({
         {/* Top Header */}
         <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-[#dfe6d9]/80 bg-[#fbf8f2]/90 backdrop-blur-md px-8 shadow-xs">
           <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white border border-[#dfe6d9] p-1 flex items-center justify-center shadow-2xs overflow-hidden sm:hidden">
+              <img src="/image/logo.png" alt="LocalVegetable" className="h-full w-full object-contain" />
+            </div>
             <h1 className="text-xl font-bold text-[var(--foreground)] tracking-tight font-heading">
               Admin Overview
             </h1>

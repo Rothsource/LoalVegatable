@@ -44,6 +44,12 @@ h1, h2, h3, h4, .font-heading, .veg-heading {
   font-family: 'Fraunces', Georgia, serif;
 }
 
+@keyframes customer-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 button,
 input {
   font: inherit;

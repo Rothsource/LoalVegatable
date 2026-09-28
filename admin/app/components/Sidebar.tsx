@@ -85,8 +85,8 @@ export default function Sidebar() {
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col bg-[#fbf8f2] border-r border-[#dfe6d9] text-[var(--foreground)]">
       {/* Brand Header */}
       <div className="flex h-20 items-center gap-3 px-6 border-b border-[#dfe6d9]/80">
-        <div className="w-10 h-10 rounded-xl bg-[var(--leaf)] flex items-center justify-center font-black text-white text-base shadow-[0_6px_20px_rgba(13,179,13,0.3)]">
-          LV
+        <div className="w-10 h-10 rounded-xl bg-white border border-[#dfe6d9] p-1 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+          <img src="/image/logo.png" alt="LocalVegetable" className="h-full w-full object-contain" />
         </div>
         <div>
           <div className="font-extrabold text-[15px] tracking-tight text-[var(--foreground)] flex items-center gap-1.5 font-heading">

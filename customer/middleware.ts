@@ -22,7 +22,14 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/auth/')
   ) return NextResponse.next()
 
-  const protectedPaths = ['/shop/', '/cart', '/checkout', '/profile', '/orders']
+  const protectedPaths = [
+    '/cart',
+    '/checkout',
+    '/favorites',
+    '/notifications',
+    '/profile',
+    '/orders',
+  ]
   const isProtected = protectedPaths.some(p => pathname.startsWith(p))
   if (!isProtected) return NextResponse.next()
 

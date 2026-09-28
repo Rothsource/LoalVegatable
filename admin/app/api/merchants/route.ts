@@ -1,6 +1,6 @@
 // admin/app/api/merchants/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function GET() {
   const { data: merchants, error } = await supabaseAdmin

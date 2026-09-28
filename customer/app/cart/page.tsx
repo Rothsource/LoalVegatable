@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { ShoppingCart, Trash2, ChevronRight, ShoppingBag, ArrowLeft, Plus, Minus, X, Star, Leaf, Box, Calendar, MapPin, Phone, CreditCard, CheckCircle2, ChevronLeft, Navigation, Search, Loader2, ExternalLink, Truck, Bell, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import CustomerOrderTrackingMap from '@/components/CustomerOrderTrackingMap';
-import { CircularLoader, CartSkeleton } from '@/components/CustomerSkeleton';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 import { isProductExpired } from '@/lib/expiry';
 
@@ -114,70 +115,113 @@ function matchProvince(addr: any): string | null {
 function ABAQRCode({ amount }: { amount: number }) {
   const abaKHR = Math.round(amount);
   return (
-    <div style={{ textAlign: 'center' }}>
+    <div style={{ maxWidth: '340px', margin: '0 auto', textAlign: 'center', filter: 'drop-shadow(0 12px 28px rgba(225,35,46,0.18))' }}>
+      {/* Official KHQR Red Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #004b87 0%, #0066b2 100%)',
-        borderRadius: '16px 16px 0 0',
-        padding: '16px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        background: 'linear-gradient(135deg, #e1232e 0%, #c41822 100%)',
+        borderRadius: '20px 20px 0 0',
+        padding: '18px 24px 14px',
         color: '#fff',
-        boxShadow: '0 4px 14px rgba(0,102,178,0.25)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ background: '#fff', borderRadius: '6px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center' }}>
-            <span style={{ color: '#0066b2', fontWeight: '900', fontSize: '13px', letterSpacing: '-0.3px' }}>ABA</span>
-          </div>
-          <span style={{ color: '#e0f2fe', fontWeight: '700', fontSize: '12px', letterSpacing: '0.5px' }}>PAYWAY KHQR</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+          <img
+            src="/image/khqr-logo-white.png"
+            alt="KHQR Logo"
+            style={{ height: '30px', width: 'auto', display: 'block' }}
+          />
         </div>
-        <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', padding: '3px 10px', borderRadius: '100px', fontWeight: '700' }}>
-          Scan & Pay
+        <div style={{
+          fontSize: '10px',
+          fontWeight: '700',
+          letterSpacing: '1px',
+          color: 'rgba(255,255,255,0.88)',
+          textTransform: 'uppercase',
+        }}>
+          Bakong · National Bank of Cambodia
         </div>
       </div>
 
+      {/* Ticket Body */}
       <div style={{
         background: '#fff',
-        border: '2px solid #e0f0fe',
+        border: '1.5px solid #fecdd3',
         borderTop: 'none',
-        borderRadius: '0 0 16px 16px',
-        padding: '24px 20px 20px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
+        borderRadius: '0 0 20px 20px',
+        padding: '20px 20px 22px',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
       }}>
-        <div style={{
-          width: '190px', height: '190px', margin: '0 auto 18px',
-          border: '3px solid #0066b2', borderRadius: '18px',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          background: '#f8fbff', position: 'relative', overflow: 'hidden',
-          boxShadow: '0 4px 16px rgba(0,102,178,0.12)',
-        }}>
-          {[
-            { top: 10, left: 10 }, { top: 10, right: 10 },
-            { bottom: 10, left: 10 }, { bottom: 10, right: 10 },
-          ].map((pos, i) => (
-            <div key={i} style={{
-              position: 'absolute', width: 28, height: 28,
-              borderColor: '#0066b2', borderStyle: 'solid',
-              borderWidth: i === 0 ? '3px 0 0 3px' : i === 1 ? '3px 3px 0 0' : i === 2 ? '0 0 3px 3px' : '0 3px 3px 0',
-              borderRadius: i === 0 ? '4px 0 0 0' : i === 1 ? '0 4px 0 0' : i === 2 ? '0 0 0 4px' : '0 0 4px 0',
-              ...pos,
-            }} />
-          ))}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,14px)', gap: '4px', opacity: 0.65 }}>
-            {Array.from({ length: 49 }).map((_, i) => (
-              <div key={i} style={{ width: 10, height: 10, borderRadius: '2px', background: [0, 1, 2, 6, 7, 13, 14, 42, 43, 44, 45, 46, 48].includes(i) ? '#0066b2' : Math.random() > 0.5 ? '#0066b2' : 'transparent' }} />
-            ))}
+        {/* Merchant & Amount */}
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            Local Vegetable Store
           </div>
-          <div style={{ marginTop: '8px', fontSize: '10px', color: '#0066b2', fontWeight: '800', letterSpacing: '0.5px' }}>KHQR OFFICIAL</div>
+          <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', marginTop: '2px', letterSpacing: '-0.5px' }}>
+            {abaKHR.toLocaleString()} <span style={{ fontSize: '18px', fontWeight: '800', color: '#e1232e' }}>KHR</span>
+          </div>
         </div>
 
-        <div style={{ background: '#f0f7ff', borderRadius: '14px', padding: '14px 24px', display: 'inline-block', marginBottom: '8px', border: '1.5px solid #cce0f5' }}>
-          <div style={{ fontSize: '11px', color: '#0066b2', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Total Amount Due</div>
-          <div style={{ fontSize: '28px', fontWeight: '900', color: '#0066b2', marginTop: '2px', letterSpacing: '-0.5px' }}>{abaKHR.toLocaleString()} KHR</div>
+        {/* Perforated ticket divider */}
+        <div style={{
+          position: 'relative',
+          margin: '0 -20px 16px',
+          borderTop: '2px dashed #e2e8f0',
+        }} />
+
+        {/* Real Official Bakong KHQR Code with Red Emblem */}
+        <div style={{
+          width: '220px',
+          height: '220px',
+          margin: '0 auto 16px',
+          padding: '10px',
+          background: '#fff',
+          borderRadius: '16px',
+          border: '2px solid #f1f5f9',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <img
+            src="/image/bakong-khqr.png"
+            alt="Real Bakong KHQR"
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', borderRadius: '8px' }}
+          />
         </div>
 
-        <p style={{ fontSize: '12px', color: '#64748b', margin: '10px 0 0', lineHeight: '1.5', fontWeight: '600' }}>
-          Open ABA Mobile on phone → Tap <strong>"Scan QR"</strong> → Confirm payment in KHR
+        {/* Supported Banks Badges */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          flexWrap: 'wrap',
+          marginBottom: '12px',
+        }}>
+          {['Bakong', 'ABA Bank', 'Wing', 'ACLEDA'].map((b) => (
+            <span
+              key={b}
+              style={{
+                fontSize: '10px',
+                fontWeight: '700',
+                color: '#475569',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                padding: '2px 8px',
+                borderRadius: '6px',
+              }}
+            >
+              {b}
+            </span>
+          ))}
+        </div>
+
+        <p style={{ fontSize: '11px', color: '#64748b', margin: 0, lineHeight: '1.5', fontWeight: '600' }}>
+          Scan with <strong>Bakong App</strong> or any Cambodian banking app
         </p>
       </div>
     </div>
@@ -186,9 +230,9 @@ function ABAQRCode({ amount }: { amount: number }) {
 
 function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
   const steps = [
-    { n: 1, label: 'Delivery Details', subtitle: 'Where to deliver' },
-    { n: 2, label: 'Distributor Match', subtitle: 'Nearby driver' },
-    { n: 3, label: 'Payment', subtitle: 'ABA PayWay' },
+    { n: 1, label: 'Delivery Location', subtitle: 'Where to deliver' },
+    { n: 2, label: 'Payment First', subtitle: 'Bakong KHQR' },
+    { n: 3, label: 'Merchant Review', subtitle: 'Farm acceptance' },
     { n: 4, label: 'Live Delivery', subtitle: 'Driver arrival' },
   ];
   return (
@@ -247,8 +291,23 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
 }
 
 export default function CartPage() {
+  const router = useRouter();
+  const [authChecking, setAuthChecking] = useState(true);
   const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? (await supabase.auth.getUser()).data?.user;
+      if (!user) {
+        router.replace('/auth/login?redirectTo=/cart');
+        return;
+      }
+      setAuthChecking(false);
+    }
+    checkAuth();
+  }, [router]);
   const [flow, setFlow] = useState<'cart' | 'waiting-accept' | 'checkout-delivery' | 'checkout-payment' | 'waiting-delivery' | 'success'>('cart');
   const [activeOrderStatus, setActiveOrderStatus] = useState<'accepted' | 'out_for_delivery' | 'delivered'>('accepted');
   const [arrivedAtTime, setArrivedAtTime] = useState<string | null>(null);
@@ -262,6 +321,11 @@ export default function CartPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState('');
+  const [confirmedAddressId, setConfirmedAddressId] = useState<number | null>(null);
+  const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [paidItemsCount, setPaidItemsCount] = useState<number>(0);
+  const [merchantDeclined, setMerchantDeclined] = useState<boolean>(false);
+  const [refundTimestamp, setRefundTimestamp] = useState<string | null>(null);
 
   const [savedAddress, setSavedAddress] = useState<{
     id: number; street: string | null; province: string | null;
@@ -383,28 +447,34 @@ export default function CartPage() {
     const checkStatuses = async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status')
+        .select('id, status, payment_status')
         .in('id', waitingOrderIds);
 
       if (cancelled) return;
 
       if (error) {
         console.error('waiting-accept: could not read order status', error);
-        setCheckoutError(`Could not check order status: ${error.message}`);
         return;
       }
-      if (!data || data.length === 0) {
-        console.warn('waiting-accept: no rows returned for', waitingOrderIds, '— check the SELECT RLS policy on orders');
-        return;
-      }
+      if (!data || data.length === 0) return;
 
-      const anyCancelled = data.some(o => o.status === 'cancelled');
-      if (anyCancelled) { setCheckoutError('A distributor declined your order. Please try again.'); setFlow('cart'); return; }
+      const anyCancelled = data.some(o => o.status === 'cancelled' || o.payment_status === 'refunded');
+      if (anyCancelled) {
+        setMerchantDeclined(true);
+        setRefundTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        return;
+      }
 
       const allAccepted = waitingOrderIds.every(
-        id => data.find(o => o.id === id)?.status === 'accepted'
+        id => {
+          const s = data.find(o => o.id === id)?.status;
+          return s === 'accepted' || s === 'preparing' || s === 'ready' || s === 'out_for_delivery' || s === 'delivering' || s === 'delivered';
+        }
       );
-      if (allAccepted) setFlow('checkout-payment');
+      if (allAccepted) {
+        setActiveOrderStatus('accepted');
+        setFlow('waiting-delivery');
+      }
     };
 
     checkStatuses();
@@ -741,7 +811,7 @@ export default function CartPage() {
     setFlow('checkout-delivery');
   };
 
-  const handleRequestDistributor = async () => {
+  const handleProceedToPayment = async () => {
     if (!validateDelivery()) return;
 
     setCheckingOut(true);
@@ -803,13 +873,37 @@ export default function CartPage() {
       }
     }
 
+    setConfirmedAddressId(addressId);
+    setCheckingOut(false);
+    setFlow('checkout-payment');
+  };
+
+  const handlePayFirst = async () => {
+    setPlacing(true);
+    setPlaceError('');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setPlaceError('Not logged in. Please sign in.'); setPlacing(false); return; }
+
+    const finalAddressId = confirmedAddressId || savedAddress?.id;
+    if (!finalAddressId) {
+      setPlaceError('Delivery address is missing. Please review your address in Step 1.');
+      setPlacing(false);
+      return;
+    }
+
     try {
+      const currentTotal = total;
+      const currentQty = totalQty;
+
+      // Submit order creation with paymentStatus: 'paid' (Simulated ABA PayWay)
       const res = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          addressId,
+          addressId: finalAddressId,
+          paymentStatus: 'paid',
           items: cartProducts.map(p => ({
             id: String(p.id),
             name: p.name,
@@ -823,43 +917,23 @@ export default function CartPage() {
 
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setCheckoutError(data.error || 'Failed to place order.');
-        setCheckingOut(false);
+        setPlaceError(data.error || 'Failed to complete payment.');
+        setPlacing(false);
         return;
       }
 
-      setCheckingOut(false);
-      setWaitingOrderIds(data.createdOrderIds);
+      setPaidAmount(currentTotal);
+      setPaidItemsCount(currentQty);
+      setWaitingOrderIds(data.createdOrderIds || []);
+      setMerchantDeclined(false);
+      clearCart();
+      setCartProducts([]);
+      setPlacing(false);
       setFlow('waiting-accept');
     } catch (err: any) {
-      setCheckoutError(err.message || 'Network error placing order.');
-      setCheckingOut(false);
-    }
-  };
-
-  const handleConfirmPayment = async () => {
-    setPlacing(true);
-    setPlaceError('');
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setPlaceError('Not logged in.'); setPlacing(false); return; }
-
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({ payment_status: 'paid' })
-      .in('id', waitingOrderIds);
-
-    if (updateError) {
-      setPlaceError(updateError.message);
+      setPlaceError(err.message || 'Payment simulation error.');
       setPlacing(false);
-      return;
     }
-
-    clearCart();
-    setCartProducts([]);
-    setPlacing(false);
-    setActiveOrderStatus('accepted');
-    setFlow('waiting-delivery');
   };
 
   const totalQty = cartProducts.reduce((s, p) => s + (p.qty ?? 1), 0);
@@ -873,6 +947,14 @@ export default function CartPage() {
     fontFamily: 'inherit', outline: 'none', background: '#fafafa',
     transition: 'border-color 0.2s',
   });
+
+  if (authChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <CircularLoader size={38} label="Checking account..." />
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fafafa', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1084,126 +1166,216 @@ export default function CartPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-6">
-            <div className="flex items-center justify-center py-4">
-              <CircularLoader size={38} label="Loading your basket…" />
-            </div>
-            <CartSkeleton />
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <CircularLoader size={38} label="Loading your basket…" />
           </div>
         ) : (
           <>
-            {flow === 'waiting-accept' && (
-          <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '40px 32px', boxShadow: '0 16px 48px rgba(15, 23, 42, 0.08)', border: '1.5px solid #e2e8f0', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
-            <StepIndicator step={2} />
+            {flow === 'waiting-accept' && merchantDeclined && (
+              <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '40px 32px', boxShadow: '0 16px 48px rgba(239, 68, 68, 0.08)', border: '1.5px solid #fee2e2', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
+                <StepIndicator step={3} />
 
-            {/* Refined Radar Search Beacon */}
-            <div className="radar-box" style={{ margin: '10px auto 24px' }}>
-              <div className="radar-ring" />
-              <div className="radar-ring" />
-              <div className="radar-ring" />
-              <div className="radar-core">
-                <Navigation size={28} color="#fff" style={{ transform: 'rotate(-45deg)' }} />
-              </div>
-            </div>
-
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: '6px 16px', borderRadius: '100px', marginBottom: '16px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', display: 'inline-block', boxShadow: '0 0 0 3px rgba(22,163,74,0.2)' }} />
-              <span style={{ fontSize: '12px', fontWeight: '800', color: '#1e293b', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
-                Connecting with Nearby Distributor
-              </span>
-            </div>
-
-            <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px', letterSpacing: '-0.3px' }}>
-              Matching You with a Local Courier…
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', margin: '0 auto 24px', maxWidth: '480px' }}>
-              Your order has been broadcasted to certified local distributors nearby. Once claimed, the ABA PayWay QR payment will unlock automatically right here.
-            </p>
-
-            {/* 3-Step Live Dispatch Progress */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 14px', marginBottom: '22px', textAlign: 'left' }}>
-              <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✓ Step 1</div>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Order Dispatched</div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Broadcast to zone</div>
-              </div>
-              <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>● Step 2</div>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Courier Claim</div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Awaiting pickup</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>○ Step 3</div>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>ABA QR Unlock</div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Instant payment</div>
-              </div>
-            </div>
-
-            {/* Destination summary card */}
-            <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 20px', marginBottom: '20px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                <MapPin size={20} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Target Delivery Location
+                <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#fef2f2', border: '2px solid #fecdd3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#dc2626' }}>
+                  <X size={36} strokeWidth={2.5} />
                 </div>
-                <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
-                  {address ? `${address}, ${province}` : province}
+
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#fef2f2', border: '1.5px solid #fecdd3', padding: '6px 16px', borderRadius: '100px', marginBottom: '14px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626', display: 'inline-block' }} />
+                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#991b1b', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                    Order Not Accepted
+                  </span>
                 </div>
-                {phone && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', fontWeight: '600' }}>Contact phone: <strong style={{ color: '#0f172a' }}>{phone}</strong></div>}
+
+                <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b', margin: '0 0 10px', letterSpacing: '-0.3px' }}>
+                  Merchant Did Not Accept Your Order
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', margin: '0 auto 24px', maxWidth: '480px' }}>
+                  The farm merchant is currently unable to fulfill your order (they may be out of fresh stock, closed, or at maximum capacity).
+                </p>
+
+                {/* Refund confirmation box */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '20px',
+                  padding: '24px 20px',
+                  marginBottom: '28px',
+                  textAlign: 'left',
+                  boxShadow: '0 4px 16px rgba(22, 163, 74, 0.08)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#16a34a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <ShieldCheck size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                        Money Sent Back
+                      </div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#14532d' }}>
+                        100% Payment Refunded
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px solid #bbf7d0', borderBottom: '1px solid #bbf7d0', padding: '12px 0', margin: '10px 0' }}>
+                    <span style={{ fontSize: '13px', color: '#166534', fontWeight: '600' }}>Refunded Amount</span>
+                    <span style={{ fontSize: '22px', fontWeight: '900', color: '#14532d' }}>
+                      {(paidAmount || total).toLocaleString()} KHR
+                    </span>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '12px', color: '#15803d', lineHeight: '1.5', fontWeight: '600' }}>
+                    ✓ Instant Reversal: Since you paid upfront using demo payment, your payment was cancelled and the total of <strong>{(paidAmount || total).toLocaleString()} KHR</strong> has been credited back to you in full.
+                  </p>
+                  
+                  {refundTimestamp && (
+                    <div style={{ fontSize: '11px', color: '#166534', marginTop: '8px', opacity: 0.85 }}>
+                      Refund confirmed at {refundTimestamp} · Order Ref #{waitingOrderIds[0]?.slice(0, 8).toUpperCase() || 'REF-VOID'}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMerchantDeclined(false);
+                      setWaitingOrderIds([]);
+                      setFlow('cart');
+                    }}
+                    style={{
+                      flex: 1, padding: '14px', borderRadius: '14px',
+                      border: '1.5px solid #cbd5e1', background: '#fff',
+                      color: '#475569', fontWeight: '700', fontSize: '14px',
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    Return to Cart
+                  </button>
+                  <Link
+                    href="/shop"
+                    style={{
+                      flex: 1.5, padding: '14px', borderRadius: '14px',
+                      background: deepGreen, color: '#fff',
+                      fontWeight: '800', fontSize: '14px',
+                      textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    }}
+                  >
+                    Browse Other Shops <ChevronRight size={16} />
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Live pulsating banner */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fffbeb', border: '1.5px solid #fef3c7', padding: '12px 18px', borderRadius: '14px', marginBottom: '24px' }}>
-              <Loader2 size={16} color="#d97706" style={{ animation: 'spin 1.2s linear infinite' }} />
-              <span style={{ fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
-                Please stay on this page — usually confirmed in 1–3 minutes
-              </span>
-            </div>
+            {flow === 'waiting-accept' && !merchantDeclined && (
+              <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '40px 32px', boxShadow: '0 16px 48px rgba(15, 23, 42, 0.08)', border: '1.5px solid #e2e8f0', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
+                <StepIndicator step={3} />
 
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await supabase.rpc('cancel_pending_order', { p_order_id: waitingOrderIds[0] });
-                } catch { }
-                try {
-                  await supabase.from('orders').update({ status: 'cancelled' }).in('id', waitingOrderIds);
-                } catch { }
-                setWaitingOrderIds([]);
-                setFlow('cart');
-              }}
-              style={{
-                padding: '11px 24px',
-                borderRadius: '12px',
-                border: '1.5px solid #e2e8f0',
-                background: '#fff',
-                color: '#64748b',
-                fontWeight: '700',
-                fontSize: '13px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => {
-                const el = e.currentTarget as HTMLButtonElement;
-                el.style.borderColor = '#ef4444';
-                el.style.color = '#ef4444';
-                el.style.background = '#fff5f5';
-              }}
-              onMouseLeave={e => {
-                const el = e.currentTarget as HTMLButtonElement;
-                el.style.borderColor = '#e2e8f0';
-                el.style.color = '#64748b';
-                el.style.background = '#fff';
-              }}
-            >
-              Cancel delivery request
-            </button>
-          </div>
-        )}
+                {/* Refined Radar Search Beacon */}
+                <div className="radar-box" style={{ margin: '10px auto 24px' }}>
+                  <div className="radar-ring" />
+                  <div className="radar-ring" />
+                  <div className="radar-ring" />
+                  <div className="radar-core">
+                    <Leaf size={28} color="#fff" />
+                  </div>
+                </div>
+
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ecfdf5', border: '1.5px solid #a7f3d0', padding: '6px 16px', borderRadius: '100px', marginBottom: '16px' }}>
+                  <CheckCircle2 size={14} color="#059669" />
+                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#065f46', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                    Payment Verified: {(paidAmount || total).toLocaleString()} KHR
+                  </span>
+                </div>
+
+                <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px', letterSpacing: '-0.3px' }}>
+                  Waiting for Merchant Acceptance…
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', margin: '0 auto 24px', maxWidth: '480px' }}>
+                  Your order has been paid and broadcasted directly to the farmer. Once the merchant accepts your order, packaging begins immediately. If declined, your payment is 100% refunded.
+                </p>
+
+                {/* 3-Step Live Dispatch Progress */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 14px', marginBottom: '22px', textAlign: 'left' }}>
+                  <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✓ Step 1</div>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Paid First</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{(paidAmount || total).toLocaleString()} KHR</div>
+                  </div>
+                  <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>● Step 2</div>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Merchant Review</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Accept or Refund</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>○ Step 3</div>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Delivery Dispatch</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Live GPS Map</div>
+                  </div>
+                </div>
+
+                {/* Destination summary card */}
+                <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 20px', marginBottom: '20px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0', color: '#1e293b' }}>
+                    <MapPin size={20} />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Delivery Location
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
+                      {address ? `${address}, ${province}` : province}
+                    </div>
+                    {phone && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', fontWeight: '600' }}>Contact phone: <strong style={{ color: '#0f172a' }}>{phone}</strong></div>}
+                  </div>
+                </div>
+
+                {/* Live pulsating banner */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fffbeb', border: '1.5px solid #fef3c7', padding: '12px 18px', borderRadius: '14px', marginBottom: '24px' }}>
+                  <Loader2 size={16} color="#d97706" style={{ animation: 'spin 1.2s linear infinite' }} />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
+                    Notification pushed to merchant — awaiting acceptance…
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await supabase.from('orders').update({ status: 'cancelled', payment_status: 'refunded' }).in('id', waitingOrderIds);
+                    } catch { }
+                    setMerchantDeclined(true);
+                    setRefundTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                  }}
+                  style={{
+                    padding: '11px 24px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #e2e8f0',
+                    background: '#fff',
+                    color: '#64748b',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.borderColor = '#ef4444';
+                    el.style.color = '#ef4444';
+                    el.style.background = '#fff5f5';
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.borderColor = '#e2e8f0';
+                    el.style.color = '#64748b';
+                    el.style.background = '#fff';
+                  }}
+                >
+                  Cancel Order & Refund Money
+                </button>
+              </div>
+            )}
 
         {(flow === 'waiting-delivery' || flow === 'success') && (
           <div style={{ maxWidth: '820px', margin: '0 auto', animation: 'fadeUp 0.4s ease' }}>
@@ -1280,7 +1452,7 @@ export default function CartPage() {
                     Paid in Full (ABA KHQR)
                   </span>
                   <div style={{ fontSize: '20px', fontWeight: '900', color: deepGreen }}>
-                    {total.toLocaleString()} KHR
+                    {(paidAmount || total).toLocaleString()} KHR
                   </div>
                 </div>
               </div>
@@ -1874,16 +2046,16 @@ export default function CartPage() {
                   type="button"
                   className="checkout-btn"
                   style={{ flex: 2 }}
-                  onClick={handleRequestDistributor}
+                  onClick={handleProceedToPayment}
                   disabled={checkingOut}
                 >
                   {checkingOut ? (
                     <>
-                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Notifying distributors…
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Saving details…
                     </>
                   ) : (
                     <>
-                      Request Distributor <ChevronRight size={16} />
+                      Proceed to Payment <ChevronRight size={16} />
                     </>
                   )}
                 </button>
@@ -1898,17 +2070,26 @@ export default function CartPage() {
         {flow === 'checkout-payment' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '30px', alignItems: 'start', animation: 'fadeUp 0.3s ease' }}>
             <div style={{ backgroundColor: '#fff', borderRadius: '24px', padding: '36px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
-              <StepIndicator step={3} />
+              <StepIndicator step={2} />
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#eff6ef', border: '1.5px solid #cce8cc', borderRadius: '12px', padding: '12px 16px', marginBottom: '20px' }}>
-                <CheckCircle2 size={18} color={brandGreen} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: deepGreen }}>
-                  Distributor accepted your request! Complete payment to confirm order.
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#eff6ef', border: '1.5px solid #cce8cc', borderRadius: '14px', padding: '14px 18px', marginBottom: '22px' }}>
+                <ShieldCheck size={20} color={brandGreen} style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: '700', color: deepGreen, lineHeight: '1.4' }}>
+                  Pay first to dispatch: Your payment pushes an instant notification to the merchant. If the merchant declines your order, 100% of your money is refunded immediately.
                 </span>
               </div>
 
-              <h2 style={{ fontSize: '22px', fontWeight: '800', color: deepGreen, margin: '0 0 6px' }}>Pay with ABA Bank</h2>
-              <p style={{ color: '#888', fontSize: '14px', margin: '0 0 28px' }}>Scan the QR code with your ABA Mobile app to complete payment.</p>
+              <h2 style={{ fontSize: '24px', fontWeight: '900', color: deepGreen, margin: '0 0 6px' }}>Pay First with ABA Bank</h2>
+              <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 16px' }}>
+                Scan the QR code with your ABA Mobile app or click Pay below to simulate payment and broadcast your paid order.
+              </p>
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '8px', padding: '6px 12px', marginBottom: '22px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb' }} />
+                <span style={{ fontSize: '12px', fontWeight: '700', color: '#1d4ed8' }}>
+                  Simulated Payment (Demo Mode — Real ABA PayWay coming soon)
+                </span>
+              </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', backgroundColor: '#f0fdf0', border: '1.5px solid #d1fae5', borderRadius: '14px', padding: '14px 18px', marginBottom: '28px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -1940,17 +2121,23 @@ export default function CartPage() {
                 </button>
               </div>
 
-              <div style={{ border: '2px solid #cce0f5', borderRadius: '20px', padding: '28px', marginBottom: '28px', backgroundColor: '#f8fbff' }}>
+              <div style={{
+                borderRadius: '24px',
+                padding: '24px 16px',
+                marginBottom: '28px',
+                background: 'linear-gradient(180deg, #fff5f5 0%, #f8fafc 100%)',
+                border: '1.5px solid #fed7aa',
+              }}>
                 <ABAQRCode amount={total} />
               </div>
 
               <div style={{ backgroundColor: '#f9fafb', borderRadius: '14px', padding: '18px', marginBottom: '28px' }}>
-                <p style={{ fontSize: '12px', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 12px' }}>How to pay</p>
+                <p style={{ fontSize: '12px', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 12px' }}>How Pay-First Works</p>
                 {[
-                  'Open ABA Mobile on your phone',
-                  'Tap "Scan" and point at the QR code above',
-                  'Check the amount and tap "Pay"',
-                  'Come back here and tap "I\'ve Paid" below',
+                  'Scan Bakong KHQR or tap simulated payment below',
+                  'Payment is securely recorded in the platform',
+                  'Live notification is sent directly to the farm merchant',
+                  'If merchant accepts, delivery begins. If declined, 100% money back!',
                 ].map((step, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 3 ? '10px' : 0 }}>
                     <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: deepGreen, color: '#fff', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>{i + 1}</div>
@@ -1961,15 +2148,24 @@ export default function CartPage() {
 
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
+                  type="button"
                   onClick={() => setFlow('checkout-delivery')}
                   style={{ flex: 1, padding: '15px', border: '2px solid #e5e7eb', borderRadius: '14px', background: '#fff', fontWeight: '700', fontSize: '15px', color: '#555', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                   <ChevronLeft size={16} /> Back
                 </button>
-                <button className="pay-confirm-btn" style={{ flex: 2 }} onClick={handleConfirmPayment} disabled={placing}>
-                  <CheckCircle2 size={18} /> {placing ? 'Placing order...' : "I've Paid"}
+                <button className="pay-confirm-btn" style={{ flex: 2 }} onClick={handlePayFirst} disabled={placing}>
+                  {placing ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Processing & Notifying Merchant...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} /> Confirm Payment ({total.toLocaleString()} KHR)
+                    </>
+                  )}
                 </button>
-                {placeError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px' }}>{placeError}</p>}
               </div>
+              {placeError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px', textAlign: 'center', fontWeight: '600' }}>{placeError}</p>}
             </div>
 
             <MiniOrderSummary cartProducts={cartProducts} total={total} />

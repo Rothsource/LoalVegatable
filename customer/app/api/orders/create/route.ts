@@ -31,10 +31,11 @@ interface IncomingItem {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, addressId, items } = body as {
+    const { userId, addressId, items, paymentStatus } = body as {
       userId: string;
       addressId: number;
       items: IncomingItem[];
+      paymentStatus?: string;
     };
 
     if (!userId || !addressId || !items || !Array.isArray(items) || items.length === 0) {
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
           user_id: userId,
           address_id: addressId,
           status: 'pending',
-          payment_status: 'pending',
+          payment_status: paymentStatus || 'paid',
           total_amount: orderTotal,
         })
         .select('id')
@@ -225,9 +226,9 @@ export async function POST(req: NextRequest) {
 
         if (merchantSubs && merchantSubs.length > 0) {
           const merchantPayload = JSON.stringify({
-            title: 'New customer crop order!',
-            body: `Order #${order.id.slice(0, 8)} · ${itemSummaries} · ${totalKHR} KHR`,
-            url: '/order',
+            title: 'New paid harvest order!',
+            body: `Order #${order.id.slice(0, 8)} · ${itemSummaries} · ${totalKHR} KHR · Paid & Awaiting Acceptance`,
+            url: '/orders',
           });
 
           await Promise.all(

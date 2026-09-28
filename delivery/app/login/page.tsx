@@ -53,29 +53,115 @@ export default function LoginPage() {
 
   return (
     <AuthShell>
-      <div className="mb-8">
-        <span className="inline-flex items-center gap-2 rounded-full bg-[#e9f2e4] px-3 py-1.5 text-xs font-extrabold text-[var(--leaf)]"><LockKeyhole size={14} /> Rider access</span>
-        <h1 className="mt-5 text-[34px] font-black tracking-[-0.045em] sm:text-[40px]">Welcome back</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Sign in to see your requests and current delivery.</p>
+      <div className="mb-7">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e0e5de] bg-[#f6f2ec] px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[#765238]">
+          <LockKeyhole size={13} className="text-[#765238]" />
+          <span>Fleet Dispatch Portal</span>
+        </span>
+        <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight text-[#24382d] sm:text-4xl">
+          Rider sign in
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-[#5d685f]">
+          Sign in to access assigned farm manifests, route coordinates, and live delivery updates.
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        <FormField label="Email address" type="email" autoComplete="email" placeholder="name@gmail.com" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} />
-        <FormField label="Password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(event) => { setPassword(event.target.value); setError(""); }} trailing={<button type="button" onClick={() => setShowPassword((visible) => !visible)} className="grid h-10 w-10 place-items-center rounded-xl text-[#778373] hover:bg-[#edf3e9]" aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>} />
-        <div className="flex items-center justify-between gap-4">
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-[#596655]"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="h-4 w-4 accent-[var(--leaf)]" />Remember me</label>
-          <Link href="/activate" className="text-sm font-extrabold text-[var(--leaf)] hover:underline">Reset access</Link>
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <FormField
+          label="Courier Email Address"
+          type="email"
+          autoComplete="email"
+          placeholder="rider@localveg.com"
+          value={email}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            setError("");
+          }}
+        />
+
+        <FormField
+          label="Password"
+          type={showPassword ? "text" : "password"}
+          autoComplete="current-password"
+          placeholder="Enter your rider password"
+          value={password}
+          onChange={(event) => {
+            setPassword(event.target.value);
+            setError("");
+          }}
+          trailing={
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="grid h-10 w-10 place-items-center rounded-xl text-[#68746a] transition hover:bg-[#f6f7f3] hover:text-[#24382d]"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          }
+        />
+
+        <div className="flex items-center justify-between gap-4 py-1">
+          <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#5d685f]">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(event) => setRemember(event.target.checked)}
+              className="h-4 w-4 rounded accent-[#1b4332]"
+            />
+            Keep me signed in
+          </label>
+          <Link href="/activate" className="text-xs font-bold text-[#765238] transition hover:text-[#765238] hover:underline">
+            Forgot password?
+          </Link>
         </div>
-        {error && <div role="alert" className="flex items-start gap-2 rounded-2xl border border-[#efd3ce] bg-[#fff7f5] p-3.5 text-sm font-semibold leading-5 text-[var(--danger)]"><Info size={17} className="mt-0.5 shrink-0" />{error}</div>}
-        <Button type="submit" fullWidth loading={loading} icon={<ArrowRight size={18} />}>Sign in</Button>
+
+        {error && (
+          <div role="alert" className="flex items-start gap-2.5 rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-3.5 text-xs font-semibold leading-relaxed text-[#991b1b]">
+            <Info size={16} className="mt-0.5 shrink-0 text-[#b91c1c]" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          fullWidth
+          loading={loading}
+          icon={<ArrowRight size={17} />}
+          className="!border-[#1b4332] !bg-[#1b4332] shadow-[0_4px_16px_rgba(140,82,40,0.25)] hover:!bg-[#123327]"
+        >
+          Sign in to Rider Dashboard
+        </Button>
       </form>
 
-      <div className="my-7 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[#9aa397]"><span className="h-px flex-1 bg-[var(--line)]" />Demo access<span className="h-px flex-1 bg-[var(--line)]" /></div>
-      <button type="button" onClick={fillDemo} className="w-full rounded-[18px] border border-[#d8e4d3] bg-[#f2f7ef] p-4 text-left transition hover:border-[#b9d0af] hover:bg-[#ebf4e6]">
-        <span className="flex items-center gap-2 text-sm font-extrabold text-[var(--leaf-dark)]"><Mail size={16} />Use demo rider login</span>
-        <span className="mt-2 block break-all text-xs leading-5 text-[var(--muted)]">{DEMO_AUTH.authorizedEmail} · {DEMO_AUTH.password}</span>
-      </button>
-      <p className="mt-7 text-center text-sm text-[var(--muted)]">First time here? <Link href="/activate" className="font-extrabold text-[var(--leaf)] hover:underline">Activate your account</Link></p>
+      {/* Demo rider auto-fill */}
+      <div className="mt-8 rounded-2xl border border-[#e0e5de] bg-[#ffffff] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e0e5de] bg-[#f6f2ec] text-[#765238]">
+              <Mail size={15} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#24382d]">Demo Courier Credentials</p>
+              <p className="truncate text-[11px] text-[#5d685f]">{DEMO_AUTH.authorizedEmail}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={fillDemo}
+            className="shrink-0 rounded-lg border border-[#e0e5de] bg-[#f6f7f3] px-3 py-1.5 text-xs font-bold text-[#765238] transition hover:bg-[#331e13]"
+          >
+            Auto Fill
+          </button>
+        </div>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-[#68746a]">
+        First time driving with us?{" "}
+        <Link href="/activate" className="font-bold text-[#765238] hover:text-[#765238] hover:underline">
+          Activate courier account
+        </Link>
+      </p>
     </AuthShell>
   );
 }

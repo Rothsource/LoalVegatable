@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock, Mail, RefreshCw, AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Mail } from "lucide-react";
+import AuthShell from "@/components/auth/AuthShell";
 import { supabase } from "@/lib/supabase";
 
 export default function DistributorLoginPage() {
@@ -11,6 +13,7 @@ export default function DistributorLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -57,169 +60,197 @@ export default function DistributorLoginPage() {
     router.replace("/distributors/orders");
   }
 
+  const inputClass =
+    "w-full rounded-xl border border-[#e0e5de] bg-[#ffffff] px-4 py-3 text-sm text-[#24382d] placeholder-[#68746a] outline-none transition-all hover:border-[#d9dfd8] focus:border-[#765238] focus:bg-[#ffffff] focus:ring-4 focus:ring-[#765238]/15";
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#faf7f0] px-4 py-12">
-      <div className="w-full max-w-md rounded-[28px] border-2 border-[#dfe6d9] bg-white p-8 sm:p-10 shadow-[0_8px_30px_rgba(46,111,64,0.06)] space-y-6">
-        {/* Brand header */}
-        <div className="text-center space-y-3">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2 border border-[#dfe6d9] shadow-md">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/image/logo.png" alt="LocalVeg" className="h-full w-full object-contain" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-[#182216] tracking-tight">
-              Distributor Portal
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#52604f] font-medium">
-              Access orders, manage farm stock, and coordinate dispatches.
-            </p>
-          </div>
-        </div>
-
-        {error && (
-          <div className="flex items-center gap-2.5 rounded-2xl border border-[#eedbd7] bg-[#fff5f4] p-3.5 text-xs sm:text-sm font-bold text-[#c53929]">
-            <AlertCircle size={16} className="flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {stage === "email" && (
-          <form onSubmit={handleEmailSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-wider text-[#2E6F40]">
-                Your Work Email
-              </label>
-              <div className="relative">
-                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c9b88]" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="driver@farm.com"
-                  className="w-full rounded-2xl border-2 border-[#dfe6d9] bg-[#fafbf8] pl-10 pr-4 py-3 text-sm font-bold text-[#182216] outline-none focus:border-[#0DB30D] focus:bg-white transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0DB30D] hover:bg-[#0A490A] py-3.5 text-sm font-black text-white shadow-md active:scale-95 transition-all"
-            >
-              <span>Continue</span>
-              <ArrowRight size={16} />
-            </button>
-          </form>
-        )}
-
-        {stage === "setPassword" && (
-          <form onSubmit={handleSetPassword} className="space-y-4">
-            <p className="text-xs text-[#52604f] font-semibold">
-              Create a password for <span className="font-bold text-[#182216]">{email}</span>.
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-wider text-[#2E6F40]">
-                New Password
-              </label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c9b88]" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  className="w-full rounded-2xl border-2 border-[#dfe6d9] bg-[#fafbf8] pl-10 pr-4 py-3 text-sm font-bold text-[#182216] outline-none focus:border-[#0DB30D] focus:bg-white transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-wider text-[#2E6F40]">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c9b88]" />
-                <input
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="Repeat your password"
-                  className="w-full rounded-2xl border-2 border-[#dfe6d9] bg-[#fafbf8] pl-10 pr-4 py-3 text-sm font-bold text-[#182216] outline-none focus:border-[#0DB30D] focus:bg-white transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0DB30D] hover:bg-[#0A490A] py-3.5 text-sm font-black text-white shadow-md active:scale-95 disabled:opacity-50 transition-all"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw size={16} className="animate-spin" />
-                  <span>Setting Password…</span>
-                </>
-              ) : (
-                <span>Set Password & Sign In</span>
-              )}
-            </button>
-
+    <AuthShell
+      eyebrow="Distributor Network"
+      title={
+        stage === "email"
+          ? "Distributor sign in"
+          : stage === "setPassword"
+          ? "Set your password"
+          : "Enter password"
+      }
+      description={
+        stage === "email"
+          ? "Enter your work email to access orders, manage farm stock, and coordinate dispatches."
+          : stage === "setPassword"
+          ? `Create a secure password for ${email}.`
+          : `Sign in with your password for ${email}.`
+      }
+      footer={
+        <div className="flex items-center justify-between gap-4 text-xs font-medium text-[#5d685f]">
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center gap-1.5 font-bold text-[#765238] transition hover:text-[#765238] hover:underline"
+          >
+            <ArrowLeft size={15} />
+            <span>Switch to Merchant Login</span>
+          </Link>
+          {stage !== "email" && (
             <button
               type="button"
               onClick={() => {
                 setStage("email");
                 setError("");
               }}
-              className="w-full text-center text-xs font-bold text-[#647060] hover:text-[#182216]"
+              className="text-xs font-semibold text-[#5d685f] underline hover:text-[#24382d]"
             >
-              Use a different email
+              Change email
             </button>
-          </form>
-        )}
+          )}
+        </div>
+      }
+    >
+      {error && (
+        <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-xs font-semibold leading-relaxed text-[#991b1b]">
+          <AlertCircle size={17} className="mt-0.5 shrink-0 text-[#b91c1c]" />
+          <span>{error}</span>
+        </div>
+      )}
 
-        {stage === "login" && (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="rounded-xl border border-[#dfe6d9] bg-[#f7f9f5] px-4 py-2.5 text-xs font-bold text-[#182216]">
-              {email}
+      {stage === "email" && (
+        <form onSubmit={handleEmailSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#435449]">
+              Assigned Work Email
+            </label>
+            <div className="relative mt-1.5">
+              <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#68746a]" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="dispatch@farmhub.com"
+                required
+                className={`${inputClass} pl-10`}
+              />
             </div>
+          </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-wider text-[#2E6F40]">
-                Password
-              </label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c9b88]" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full rounded-2xl border-2 border-[#dfe6d9] bg-[#fafbf8] pl-10 pr-4 py-3 text-sm font-bold text-[#182216] outline-none focus:border-[#0DB30D] focus:bg-white transition-all"
-                  required
-                />
-              </div>
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1b4332] py-3.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(140,82,40,0.25)] transition hover:bg-[#123327] active:scale-[0.99]"
+          >
+            <span>Continue</span>
+            <ArrowRight size={16} />
+          </button>
+        </form>
+      )}
+
+      {stage === "setPassword" && (
+        <form onSubmit={handleSetPassword} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#435449]">
+              New Password
+            </label>
+            <div className="relative mt-1.5">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                required
+                className={`${inputClass} pr-11`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#68746a] transition hover:text-[#24382d]"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0DB30D] hover:bg-[#0A490A] py-3.5 text-sm font-black text-white shadow-md active:scale-95 disabled:opacity-50 transition-all"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw size={16} className="animate-spin" />
-                  <span>Signing in…</span>
-                </>
-              ) : (
-                <span>Sign In to Dashboard</span>
-              )}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#435449]">
+              Confirm Password
+            </label>
+            <div className="relative mt-1.5">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Repeat password"
+                required
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1b4332] py-3.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(140,82,40,0.25)] transition hover:bg-[#123327] active:scale-[0.99] disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={17} className="animate-spin" />
+                <span>Setting password…</span>
+              </>
+            ) : (
+              <>
+                <span>Set Password & Continue</span>
+                <ArrowRight size={16} />
+              </>
+            )}
+          </button>
+        </form>
+      )}
+
+      {stage === "login" && (
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div className="rounded-xl border border-[#e0e5de] bg-[#ffffff] px-4 py-2.5 text-xs font-semibold text-[#5d685f]">
+            Account: <strong className="text-[#24382d]">{email}</strong>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#435449]">
+              Password
+            </label>
+            <div className="relative mt-1.5">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                className={`${inputClass} pr-11`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#68746a] transition hover:text-[#24382d]"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1b4332] py-3.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(140,82,40,0.25)] transition hover:bg-[#123327] active:scale-[0.99] disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={17} className="animate-spin" />
+                <span>Signing in…</span>
+              </>
+            ) : (
+              <>
+                <span>Sign In to Distributor Console</span>
+                <ArrowRight size={16} />
+              </>
+            )}
+          </button>
+        </form>
+      )}
+    </AuthShell>
   );
 }

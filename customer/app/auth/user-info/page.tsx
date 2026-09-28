@@ -305,20 +305,21 @@ export default function UserInfoPage() {
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '12px 16px', borderRadius: '10px',
-    border: '1px solid #e0e0e0', outline: 'none', fontSize: '14px',
-    fontFamily: 'inherit', boxSizing: 'border-box',
+    width: '100%', padding: '12px 14px', borderRadius: '12px',
+    border: '1px solid #dfe6dd', backgroundColor: '#ffffff', outline: 'none', fontSize: '14px',
+    fontFamily: 'inherit', boxSizing: 'border-box', color: '#1b4332',
+    transition: 'all 0.15s ease',
   };
   const labelStyle: React.CSSProperties = {
-    display: 'block', marginBottom: '8px', color: '#444',
-    fontWeight: '600', fontSize: '14px',
+    display: 'block', marginBottom: '6px', color: '#334b3d',
+    fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em',
   };
   const khmerInputStyle: React.CSSProperties = {
     ...inputStyle, fontSize: '13px',
-    border: '1px solid #bbf7d0', background: '#fff', padding: '10px 12px',
+    border: '1px solid #dfe6dd', background: '#ffffff', padding: '10px 12px', color: '#1b4332',
   };
   const khmerLabelStyle: React.CSSProperties = {
-    ...labelStyle, fontSize: '12px', color: '#166534',
+    ...labelStyle, fontSize: '11px', color: '#1b4332',
   };
 
   return (
@@ -334,7 +335,7 @@ export default function UserInfoPage() {
           min-height: 100vh;
           width: 100%;
           font-family: 'Inter', sans-serif;
-          background-color: #fdfdfb;
+          background-color: #ffffff;
         }
         .userinfo-left {
           width: 50%;
@@ -607,7 +608,7 @@ export default function UserInfoPage() {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              style={{ width: '100%', padding: '16px', borderRadius: '12px', backgroundColor: '#0DB30D', color: '#fff', border: 'none', fontWeight: '700', fontSize: '16px', cursor: 'pointer', marginTop: '10px', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              style={{ width: '100%', padding: '15px', borderRadius: '12px', backgroundColor: '#1b4332', color: '#fff', border: 'none', fontWeight: '700', fontSize: '15px', cursor: 'pointer', marginTop: '10px', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 16px rgba(27,67,50,0.22)' }}
             >
               {loading ? (
                 <>

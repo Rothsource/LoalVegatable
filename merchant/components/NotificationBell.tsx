@@ -75,6 +75,24 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
   }, [load, role]);
 
   const accept = async (orderId: string) => {
+    if (role === "merchant") {
+      try {
+        await fetch("/api/merchant/orders/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, action: "accept" }),
+        });
+      } catch {
+        await supabase
+          .from("orders")
+          .update({ status: "accepted", accepted_at: new Date().toISOString() })
+          .eq("id", orderId);
+      }
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      load();
+      return;
+    }
+
     if (!distributorId) return;
     const { data } = await supabase
       .from("orders")
@@ -88,6 +106,24 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
   };
 
   const deny = async (orderId: string) => {
+    if (role === "merchant") {
+      try {
+        await fetch("/api/merchant/orders/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, action: "deny", reason: "Merchant unable to accept order" }),
+        });
+      } catch {
+        await supabase
+          .from("orders")
+          .update({ status: "cancelled", payment_status: "refunded" })
+          .eq("id", orderId);
+      }
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      load();
+      return;
+    }
+
     const denied = getDenied();
     localStorage.setItem("distributor-denied-orders", JSON.stringify([...denied, orderId]));
     setOrders((prev) => prev.filter((o) => o.id !== orderId));
@@ -161,13 +197,13 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
                       </span>
                     </div>
 
-                    {role === "distributor" && o.status === "pending" && (
+                    {o.status === "pending" && (
                       <div className="mt-2.5 flex gap-2 pt-2 border-t border-gray-100">
                         <button
                           onClick={() => deny(o.id)}
                           className="flex-1 rounded-xl border border-red-200 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 transition cursor-pointer"
                         >
-                          Pass
+                          {role === "merchant" ? "Decline (Refund)" : "Pass"}
                         </button>
                         <button
                           onClick={() => accept(o.id)}

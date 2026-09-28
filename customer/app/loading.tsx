@@ -1,4 +1,3 @@
-import React from "react";
 import { FullPageLoader } from "@/components/CustomerSkeleton";
 
 export default function Loading() {

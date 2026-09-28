@@ -1,16 +1,23 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Heart, Star, ShoppingBasket, Plus, Minus, Leaf } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Heart, Star, ShoppingBasket, Plus, Minus, Leaf, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { ProductGridSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 import { isProductExpired, getTodayDateString } from '@/lib/expiry';
 
-const brandGreen = '#0DB30D';
-const deepGreen = '#0A490A';
+const brandGreen = '#1b4332';
+const deepGreen = '#1b4332';
+
+function stripEmoji(text: string | null | undefined): string {
+  if (!text) return '';
+  return text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{1F600}-\u{1F64F}\u{1FA70}-\u{1FAFF}\u{FE00}-\u{FE0F}]/gu, '').trim();
+}
 
 export default function FavoritesPage() {
+  const router = useRouter();
   const [favProducts, setFavProducts] = useState<any[]>([]);
   const [cartItems, setCartItems] = useState<Record<string, any>>({});
   const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
@@ -21,7 +28,11 @@ export default function FavoritesPage() {
     async function loadFavorites() {
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user ?? (await supabase.auth.getUser()).data?.user;
-      if (!user) { setLoading(false); return; }
+      if (!user) {
+        setLoading(false);
+        router.replace('/auth/login?redirectTo=/favorites');
+        return;
+      }
 
       const { data: favRows } = await supabase
         .from('favourite_vegetables')
@@ -98,8 +109,8 @@ export default function FavoritesPage() {
         const isShopOpen = p.merchant_id ? (shopStatuses[p.merchant_id] ?? true) : true;
         return {
           id: p.id,
-          name: p.name,
-          category: p.categories?.name ?? 'Uncategorized',
+          name: stripEmoji(p.name),
+          category: stripEmoji(p.categories?.name ?? 'Uncategorized'),
           price: Number(p.price),
           unit: p.unit ?? '',
           rating: ratingMap[p.id] ?? 0,
@@ -107,10 +118,10 @@ export default function FavoritesPage() {
           isShopOpen,
           img: realVegImg,
           quantity: p.stock_quantity ?? 0,
-          benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
+          benefit: stripEmoji(p.is_organic ? 'Organically grown' : 'Locally sourced'),
           shopSlug: p.merchant_id,
-          shopName: merchant.community_name ?? merchant.full_name ?? 'Local Farm',
-          shopAvatar: merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant.community_name || merchant.full_name || 'Farm')}&background=0DB30D&color=fff&size=50`,
+          shopName: stripEmoji(merchant.community_name ?? merchant.full_name ?? 'Local Farm'),
+          shopAvatar: merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant.community_name || merchant.full_name || 'Farm')}&background=1b4332&color=fff&size=50`,
           shopLocation: merchant.province ?? '',
         };
       });
@@ -177,11 +188,8 @@ export default function FavoritesPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-6">
-            <div className="flex items-center justify-center py-2">
-              <CircularLoader size={38} label="Loading your favorites…" />
-            </div>
-            <ProductGridSkeleton count={4} />
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <CircularLoader size={38} label="Loading your favorites..." />
           </div>
         ) : favProducts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '90px 20px', backgroundColor: '#fff', borderRadius: '28px', border: '1.5px solid #dfe6d9', boxShadow: '0 12px 36px rgba(43,68,38,0.05)' }}>
@@ -192,8 +200,9 @@ export default function FavoritesPage() {
             <p style={{ color: '#647060', fontWeight: '500', fontSize: '14px', marginBottom: '24px' }}>
               Browse local farms and tap the heart on any vegetable to save it here.
             </p>
-            <Link href="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: deepGreen, color: '#fff', padding: '14px 28px', borderRadius: '14px', fontWeight: '800', fontSize: '14px', textDecoration: 'none', boxShadow: '0 6px 20px rgba(10,73,10,0.25)' }}>
-              Browse Produce →
+            <Link href="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: deepGreen, color: '#fff', padding: '14px 28px', borderRadius: '14px', fontWeight: '800', fontSize: '14px', textDecoration: 'none', boxShadow: '0 6px 20px rgba(27,67,50,0.25)' }}>
+              <span>Browse Produce</span>
+              <ArrowRight size={16} />
             </Link>
           </div>
         ) : (

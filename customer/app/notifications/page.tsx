@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Bell, CheckCircle2, Clock, Truck, Package, MapPin, 
   Phone, ArrowRight, RefreshCw, AlertCircle, ShoppingBag, 
@@ -9,7 +10,7 @@ import {
   ChevronDown, ChevronUp, Navigation, Eye
 } from 'lucide-react';
 import CustomerOrderTrackingMap from '@/components/CustomerOrderTrackingMap';
-import { NotificationSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 
 interface OrderItem {
@@ -42,6 +43,7 @@ const brandGreen = '#0DB30D';
 const deepGreen = '#0A490A';
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<CustomerOrderNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -62,6 +64,7 @@ export default function NotificationsPage() {
         setIsLoggedIn(false);
         setNotifications([]);
         setLoading(false);
+        router.replace('/auth/login?redirectTo=/notifications');
         return;
       }
       setIsLoggedIn(true);
@@ -195,14 +198,12 @@ export default function NotificationsPage() {
     switch (status) {
       case 'accepted':
         return {
-          title: 'Distributor Assigned',
-          desc: paymentStatus === 'paid' 
-            ? 'Distributor accepted your delivery request and payment is confirmed.' 
-            : 'Distributor accepted! Please complete payment to finalize your delivery.',
+          title: 'Merchant Accepted Order',
+          desc: 'The merchant has accepted your paid order and is packaging your fresh produce.',
           badgeBg: '#eff6ef',
           badgeText: deepGreen,
           badgeBorder: '#cce8cc',
-          step: 2,
+          step: 3,
           icon: <ShieldCheck size={18} color={deepGreen} />,
         };
       case 'out_for_delivery':
@@ -228,8 +229,10 @@ export default function NotificationsPage() {
         };
       case 'cancelled':
         return {
-          title: 'Order Cancelled',
-          desc: 'This delivery request was cancelled.',
+          title: paymentStatus === 'refunded' ? 'Merchant Declined (100% Refunded)' : 'Order Cancelled',
+          desc: paymentStatus === 'refunded'
+            ? 'The merchant was unable to accept your order. Your upfront payment has been 100% refunded to your account.'
+            : 'This order was cancelled.',
           badgeBg: '#fff1f2',
           badgeText: '#be123c',
           badgeBorder: '#fecdd3',
@@ -238,21 +241,21 @@ export default function NotificationsPage() {
         };
       default:
         return {
-          title: 'Searching for Distributor',
-          desc: 'Nearby delivery distributors are currently reviewing your order request.',
+          title: 'Paid · Awaiting Merchant Acceptance',
+          desc: 'Your order was paid first and sent to the merchant for harvest confirmation.',
           badgeBg: '#fefce8',
           badgeText: '#854d0e',
           badgeBorder: '#fef08a',
-          step: 1,
+          step: 2,
           icon: <Clock size={18} color="#ca8a04" />,
         };
     }
   };
 
   const stepsList = [
-    { n: 1, label: 'Placed' },
-    { n: 2, label: 'Assigned' },
-    { n: 3, label: 'Paid' },
+    { n: 1, label: 'Ordered' },
+    { n: 2, label: 'Paid First' },
+    { n: 3, label: 'Accepted' },
     { n: 4, label: 'In Transit' },
     { n: 5, label: 'Delivered' },
   ];
@@ -351,13 +354,9 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        {/* While checking auth or loading orders */}
         {(loading || isLoggedIn === null) && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center py-2">
-              <CircularLoader size={38} label="Checking order updates…" />
-            </div>
-            <NotificationSkeleton />
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <CircularLoader size={38} label="Checking order updates…" />
           </div>
         )}
 

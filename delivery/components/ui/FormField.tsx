@@ -1,4 +1,3 @@
-import { AlertCircle } from "lucide-react";
 import type { InputHTMLAttributes, ReactNode } from "react";
 
 type FormFieldProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -14,7 +13,7 @@ export function FormField({ label, error, hint, trailing, id, className = "", ..
 
   return (
     <div>
-      <label htmlFor={fieldId} className="mb-2 block text-sm font-bold text-[#344033]">
+      <label htmlFor={fieldId} className="mb-2 block text-sm font-semibold text-[#35473a]">
         {label}
       </label>
       <div className="relative">
@@ -23,13 +22,12 @@ export function FormField({ label, error, hint, trailing, id, className = "", ..
           id={fieldId}
           aria-invalid={Boolean(error)}
           aria-describedby={error || hint ? messageId : undefined}
-          className={`h-[52px] w-full rounded-[14px] border bg-white px-4 text-[15px] font-medium text-[var(--ink)] placeholder:text-[#98a294] transition outline-none focus:border-[var(--leaf)] focus:ring-4 focus:ring-[#dcebd8] ${trailing ? "pr-12" : ""} ${error ? "border-[#da8d86] bg-[#fffafa]" : "border-[var(--line)]"} ${className}`}
+          className={`h-[50px] w-full rounded-lg border border-[#d9dfd8] bg-white px-4 text-sm font-medium text-[#24382d] placeholder:text-[#7a857c] transition outline-none hover:border-[#a8b8aa] focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/15 ${trailing ? "pr-12" : ""} ${error ? "border-red-300 bg-red-50" : ""} ${className}`}
         />
         {trailing && <div className="absolute inset-y-0 right-1.5 flex items-center">{trailing}</div>}
       </div>
       {(error || hint) && (
-        <p id={messageId} className={`mt-2 flex items-start gap-1.5 text-xs leading-5 ${error ? "font-semibold text-[var(--danger)]" : "text-[var(--muted)]"}`}>
-          {error && <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />}
+        <p id={messageId} className={`mt-2 flex items-start text-xs leading-5 ${error ? "font-semibold text-red-700" : "text-[#68746a]"}`}>
           {error ?? hint}
         </p>
       )}

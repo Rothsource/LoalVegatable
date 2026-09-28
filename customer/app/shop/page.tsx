@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Search, Star, Heart, ShoppingBasket, Store, ChevronDown, SlidersHorizontal, X, RotateCcw, Plus, Minus, Leaf, Box, Calendar, MapPin, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { ProductGridSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
+import { CircularLoader } from '@/components/CustomerSkeleton';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 import { isProductExpired, getTodayDateString } from '@/lib/expiry';
@@ -708,11 +708,8 @@ export default function ShopPage() {
 
         {/* ── Product Grid ── */}
         {loading ? (
-          <div className="mb-20 space-y-6">
-            <div className="flex items-center justify-center py-2">
-              <CircularLoader size={40} label="Gathering fresh produce…" />
-            </div>
-            <ProductGridSkeleton count={8} />
+          <div className="flex min-h-[50vh] items-center justify-center pb-20">
+            <CircularLoader size={40} label="Gathering fresh produce…" />
           </div>
         ) : processed.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#999' }}>

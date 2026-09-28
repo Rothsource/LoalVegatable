@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Header from "@/components/Header";
 import { PRODUCT_IMAGE_BY_NAME } from "@/lib/productPhotos";
+import { supabase } from "@/lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Status = "Pending" | "Preparing" | "Ready" | "Delivered" | "Cancelled";
@@ -14,6 +15,7 @@ type OrderItem = {
 
 type Order = {
   id: string;
+  rawId?: string;
   customer: string;
   phone: string;
   address: string;
@@ -485,13 +487,76 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [denyTarget, setDenyTarget]       = useState<Order | null>(null);
 
+  const loadOrders = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const res = await fetch(`/api/merchant/orders?merchantId=${user.id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.orders && Array.isArray(data.orders) && data.orders.length > 0) {
+        const mapped: Order[] = data.orders.map((o: any) => {
+          let capitalizedStatus: Status = "Pending";
+          if (o.status === "accepted" || o.status === "preparing") capitalizedStatus = "Preparing";
+          else if (o.status === "ready" || o.status === "packaged") capitalizedStatus = "Ready";
+          else if (o.status === "delivered") capitalizedStatus = "Delivered";
+          else if (o.status === "cancelled") capitalizedStatus = "Cancelled";
+
+          return {
+            id: `#${o.id.slice(0, 8)}`,
+            rawId: o.id,
+            customer: o.customer_phone ? `Customer (${o.customer_phone})` : "Local Customer",
+            phone: o.customer_phone || "Contact via App",
+            address: [o.address_street, o.address_province].filter(Boolean).join(", ") || "Direct Delivery",
+            items: (o.items || []).map((i: any) => ({
+              name: i.product_name || "Produce",
+              qty: i.quantity || 1,
+              price: i.unit_price || 0,
+            })),
+            total: o.total_amount || 0,
+            status: capitalizedStatus,
+            time: new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+        });
+        setOrders(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to load real merchant orders:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+    const channel = supabase
+      .channel("merchant-orders-page")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => loadOrders())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadOrders]);
+
   const filtered     = tab === "All" ? orders : orders.filter((o) => o.status === tab);
   const pendingCount = orders.filter((o) => o.status === "Pending").length;
 
-  const updateStatus = useCallback((id: string, status: Status) => {
+  const updateStatus = useCallback(async (id: string, status: Status) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
     setSelectedOrder((prev) => (prev?.id === id ? { ...prev, status } : prev));
-  }, []);
+
+    const target = orders.find((o) => o.id === id);
+    const orderUuid = target?.rawId;
+    if (orderUuid) {
+      const action = status === "Cancelled" ? "deny" : "accept";
+      try {
+        await fetch("/api/merchant/orders/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: orderUuid, action }),
+        });
+      } catch (err) {
+        console.error("Order response sync failed:", err);
+      }
+    }
+  }, [orders]);
 
   const handleDenyConfirm = useCallback(() => {
     if (!denyTarget) return;

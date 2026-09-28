@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { MapPin, Navigation, Search, Loader2, ExternalLink, Pencil } from 'lucide-react';
 import { PageSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
@@ -25,8 +24,6 @@ interface KhmerAddress {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
-
   // ── Loaded account state ──
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState('');

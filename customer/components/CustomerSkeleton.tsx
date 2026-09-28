@@ -148,46 +148,69 @@ export function CartSkeleton() {
   );
 }
 
-export function CircularLoader({ 
-  size = 40, 
+export function CircularLoader({
+  size = 40,
   strokeWidth = 3.5,
-  label 
-}: { 
-  size?: number; 
+  label,
+}: {
+  size?: number;
   strokeWidth?: number;
-  label?: string; 
+  label?: string;
 }) {
+  const center = size / 2;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
   return (
-    <div className="flex flex-col items-center justify-center p-4 gap-3" role="status" aria-label="Loading">
-      <div 
-        className="relative flex items-center justify-center" 
-        style={{ width: size, height: size }}
+    <div
+      role="status"
+      aria-label={label || "Loading"}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <style>{`
+        @keyframes customer-loader-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <svg
+        aria-hidden="true"
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        style={{
+          display: "block",
+          flexShrink: 0,
+          transformOrigin: "center",
+          animation: "customer-loader-spin 0.75s linear infinite",
+        }}
       >
-        {/* Soft background track ring */}
-        <div 
-          className="absolute inset-0 rounded-full border-solid border-[#e2ebd9]" 
-          style={{ borderWidth: strokeWidth }}
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke="#e2ebd9"
+          strokeWidth={strokeWidth}
         />
-        {/* Rotating arc in --leaf (#0DB30D) with smooth continuous rotation */}
-        <div
-          className="absolute inset-0 rounded-full border-solid border-transparent border-t-[#0DB30D] border-r-[#0DB30D] animate-spin"
-          style={{ 
-            borderWidth: strokeWidth,
-            animationDuration: "0.75s",
-            animationTimingFunction: "linear"
-          }}
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke="#0DB30D"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={`${circumference * 0.28} ${circumference * 0.72}`}
         />
-      </div>
-      {label && (
-        <span className="text-xs font-bold tracking-wider text-[#2E6F40] uppercase opacity-90 animate-pulse">
-          {label}
-        </span>
-      )}
-      <span className="sr-only">Loading…</span>
+      </svg>
     </div>
   );
 }
-
 // Alias for semantic usage
 export const LeafSpinner = CircularLoader;
 

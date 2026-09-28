@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginForm({ initialError = "" }: { initialError?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
 
@@ -27,47 +29,113 @@ export default function LoginForm({ initialError = "" }: { initialError?: string
     window.location.href = "/home";
   }
 
-  const inputClass = "mt-2 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 hover:border-gray-300 hover:bg-gray-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10";
+  const inputClass =
+    "w-full rounded-xl border border-[#e0e5de] bg-[#ffffff] px-4 py-3 text-sm text-[#24382d] placeholder-[#68746a] outline-none transition-all hover:border-[#d9dfd8] focus:border-[#765238] focus:bg-[#ffffff] focus:ring-3 focus:ring-[#765238]/15";
 
   return (
     <AuthShell
-      eyebrow="Secure access"
+      eyebrow="Merchant Access"
       title="Welcome back"
-      description="Sign in to your merchant account."
-      footer={<span>New to LocalVeg? <Link href="/auth/register" className="font-bold text-emerald-600 transition hover:text-emerald-700 hover:underline">Create an account</Link></span>}
+      description="Sign in to your merchant workspace to manage farm inventory and orders."
+      footer={
+        <span>
+          Looking to become a verified supplier?{" "}
+          <Link href="/auth/register" className="font-bold text-[#765238] transition hover:text-[#765238] hover:underline">
+            Register your farm
+          </Link>
+        </span>
+      }
     >
       {error && (
-        <div role="alert" className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-          </svg>
-          {error}
+        <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-xs font-semibold leading-relaxed text-[#991b1b]">
+          <AlertCircle size={17} className="mt-0.5 shrink-0 text-[#b91c1c]" />
+          <span>{error}</span>
         </div>
       )}
-      <form onSubmit={handleSubmit} className="space-y-5">
+
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="login-email" className="text-sm font-semibold text-gray-700">Email address</label>
-          <input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" autoComplete="email" required className={inputClass} />
-        </div>
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <label htmlFor="login-password" className="text-sm font-semibold text-gray-700">Password</label>
-            <Link href="/auth/forgot-password" className="text-sm font-semibold text-emerald-600 transition hover:text-emerald-700 hover:underline">Forgot password?</Link>
+          <label htmlFor="login-email" className="block text-xs font-bold uppercase tracking-wider text-[#435449]">
+            Work Email Address
+          </label>
+          <div className="mt-1.5">
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="grower@localfarm.com"
+              autoComplete="email"
+              required
+              className={inputClass}
+            />
           </div>
-          <input id="login-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" autoComplete="current-password" required className={inputClass} />
         </div>
-        <button type="submit" disabled={loading} className="mt-2 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:translate-y-[-1px] hover:from-emerald-500 hover:to-emerald-400 hover:shadow-xl hover:shadow-emerald-500/30 disabled:pointer-events-none disabled:opacity-70">
-          {loading ? "Signing in…" : "Sign in"}
+
+        <div>
+          <div className="flex items-center justify-between">
+            <label htmlFor="login-password" className="block text-xs font-bold uppercase tracking-wider text-[#435449]">
+              Password
+            </label>
+            <Link
+              href="/auth/forgot-password"
+              className="text-xs font-semibold text-[#765238] transition hover:text-[#765238] hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative mt-1.5">
+            <input
+              id="login-password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your account password"
+              autoComplete="current-password"
+              required
+              className={`${inputClass} pr-11`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#68746a] transition hover:text-[#24382d]"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1b4332] py-3.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(140,82,40,0.25)] transition hover:bg-[#123327] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+        >
+          {loading ? (
+            <>
+              <Loader2 size={17} className="animate-spin" />
+              <span>Verifying credentials…</span>
+            </>
+          ) : (
+            <>
+              <span>Sign In to Merchant Console</span>
+              <ArrowRight size={16} />
+            </>
+          )}
         </button>
       </form>
-      <div className="mt-6 flex flex-col items-start gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 transition-colors hover:bg-emerald-50">
-        <div className="flex items-center gap-2 text-sm font-bold text-emerald-900">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-          Signing in as a distributor?
+
+      {/* Distributor Team switch */}
+      <div className="mt-8 flex items-center justify-between gap-4 rounded-xl border border-[#e0e5de] bg-[#f6f7f3] p-4">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-[#24382d]">Distributor or Dispatch Team?</p>
+          <p className="mt-1 text-[11px] leading-4 text-[#5d685f]">Sign in to coordinate dispatches and deliveries.</p>
         </div>
-        <p className="text-sm leading-relaxed text-emerald-700/80">Distributors sign in with a link sent to their email — no password needed.</p>
-        <Link href="/auth/distributor-login" className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-emerald-700 transition hover:text-emerald-800 hover:underline">
-          Sign in as distributor <span>→</span>
+        <Link
+          href="/auth/distributor-login"
+          className="shrink-0 rounded-lg bg-[#1b4332] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#123327] active:bg-[#0c241b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1b4332]"
+        >
+          Distributor Login
         </Link>
       </div>
     </AuthShell>

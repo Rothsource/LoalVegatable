@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,14 +21,14 @@ export default function LoginPage() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
       const data = await res.json();
       setLoading(false);
 
       if (!res.ok) {
-        setError(data.error || "Login failed");
+        setError(data.error || "Authentication failed. Check your administrative credentials.");
         return;
       }
 
@@ -35,86 +37,112 @@ export default function LoginPage() {
       router.push("/admin");
     } catch {
       setLoading(false);
-      setError("An unexpected connection error occurred.");
+      setError("An unexpected connection error occurred. Check your network link.");
     }
   }
 
+  const inputClass =
+    "w-full rounded-lg border border-[#d9dfd8] bg-white px-3.5 py-3 text-sm text-[#24382d] placeholder:text-[#7a857c] outline-none transition focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/15";
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4">
-      <form
-        onSubmit={handleLogin}
-        className="w-full max-w-md rounded-3xl bg-white p-8 sm:p-10 border border-[#dfe6d9] shadow-[0_12px_40px_rgba(44,62,31,0.06)]"
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[var(--leaf)] text-white font-black text-sm flex items-center justify-center shadow-md">
-            LV
+    <main className="flex min-h-screen items-center justify-center bg-white px-4 py-10 text-[#24382d]">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-[#e3e7e1] bg-white p-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/image/logo.png" alt="LocalVegetable" className="h-full w-full object-contain" />
           </div>
-          <div>
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-[var(--leaf-accent)]">
-              LocalVegetable
-            </h2>
-            <p className="text-[11px] text-[#7d8b79] font-medium">Control Portal</p>
-          </div>
+          <span className="mt-4 text-xs font-bold uppercase tracking-[0.12em] text-[#765238]">
+            Central Operations
+          </span>
+          <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight text-[#20382b]">
+            Admin Console Sign In
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-[#5d685f]">
+            Administrative control for produce catalog, merchant reviews, and fleet operations.
+          </p>
         </div>
 
-        <h1 className="mb-2 text-2xl sm:text-3xl font-bold text-[var(--foreground)] font-heading">
-          Admin Sign In
-        </h1>
-        <p className="mb-6 text-xs text-[#667262] leading-relaxed">
-          Authenticate with your administrative credentials to manage marketplace operations.
-        </p>
-
-        {error && (
-          <div className="mb-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-xs font-semibold text-red-600">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-4 mb-6">
-          <div>
-            <label className="block text-xs font-bold text-[#4d5e49] mb-1.5 uppercase tracking-wider">
-              Email Address
-            </label>
-            <input
-              type="email"
-              placeholder="admin@localveg.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full rounded-xl border border-[#dfe6d9] bg-[#fafbf9] px-4 py-3 text-sm text-[var(--foreground)] placeholder-[#9ca69a] focus:bg-white focus:border-[var(--leaf)] focus:outline-none focus:ring-2 focus:ring-[var(--leaf)]/20 transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#4d5e49] mb-1.5 uppercase tracking-wider">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full rounded-xl border border-[#dfe6d9] bg-[#fafbf9] px-4 py-3 text-sm text-[var(--foreground)] placeholder-[#9ca69a] focus:bg-white focus:border-[var(--leaf)] focus:outline-none focus:ring-2 focus:ring-[var(--leaf)]/20 transition-all"
-            />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-[var(--leaf)] hover:bg-[var(--leaf-dark)] py-3.5 text-sm font-extrabold text-white transition-all duration-200 shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+        <form
+          onSubmit={handleLogin}
+          className="rounded-xl border border-[#e3e7e1] bg-white p-6 shadow-[0_14px_40px_rgba(28,54,39,0.07)] sm:p-8"
         >
-          {loading ? (
-            <>
-              <div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-              <span>Authenticating…</span>
-            </>
-          ) : (
-            "Access Admin Portal"
+          {error && (
+            <div
+              role="alert"
+              className="mb-5 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium leading-relaxed text-red-800"
+            >
+              <span>{error}</span>
+            </div>
           )}
-        </button>
-      </form>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-[#35473a]">
+                Operator Email Address
+              </label>
+              <div className="mt-1.5">
+                <input
+                  aria-label="Operator email address"
+                  type="email"
+                  placeholder="admin@localveg.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-semibold text-[#35473a]">
+                  Secret Key / Password
+                </label>
+              </div>
+              <div className="relative mt-1.5">
+                <input
+                  aria-label="Secret key or password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className={`${inputClass} pr-11`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#66746a] transition hover:text-[#1b4332]"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1b4332] py-3.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(140,82,40,0.25)] transition hover:bg-[#123327] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={17} className="animate-spin" />
+                <span>Authenticating console access…</span>
+              </>
+            ) : (
+              <span>Access Admin Console</span>
+            )}
+          </button>
+
+        </form>
+
+        <p className="mt-5 text-center text-xs text-[#68746a]">
+          Authorized administrative personnel only · Activity logged & monitored
+        </p>
+      </div>
     </main>
   );
 }

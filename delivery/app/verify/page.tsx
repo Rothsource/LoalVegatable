@@ -77,27 +77,27 @@ export default function VerifyPage() {
 
   return (
     <AuthShell step={2}>
-      <Link href="/activate" className="mb-7 inline-flex min-h-10 items-center gap-2 rounded-xl text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]"><ArrowLeft size={16} />Change email</Link>
-      <span className="grid h-14 w-14 place-items-center rounded-[18px] bg-[var(--surface-soft)] text-[var(--leaf)]"><Mail size={25} /></span>
-      <h1 className="mt-6 text-[34px] font-black tracking-[-0.045em] sm:text-[40px]">Check your email</h1>
-      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Enter the 6-digit code sent to <strong className="text-[var(--ink)]">{maskEmail(activationEmail || DEMO_AUTH.authorizedEmail)}</strong>.</p>
+      <Link href="/activate" className="mb-7 inline-flex min-h-10 items-center gap-2 rounded-xl text-sm font-bold text-[#765238] hover:text-[#765238]"><ArrowLeft size={16} />Change email</Link>
+      <span className="grid h-14 w-14 place-items-center rounded-[18px] border border-[#e0e5de] bg-[#f6f2ec] text-[#765238]"><Mail size={25} /></span>
+      <h1 className="mt-6 text-[34px] font-black tracking-[-0.045em] text-[#24382d] sm:text-[40px]">Check your email</h1>
+      <p className="mt-3 text-sm leading-6 text-[#5d685f]">Enter the 6-digit code sent to <strong className="text-[#24382d]">{maskEmail(activationEmail || DEMO_AUTH.authorizedEmail)}</strong>.</p>
       <form onSubmit={handleSubmit} className="mt-8" noValidate>
         <fieldset>
-          <legend className="mb-3 text-sm font-bold text-[#344033]">Verification code</legend>
+          <legend className="mb-3 text-xs font-bold uppercase tracking-wider text-[#435449]">Verification code</legend>
           <div className="grid grid-cols-6 gap-2 sm:gap-2.5" onPaste={handlePaste}>
             {digits.map((digit, index) => (
-              <input key={index} ref={(element) => { refs.current[index] = element; }} value={digit} onChange={(event) => setDigit(index, event.target.value)} onKeyDown={(event) => handleKeyDown(index, event)} inputMode="numeric" autoComplete={index === 0 ? "one-time-code" : "off"} aria-label={`Verification digit ${index + 1}`} maxLength={1} className={`h-14 min-w-0 rounded-[14px] border bg-white text-center text-xl font-black outline-none transition focus:border-[var(--leaf)] focus:ring-4 focus:ring-[#dcebd8] sm:h-16 ${error ? "border-[#da8d86]" : "border-[var(--line)]"}`} />
+              <input key={index} ref={(element) => { refs.current[index] = element; }} value={digit} onChange={(event) => setDigit(index, event.target.value)} onKeyDown={(event) => handleKeyDown(index, event)} inputMode="numeric" autoComplete={index === 0 ? "one-time-code" : "off"} aria-label={`Verification digit ${index + 1}`} maxLength={1} className={`h-14 min-w-0 rounded-xl border bg-[#ffffff] text-center text-xl font-bold text-[#24382d] outline-none transition focus:border-[#765238] focus:ring-4 focus:ring-[#765238]/15 sm:h-16 ${error ? "border-[#fecaca] bg-[#fef2f2]" : "border-[#e0e5de] hover:border-[#d9dfd8]"}`} />
             ))}
           </div>
         </fieldset>
-        {error && <p role="alert" className="mt-3 flex items-start gap-2 text-xs font-semibold leading-5 text-[var(--danger)]"><Info size={14} className="mt-0.5 shrink-0" />{error}</p>}
-        {message && <p role="status" className="mt-3 text-xs font-semibold text-[var(--leaf)]">{message}</p>}
-        <Button type="submit" fullWidth loading={loading} icon={<ArrowRight size={18} />} className="mt-6">Verify code</Button>
+        {error && <p role="alert" className="mt-3 flex items-start gap-2 text-xs font-semibold leading-5 text-[#991b1b]"><Info size={14} className="mt-0.5 shrink-0 text-[#b91c1c]" />{error}</p>}
+        {message && <p role="status" className="mt-3 text-xs font-semibold text-[#765238]">{message}</p>}
+        <Button type="submit" fullWidth loading={loading} icon={<ArrowRight size={18} />} className="mt-6 !border-[#1b4332] !bg-[#1b4332] shadow-[0_4px_16px_rgba(140,82,40,0.25)] hover:!bg-[#123327]">Verify code</Button>
       </form>
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-[var(--muted)]">
-        {seconds > 0 ? <span className="inline-flex items-center gap-1.5"><Clock3 size={14} />Resend in 0:{String(seconds).padStart(2, "0")}</span> : <button type="button" disabled={resending} onClick={handleResend} className="min-h-10 font-extrabold text-[var(--leaf)] hover:underline disabled:opacity-60">{resending ? "Resending…" : "Resend code"}</button>}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-[#68746a]">
+        {seconds > 0 ? <span className="inline-flex items-center gap-1.5"><Clock3 size={14} />Resend in 0:{String(seconds).padStart(2, "0")}</span> : <button type="button" disabled={resending} onClick={handleResend} className="min-h-10 font-extrabold text-[#765238] hover:underline disabled:opacity-60">{resending ? "Resending…" : "Resend code"}</button>}
       </div>
-      <button type="button" onClick={() => { setDigits(DEMO_AUTH.verificationCode.split("")); setError(""); }} className="mt-6 w-full rounded-[18px] border border-[#d8e4d3] bg-[#f2f7ef] p-4 text-center text-sm font-bold text-[var(--leaf-dark)] transition hover:bg-[#ebf4e6]">Use demo code <span className="ml-1 font-black tracking-[0.18em]">{DEMO_AUTH.verificationCode}</span></button>
+      <button type="button" onClick={() => { setDigits(DEMO_AUTH.verificationCode.split("")); setError(""); }} className="mt-6 w-full rounded-[18px] border border-[#e0e5de] bg-[#ffffff] p-4 text-center text-sm font-bold text-[#765238] transition hover:bg-[#f6f7f3]">Use demo code <span className="ml-1 font-black tracking-[0.18em]">{DEMO_AUTH.verificationCode}</span></button>
     </AuthShell>
   );
 }

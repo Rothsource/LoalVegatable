@@ -13,6 +13,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const publicPaths = [
+    "/sentry-example-page",
     "/auth/login",
     "/auth/register",
     "/auth/forgot-password",

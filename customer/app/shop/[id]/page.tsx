@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, use, useCallback, useEffect } from 'react';
 import { Heart, Star, Leaf, X, Trash2, HeartOff, SlidersHorizontal, ChevronLeft, MapPin, ShieldCheck, Package, Calendar, Box, RotateCcw, Plus, Minus, ShoppingBasket } from 'lucide-react';
-import { useAuth } from '@/lib/useAuth';
 import { CircularLoader } from '@/components/CustomerSkeleton';
+import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 import { isProductExpired, getTodayDateString } from '@/lib/expiry';
 
@@ -366,8 +366,8 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const getPendingQty = (pid: string) => pendingQty[pid] ?? 1;
 
   if (loading) return (
-    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <CircularLoader size={48} />
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <CircularLoader size={48} label="Loading shop details…" />
     </div>
   );
 

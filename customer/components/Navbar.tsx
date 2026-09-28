@@ -90,9 +90,9 @@ export default function Navbar() {
   const navLinks = [
     { href: "/", label: "Home", icon: <Home size={15} /> },
     { href: "/shop", label: "Shop", icon: <Store size={15} /> },
-    { href: "/cart", label: "Cart", icon: <ShoppingCart size={15} /> },
-    { href: "/favorites", label: "Favorites", icon: <Heart size={15} /> },
-    { href: "/notifications", label: "Notifications", icon: <Bell size={15} /> },
+    { href: "/cart", label: "Cart", icon: <ShoppingCart size={15} />, requiresAuth: true },
+    { href: "/favorites", label: "Favorites", icon: <Heart size={15} />, requiresAuth: true },
+    { href: "/notifications", label: "Notifications", icon: <Bell size={15} />, requiresAuth: true },
   ];
 
   const isActive = (href: string) => {
@@ -276,12 +276,13 @@ export default function Navbar() {
 
           {/* Desktop links */}
           <ul className="nav-links">
-            {navLinks.map(({ href, label, icon }) => {
+            {navLinks.map(({ href, label, icon, requiresAuth }) => {
+              const targetHref = requiresAuth && !isLoggedIn ? `/auth/login?redirectTo=${encodeURIComponent(href)}` : href;
               const isCart = href === "/cart";
               const isNotif = href === "/notifications";
               return (
                 <li key={href}>
-                  <Link href={href} className={`nav-link${isActive(href) ? " active" : ""}`} style={{ position: 'relative' }}>
+                  <Link href={targetHref} className={`nav-link${isActive(href) ? " active" : ""}`} style={{ position: 'relative' }}>
                     {icon} {label}
                     {isCart && cartCount > 0 && (
                       <span style={{
@@ -355,11 +356,12 @@ export default function Navbar() {
         {/* Mobile menu */}
         {menuOpen && (
           <div className="mobile-menu">
-            {navLinks.map(({ href, label, icon }) => {
+            {navLinks.map(({ href, label, icon, requiresAuth }) => {
+              const targetHref = requiresAuth && !isLoggedIn ? `/auth/login?redirectTo=${encodeURIComponent(href)}` : href;
               const isCart = href === "/cart";
               const isNotif = href === "/notifications";
               return (
-                <Link key={href} href={href}
+                <Link key={href} href={targetHref}
                   className={`mobile-link${isActive(href) ? " active" : ""}`}
                   onClick={() => setMenuOpen(false)}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>

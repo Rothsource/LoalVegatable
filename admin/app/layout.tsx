@@ -4,6 +4,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "LocalVegetable | Admin Control Center",
   description: "Administrative console and ecosystem management for LocalVegetable agricultural marketplace.",
+  icons: {
+    icon: "/image/logo.png",
+    shortcut: "/image/logo.png",
+    apple: "/image/logo.png",
+  },
 };
 
 export default function RootLayout({

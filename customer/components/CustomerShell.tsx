@@ -11,9 +11,9 @@ import { supabase } from "@/lib/supabase";
 const BOTTOM_NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home },
   { href: "/shop", label: "Shop", icon: Store },
-  { href: "/cart", label: "Cart", icon: ShoppingCart, badgeKey: "cart" },
-  { href: "/notifications", label: "Updates", icon: Bell, badgeKey: "orders" },
-  { href: "/auth/profile", label: "Profile", icon: User },
+  { href: "/cart", label: "Cart", icon: ShoppingCart, badgeKey: "cart", requiresAuth: true },
+  { href: "/notifications", label: "Updates", icon: Bell, badgeKey: "orders", requiresAuth: true },
+  { href: "/auth/profile", label: "Profile", icon: User, requiresAuth: true },
 ];
 
 const AUTH_PAGES_NO_CHROME = [
@@ -29,6 +29,7 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const [cartCount, setCartCount] = useState(0);
   const [activeOrderCount, setActiveOrderCount] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Sync cart count
   const syncCart = () => {
@@ -55,6 +56,7 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
+      setIsLoggedIn(!!user);
       if (!user) {
         setActiveOrderCount(0);
         return;
@@ -75,11 +77,16 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
     syncCart();
     syncOrders();
 
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data?.session?.user);
+    });
+
     const onStorage = () => syncCart();
     window.addEventListener("storage", onStorage);
     const interval = setInterval(syncCart, 2000);
 
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session?.user);
       syncOrders();
     });
 
@@ -129,10 +136,14 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
               ? activeOrderCount
               : null;
 
+          const targetHref = (item as any).requiresAuth && !isLoggedIn
+            ? `/auth/login?redirectTo=${encodeURIComponent(item.href)}`
+            : item.href;
+
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={targetHref}
               aria-current={isActive ? "page" : undefined}
               className={`relative flex flex-col items-center justify-center gap-1 rounded-2xl py-1.5 text-[11px] font-bold tab-smooth active:scale-95 ${
                 isActive
