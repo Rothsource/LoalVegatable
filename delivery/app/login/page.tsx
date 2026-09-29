@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowRight, Eye, EyeOff, Info, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Info } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { useDelivery } from "@/context/DeliveryProvider";
-import { DEMO_AUTH } from "@/lib/demo-data";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,12 +22,6 @@ export default function LoginPage() {
   useEffect(() => {
     if (!sessionLoading && user) router.replace("/home");
   }, [router, sessionLoading, user]);
-
-  function fillDemo() {
-    setEmail(DEMO_AUTH.authorizedEmail);
-    setPassword(DEMO_AUTH.password);
-    setError("");
-  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -54,11 +47,7 @@ export default function LoginPage() {
   return (
     <AuthShell>
       <div className="mb-7">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e0e5de] bg-[#f6f2ec] px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[#765238]">
-          <LockKeyhole size={13} className="text-[#765238]" />
-          <span>Fleet Dispatch Portal</span>
-        </span>
-        <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight text-[#24382d] sm:text-4xl">
+        <h1 className="font-heading text-3xl font-bold tracking-tight text-[#24382d] sm:text-4xl">
           Rider sign in
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-[#5d685f]">
@@ -133,28 +122,6 @@ export default function LoginPage() {
           Sign in to Rider Dashboard
         </Button>
       </form>
-
-      {/* Demo rider auto-fill */}
-      <div className="mt-8 rounded-2xl border border-[#e0e5de] bg-[#ffffff] p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e0e5de] bg-[#f6f2ec] text-[#765238]">
-              <Mail size={15} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-[#24382d]">Demo Courier Credentials</p>
-              <p className="truncate text-[11px] text-[#5d685f]">{DEMO_AUTH.authorizedEmail}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={fillDemo}
-            className="shrink-0 rounded-lg border border-[#e0e5de] bg-[#f6f7f3] px-3 py-1.5 text-xs font-bold text-[#765238] transition hover:bg-[#331e13]"
-          >
-            Auto Fill
-          </button>
-        </div>
-      </div>
 
       <p className="mt-6 text-center text-xs text-[#68746a]">
         First time driving with us?{" "}

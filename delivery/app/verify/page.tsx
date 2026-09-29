@@ -97,7 +97,6 @@ export default function VerifyPage() {
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-[#68746a]">
         {seconds > 0 ? <span className="inline-flex items-center gap-1.5"><Clock3 size={14} />Resend in 0:{String(seconds).padStart(2, "0")}</span> : <button type="button" disabled={resending} onClick={handleResend} className="min-h-10 font-extrabold text-[#765238] hover:underline disabled:opacity-60">{resending ? "Resending…" : "Resend code"}</button>}
       </div>
-      <button type="button" onClick={() => { setDigits(DEMO_AUTH.verificationCode.split("")); setError(""); }} className="mt-6 w-full rounded-[18px] border border-[#e0e5de] bg-[#ffffff] p-4 text-center text-sm font-bold text-[#765238] transition hover:bg-[#f6f7f3]">Use demo code <span className="ml-1 font-black tracking-[0.18em]">{DEMO_AUTH.verificationCode}</span></button>
     </AuthShell>
   );
 }

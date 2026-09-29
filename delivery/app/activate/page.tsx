@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { ArrowLeft, ArrowRight, BadgeCheck, Info, MailCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Info, MailCheck } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { useDelivery } from "@/context/DeliveryProvider";
-import { DEMO_AUTH } from "@/lib/demo-data";
 
 export default function ActivatePage() {
   const router = useRouter();
@@ -44,10 +43,6 @@ export default function ActivatePage() {
         <FormField label="Authorized Gmail" type="email" autoComplete="email" placeholder="name@gmail.com" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} error={error} />
         <Button type="submit" fullWidth loading={loading} icon={<ArrowRight size={18} />} className="!border-[#1b4332] !bg-[#1b4332] shadow-[0_4px_16px_rgba(140,82,40,0.25)] hover:!bg-[#123327]">Continue</Button>
       </form>
-      <div className="mt-6 rounded-[18px] border border-[#e0e5de] bg-[#ffffff] p-4">
-        <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.08em] text-[#765238]"><BadgeCheck size={15} />Demo authorized email</p>
-        <button type="button" onClick={() => { setEmail(DEMO_AUTH.authorizedEmail); setError(""); }} className="mt-2 break-all text-left text-sm font-bold text-[#765238] hover:underline">{DEMO_AUTH.authorizedEmail}</button>
-      </div>
       <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-[#68746a]"><Info size={14} className="mt-0.5 shrink-0" />In production, account authorization will be checked by the Admin/backend system. This demo uses a local mock service.</p>
     </AuthShell>
   );
