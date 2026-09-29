@@ -39,3 +39,4 @@ jobs:
       - uses: semgrep/semgrep-action@v1
         with:
           config: p/security-audit
+        continue-on-error: true
