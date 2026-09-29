@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { deleteUserCompletely } from "@/lib/userCleanup";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -66,20 +67,18 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true });
   }
 
-  if (action === "set_password") {
-    const { password } = body;
-    if (!password || password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
-    }
-
-    const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(id, {
-      password,
-      email_confirm: true,
-    });
-    if (pwError) return NextResponse.json({ error: pwError.message }, { status: 500 });
-
-    return NextResponse.json({ success: true });
-  }
-
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });
+}
+
+export async function DELETE(req: Request) {
+  const { id } = await req.json();
+  if (!id) return NextResponse.json({ error: "Missing distributor id." }, { status: 400 });
+
+  try {
+    await deleteUserCompletely(id);
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error("Distributor deletion error:", err);
+    return NextResponse.json({ error: err?.message || "Failed to delete distributor." }, { status: 500 });
+  }
 }

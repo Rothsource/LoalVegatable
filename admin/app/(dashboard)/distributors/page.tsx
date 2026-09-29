@@ -56,20 +56,19 @@ export default function AdminDistributorsPage() {
     }
   }
 
-  async function setPassword(id: string) {
-    const password = prompt("Enter a password for this distributor (min 8 characters):");
-    if (!password) return;
-
+  async function handleDelete(id: string) {
+    if (!confirm("Are you sure you want to permanently delete this distributor account? This also deletes their login.")) return;
     setBusyId(id);
     try {
       const res = await fetch("/api/distributors", {
-        method: "PATCH",
+        method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "set_password", password }),
+        body: JSON.stringify({ id }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data?.error ?? "Could not set password."); return; }
-      alert("Password set. Give it to the distributor — they can now log in with email + password.");
+      if (!res.ok) { alert(data?.error ?? "Delete failed."); return; }
+      setDistributors((prev) => prev.filter((d) => d.id !== id));
+      setSelected((prev) => (prev && prev.id === id ? null : prev));
     } finally {
       setBusyId(null);
     }
@@ -143,9 +142,11 @@ export default function AdminDistributorsPage() {
                             </button>
                           </>
                         ) : (
-                          <button onClick={() => setPassword(d.id)} disabled={busyId === d.id} className="rounded-xl bg-[var(--leaf)] hover:bg-[var(--leaf-dark)] px-3 py-1.5 text-xs font-bold text-white transition-colors disabled:opacity-50 cursor-pointer">
-                            Set Password
-                          </button>
+                          <>
+                            <button onClick={() => handleDelete(d.id)} disabled={busyId === d.id} className="rounded-xl bg-[#fee2e2] hover:bg-red-200 px-3 py-1.5 text-xs font-bold text-red-700 transition-colors disabled:opacity-50 cursor-pointer">
+                              Delete
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -175,7 +176,7 @@ export default function AdminDistributorsPage() {
               <div className="flex justify-between py-1 border-b border-[#f2f4ef]"><dt className="text-[#7d8b79]">Status</dt><dd className="font-bold text-[var(--leaf-dark)] capitalize">{selected.status}</dd></div>
               <div className="flex justify-between py-1"><dt className="text-[#7d8b79]">Requested On</dt><dd className="font-bold text-[var(--foreground)]">{new Date(selected.created_at).toLocaleDateString()}</dd></div>
             </dl>
-            <div className="mt-6 flex gap-2.5 border-t border-[#f2f4ef] pt-4">
+            <div className="mt-6 flex flex-wrap gap-2.5 border-t border-[#f2f4ef] pt-4">
               {selected.status === "pending" ? (
                 <>
                   <button onClick={() => act(selected.id, "approve")} disabled={busyId === selected.id} className="rounded-xl bg-[var(--leaf)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--leaf-dark)] disabled:opacity-50 cursor-pointer">
@@ -186,9 +187,11 @@ export default function AdminDistributorsPage() {
                   </button>
                 </>
               ) : (
-                <button onClick={() => setPassword(selected.id)} disabled={busyId === selected.id} className="rounded-xl bg-[var(--leaf)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--leaf-dark)] disabled:opacity-50 cursor-pointer">
-                  Set Password
-                </button>
+                <>
+                  <button onClick={() => handleDelete(selected.id)} disabled={busyId === selected.id} className="rounded-xl bg-[#fee2e2] px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-200 disabled:opacity-50 cursor-pointer">
+                    Delete Account
+                  </button>
+                </>
               )}
             </div>
           </div>

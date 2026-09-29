@@ -1,6 +1,7 @@
 // admin/app/api/merchants/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { deleteUserCompletely } from "@/lib/userCleanup";
 
 export async function GET() {
   const { data: merchants, error } = await supabaseAdmin
@@ -58,29 +59,11 @@ export async function DELETE(request: NextRequest) {
   const { id } = await request.json();
   if (!id) return NextResponse.json({ error: "Missing merchant id." }, { status: 400 });
 
-  const { count, error: countError } = await supabaseAdmin
-    .from("products")
-    .select("id", { count: "exact", head: true })
-    .eq("merchant_id", id);
-
-  if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
-  if (count && count > 0) {
-    return NextResponse.json(
-      { error: `This merchant has ${count} product(s) listed and cannot be deleted. Revoke approval instead.` },
-      { status: 409 }
-    );
+  try {
+    await deleteUserCompletely(id);
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error("Merchant deletion error:", err);
+    return NextResponse.json({ error: err?.message || "Failed to delete merchant." }, { status: 500 });
   }
-
-  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
-  if (authError) return NextResponse.json({ error: authError.message }, { status: 500 });
-
-  const { error: profileError } = await supabaseAdmin.from("profile_merchants").delete().eq("id", id);
-  if (profileError) {
-    return NextResponse.json(
-      { error: `Login deleted, but profile cleanup failed: ${profileError.message}` },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ ok: true });
 }

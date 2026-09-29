@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { deleteUserCompletely } from "@/lib/userCleanup";
 
 export async function GET() {
   const { data, error } = await supabaseAdmin
@@ -50,8 +51,19 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
+  if (!id) return NextResponse.json({ error: "Missing delivery id." }, { status: 400 });
+
   const { data: delivery } = await supabaseAdmin.from("deliveries").select("user_id").eq("id", id).single();
-  await supabaseAdmin.from("deliveries").delete().eq("id", id);
-  if (delivery?.user_id) await supabaseAdmin.auth.admin.deleteUser(delivery.user_id);
+  await supabaseAdmin.from("orders").update({ delivery_id: null }).eq("delivery_id", id);
+  const { error: delError } = await supabaseAdmin.from("deliveries").delete().eq("id", id);
+  if (delError) return NextResponse.json({ error: delError.message }, { status: 500 });
+
+  if (delivery?.user_id) {
+    try {
+      await deleteUserCompletely(delivery.user_id);
+    } catch (cleanupErr) {
+      console.error("Delivery auth cleanup error:", cleanupErr);
+    }
+  }
   return NextResponse.json({ ok: true });
 }

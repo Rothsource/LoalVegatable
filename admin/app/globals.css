@@ -3,14 +3,14 @@
 
 :root {
   --background: #faf7f0;
-  --foreground: #2c3e1f;
+  --foreground: #24382d;
   --canvas: #fbf8f2;
   --surface: #ffffff;
-  --leaf: #0DB30D;
-  --leaf-dark: #0A490A;
+  --leaf: #1b4332;
+  --leaf-dark: #123327;
   --soil: #3B2B20;
-  --leaf-accent: #2E6F40;
-  --sprout: #6FAE5C;
+  --leaf-accent: #2d6a4f;
+  --sprout: #40916c;
   --paper: #FBF8F2;
   --line: #dfe6d9;
 }
@@ -45,5 +45,5 @@ h1, h2, h3, h4, .font-heading, .brand-heading {
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2E6F40;
+  background: #1b4332;
 }

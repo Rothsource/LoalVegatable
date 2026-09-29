@@ -121,7 +121,7 @@ export default function UsersPage() {
                     <td className="truncate py-4 text-xs font-medium text-[#556353]">{u.email || "—"}</td>
                     <td className="truncate py-4 text-xs font-semibold text-[#556353]">{u.location || "—"}</td>
                     <td className="py-4 text-xs font-extrabold text-[var(--foreground)]">{u.order_count}</td>
-                    <td className="py-4 text-xs font-bold text-[var(--leaf-dark)]">${u.total_spent.toFixed(2)}</td>
+                    <td className="py-4 text-xs font-bold text-[var(--leaf-dark)]">{Math.round(u.total_spent).toLocaleString()} KHR</td>
                     <td className="py-4" onClick={(e) => e.stopPropagation()}>
                       <button
                         disabled={busyId === u.id}
@@ -160,7 +160,7 @@ export default function UsersPage() {
               <div className="flex justify-between py-1 border-b border-[#f2f4ef]"><dt className="text-[#7d8b79]">Location</dt><dd className="font-bold text-[var(--foreground)]">{selected.location || "—"}</dd></div>
               <div className="flex justify-between py-1 border-b border-[#f2f4ef]"><dt className="text-[#7d8b79]">Joined</dt><dd className="font-medium text-[var(--foreground)]">{new Date(selected.created_at).toLocaleDateString()}</dd></div>
               <div className="flex justify-between py-1 border-b border-[#f2f4ef]"><dt className="text-[#7d8b79]">Total Orders</dt><dd className="font-bold text-[var(--foreground)]">{selected.order_count}</dd></div>
-              <div className="flex justify-between py-1"><dt className="text-[#7d8b79]">Lifetime Spent</dt><dd className="font-extrabold text-[var(--leaf-dark)]">${selected.total_spent.toFixed(2)}</dd></div>
+              <div className="flex justify-between py-1"><dt className="text-[#7d8b79]">Lifetime Spent</dt><dd className="font-extrabold text-[var(--leaf-dark)]">{Math.round(selected.total_spent).toLocaleString()} KHR</dd></div>
             </dl>
 
             {selected.default_address && (
@@ -183,7 +183,7 @@ export default function UsersPage() {
                     .map((o) => (
                       <div key={o.id} className="flex items-center justify-between rounded-xl border border-[#dfe6d9] bg-[#fafbf9] p-2.5 text-xs">
                         <span className="font-mono text-[11px] text-[#7d8b79]">#{o.id.slice(0, 8)}</span>
-                        <span className="font-bold text-[var(--foreground)]">${Number(o.total_amount).toFixed(2)}</span>
+                        <span className="font-bold text-[var(--foreground)]">{Math.round(Number(o.total_amount)).toLocaleString()} KHR</span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
                           o.status === "delivered" ? "bg-[#edf6e9] text-[var(--leaf-dark)]" :
                           o.status === "cancelled" ? "bg-red-50 text-red-700" :

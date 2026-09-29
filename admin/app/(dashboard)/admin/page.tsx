@@ -29,7 +29,7 @@ const initialActivities: RecentActivity[] = [
     type: "order",
     title: "Order #LV-8921",
     subtitle: "Organic Bok Choy x4, Khmer Carrots x2",
-    amount: "$14.50",
+    amount: "58,000 KHR",
     status: "completed",
     time: "4 mins ago",
   },
@@ -46,7 +46,7 @@ const initialActivities: RecentActivity[] = [
     type: "order",
     title: "Order #LV-8919",
     subtitle: "Morning Glory x5, Fresh Tomatoes x3",
-    amount: "$22.00",
+    amount: "88,000 KHR",
     status: "in_transit",
     time: "32 mins ago",
   },
@@ -63,7 +63,7 @@ const initialActivities: RecentActivity[] = [
     type: "order",
     title: "Order #LV-8916",
     subtitle: "Baby Spinach x3, Curly Kale x2",
-    amount: "$18.75",
+    amount: "75,000 KHR",
     status: "completed",
     time: "1 hour ago",
   },
@@ -220,7 +220,7 @@ export default function AdminPage() {
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-[var(--foreground)] font-heading">
-              ${stats.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {Math.round(stats.totalRevenue).toLocaleString()} <span className="text-xl font-bold text-[#7d8b79]">KHR</span>
             </span>
           </div>
           <div className="mt-2 text-xs text-[#7d8b79] flex items-center justify-between border-t border-[#f2f4ef] pt-2">

@@ -172,7 +172,7 @@ export default function ProductsPage() {
                     </td>
                     <td className="py-4 text-xs font-medium text-[#556353] truncate">{p.merchant_name}</td>
                     <td className="py-4 text-xs font-bold text-[var(--foreground)]">
-                      ${Number(p.price).toFixed(2)}<span className="ml-1 text-[10px] text-[#7d8b79] font-normal">/ {p.unit}</span>
+                      {Math.round(Number(p.price)).toLocaleString()} KHR<span className="ml-1 text-[10px] text-[#7d8b79] font-normal">/ {p.unit}</span>
                     </td>
                     <td className="py-4 text-xs font-semibold text-[#556353]">
                       {p.stock_quantity}<span className="ml-1 text-[10px] text-[#7d8b79]">{p.unit}</span>
@@ -249,8 +249,8 @@ export default function ProductsPage() {
               <div className="flex justify-between py-1 border-b border-[#f2f4ef]">
                 <dt className="text-[#7d8b79]">Marketplace Price</dt>
                 <dd className="font-extrabold text-[var(--foreground)]">
-                  ${Number(selected.price).toFixed(2)}
-                  {selected.compare_price ? <span className="ml-2 text-[#9ca69a] line-through font-normal">${Number(selected.compare_price).toFixed(2)}</span> : null}
+                  {Math.round(Number(selected.price)).toLocaleString()} KHR
+                  {selected.compare_price ? <span className="ml-2 text-[#9ca69a] line-through font-normal">{Math.round(Number(selected.compare_price)).toLocaleString()} KHR</span> : null}
                 </dd>
               </div>
               <div className="flex justify-between py-1 border-b border-[#f2f4ef]"><dt className="text-[#7d8b79]">Stock On Hand</dt><dd className="font-bold text-[var(--foreground)]">{selected.stock_quantity} {selected.unit}</dd></div>

@@ -238,7 +238,7 @@ export default function MerchantsPage() {
                     <div key={p.id} className="flex items-center gap-3 rounded-xl border border-[#dfe6d9] p-2.5 bg-[#fafbf9]">
                       {p.profile_pic_url && <img src={p.profile_pic_url} alt={p.name} className="h-10 w-10 rounded-lg object-cover" />}
                       <span className="flex-1 truncate text-xs font-bold text-[var(--foreground)]">{p.name}</span>
-                      <span className="text-xs font-extrabold text-[var(--foreground)]">${Number(p.price).toFixed(2)}</span>
+                      <span className="text-xs font-extrabold text-[var(--foreground)]">{Math.round(Number(p.price)).toLocaleString()} KHR</span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${p.is_active ? "bg-[#edf6e9] text-[var(--leaf-dark)]" : "bg-gray-100 text-gray-500"}`}>
                         {p.is_active ? "Active" : "Inactive"}
                       </span>
