@@ -18,6 +18,7 @@ export async function middleware(request: NextRequest) {
   ]
 
   if (
+    pathname.startsWith('/monitoring') ||
     publicPaths.includes(pathname) ||
     pathname.startsWith('/auth/')
   ) return NextResponse.next()
@@ -65,5 +66,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)'],
+  matcher: ['/((?!monitoring|_next/static|_next/image|favicon.ico|.*\\.png$).*)'],
 }

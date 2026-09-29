@@ -14,4 +14,5 @@ const nextConfig: NextConfig = {
 
 export default withSentryConfig(nextConfig, {
   silent: !process.env.CI,
+  tunnelRoute: "/monitoring",
 });
