@@ -33,72 +33,82 @@ interface Stats {
   provinces: number;
 }
 
+// Fast in-memory cache for home page (0ms instant return)
+let cachedHomeFeatured: FeaturedProduct[] | null = null;
+let cachedHomeStats: Stats | null = null;
+let cachedHomeTime = 0;
+const HOME_CACHE_TTL = 60_000;
+
 export default function Home() {
-  const [featured, setFeatured] = useState<FeaturedProduct[]>([]);
-  const [stats, setStats] = useState<Stats>({ products: 0, farms: 0, provinces: 0 });
-  const [loadingFeatured, setLoadingFeatured] = useState(true);
+  const [featured, setFeatured] = useState<FeaturedProduct[]>(() => cachedHomeFeatured ?? []);
+  const [stats, setStats] = useState<Stats>(() => cachedHomeStats ?? { products: 0, farms: 0, provinces: 0 });
+  const [loadingFeatured, setLoadingFeatured] = useState(() => !cachedHomeFeatured);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function loadHomeData() {
       const today = getTodayDateString();
 
-      // ── Live stats: real counts of unexpired active produce ──
-      const [{ count: productCount }, { data: merchants }] = await Promise.all([
+      // ── Execute stats, merchants, and featured products in 1 single parallel roundtrip ──
+      const [{ count: productCount }, { data: allMerchants }, { data: products }] = await Promise.all([
         supabase
           .from('products')
           .select('*', { count: 'exact', head: true })
           .eq('is_active', true)
           .or(`expire_date.is.null,expire_date.gte.${today}`),
-        supabase.from('profile_merchants').select('id, province'),
+        supabase
+          .from('profile_merchants')
+          .select('id, province, full_name, community_name'),
+        supabase
+          .from('products')
+          .select('id, name, price, unit, profile_pic_url, merchant_id, expire_date, categories(name)')
+          .eq('is_active', true)
+          .or(`expire_date.is.null,expire_date.gte.${today}`)
+          .order('created_at', { ascending: false })
+          .limit(10),
       ]);
 
       const provinceSet = new Set(
-        (merchants ?? []).map((m: any) => m.province).filter(Boolean)
+        (allMerchants ?? []).map((m: any) => m.province).filter(Boolean)
       );
 
-      setStats({
+      const nextStats = {
         products: productCount ?? 0,
-        farms: (merchants ?? []).length,
+        farms: (allMerchants ?? []).length,
         provinces: provinceSet.size,
-      });
-
-      // ── Featured products: most recently listed, real photos, non-expired ──
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, name, price, unit, profile_pic_url, merchant_id, expire_date, categories(name)')
-        .eq('is_active', true)
-        .or(`expire_date.is.null,expire_date.gte.${today}`)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      };
+      setStats(nextStats);
+      cachedHomeStats = nextStats;
 
       const validProducts = (products ?? [])
         .filter((p: any) => !isProductExpired(p.expire_date))
         .slice(0, 4);
 
-      const merchantIds = [...new Set(validProducts.map((p: any) => p.merchant_id).filter(Boolean))];
-      const { data: merchantRows } = merchantIds.length
-        ? await supabase.from('profile_merchants').select('id, full_name, community_name').in('id', merchantIds)
-        : { data: [] as any[] };
-
       const merchantMap: Record<string, any> = {};
-      (merchantRows ?? []).forEach((m: any) => { merchantMap[m.id] = m; });
+      (allMerchants ?? []).forEach((m: any) => { merchantMap[m.id] = m; });
 
-      setFeatured(
-        validProducts.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          category: p.categories?.name ?? 'Uncategorized',
-          price: Number(p.price),
-          unit: p.unit ?? '',
-          img: p.profile_pic_url ?? '',
-          shopName: merchantMap[p.merchant_id]?.community_name || merchantMap[p.merchant_id]?.full_name || 'Local Farm',
-        }))
-      );
+      const nextFeatured = validProducts.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        category: p.categories?.name ?? 'Uncategorized',
+        price: Number(p.price),
+        unit: p.unit ?? '',
+        img: p.profile_pic_url ?? '',
+        shopName: merchantMap[p.merchant_id]?.community_name || merchantMap[p.merchant_id]?.full_name || 'Local Farm',
+      }));
+
+      setFeatured(nextFeatured);
+      cachedHomeFeatured = nextFeatured;
+      cachedHomeTime = Date.now();
       setLoadingFeatured(false);
     }
 
-    loadHomeData();
+    if (!cachedHomeFeatured || Date.now() - cachedHomeTime > HOME_CACHE_TTL) {
+      loadHomeData();
+    } else {
+      // Revalidate quietly
+      loadHomeData();
+    }
   }, []);
 
   // ── Scroll-triggered reveal ──

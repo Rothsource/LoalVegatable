@@ -119,104 +119,116 @@ function QtyStepperLg({ value, onChange, max }: { value: number; onChange: (v: n
 }
 
 
+// Fast client-side cache for instant 0ms tab navigation
+let cachedShopProducts: Product[] | null = null;
+let cachedShopProductsTime = 0;
+const CACHE_TTL_MS = 60_000; // 60 seconds fresh cache
+
 export default function ShopPage() {
   const { requireAuth } = useAuth();
 
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allProducts, setAllProducts] = useState<Product[]>(() => cachedShopProducts ?? []);
+  const [loading, setLoading] = useState(() => !cachedShopProducts);
 
   useEffect(() => {
     async function fetchProducts() {
-    setLoading(true);
+      // If we don't have cache, show loading. If we have cache, show data instantly & revalidate quietly.
+      if (!cachedShopProducts) {
+        setLoading(true);
+      }
 
-    const today = getTodayDateString();
+      const today = getTodayDateString();
 
-    const { data, error } = await supabase
-      .from('products')
-      .select(`
-        id, name, slug, description, price, stock_quantity, unit,
-        profile_pic_url, is_active, harvest_date, expire_date, is_organic,
-        merchant_id, category_id,
-        categories ( name )
-      `)
-      .eq('is_active', true)
-      .or(`expire_date.is.null,expire_date.gte.${today}`);
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id, name, slug, description, price, stock_quantity, unit,
+          profile_pic_url, is_active, harvest_date, expire_date, is_organic,
+          merchant_id, category_id,
+          categories ( name )
+        `)
+        .eq('is_active', true)
+        .or(`expire_date.is.null,expire_date.gte.${today}`);
 
-    if (error) { console.error(error); setLoading(false); return; }
+      if (error) { console.error(error); setLoading(false); return; }
 
-    const validData = (data ?? []).filter((p: any) => !isProductExpired(p.expire_date));
+      const validData = (data ?? []).filter((p: any) => !isProductExpired(p.expire_date));
 
-    const merchantIds = [...new Set(validData.map((p: any) => p.merchant_id).filter(Boolean))];
-    const productIds = validData.map((p: any) => p.id);
+      const merchantIds = [...new Set(validData.map((p: any) => p.merchant_id).filter(Boolean))];
+      const productIds = validData.map((p: any) => p.id);
 
-    // Run merchants + reviews + shopStatuses in parallel
-    const [merchantsRes, reviewsRes, shopStatusesRes] = await Promise.all([
-      merchantIds.length > 0
-        ? supabase
-            .from('profile_merchants')
-            .select('id, full_name, community_name, province, profile_url')
-            .in('id', merchantIds)
-        : Promise.resolve({ data: [] as any[] }),
-      productIds.length > 0
-        ? supabase.from('reviews').select('product_id, rating').in('product_id', productIds)
-        : Promise.resolve({ data: [] as any[] }),
-      merchantIds.length > 0
-        ? fetch(`/api/shop-status?merchantIds=${encodeURIComponent(merchantIds.join(','))}`)
-            .then(r => r.ok ? r.json() : { statuses: {} })
-            .catch(() => ({ statuses: {} }))
-        : Promise.resolve({ statuses: {} }),
-    ]);
+      // Fast parallel fetch: merchants (with is_open) + reviews in 1 roundtrip (no slow /api/shop-status)
+      const [merchantsRes, reviewsRes] = await Promise.all([
+        merchantIds.length > 0
+          ? supabase
+              .from('profile_merchants')
+              .select('id, full_name, community_name, province, profile_url, is_open')
+              .in('id', merchantIds)
+          : Promise.resolve({ data: [] as any[] }),
+        productIds.length > 0
+          ? supabase.from('reviews').select('product_id, rating').in('product_id', productIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
 
-    const merchants = merchantsRes.data;
-    const reviews = reviewsRes.data;
-    const shopStatusMap: Record<string, boolean> = shopStatusesRes?.statuses || {};
+      const merchants = merchantsRes.data;
+      const reviews = reviewsRes.data;
 
-    const merchantMap: Record<string, any> = {};
-    (merchants ?? []).forEach(m => { merchantMap[m.id] = m; });
+      const merchantMap: Record<string, any> = {};
+      (merchants ?? []).forEach(m => { merchantMap[m.id] = m; });
 
-    const ratingMap: Record<string, number> = {};
-    if (reviews) {
-      const grouped: Record<string, number[]> = {};
-      reviews.forEach((r: any) => {
-        if (!grouped[r.product_id]) grouped[r.product_id] = [];
-        grouped[r.product_id].push(r.rating);
+      const ratingMap: Record<string, number> = {};
+      if (reviews) {
+        const grouped: Record<string, number[]> = {};
+        reviews.forEach((r: any) => {
+          if (!grouped[r.product_id]) grouped[r.product_id] = [];
+          grouped[r.product_id].push(r.rating);
+        });
+        Object.entries(grouped).forEach(([pid, ratings]) => {
+          ratingMap[pid] = parseFloat((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1));
+        });
+      }
+
+      const mapped: Product[] = validData.map((p: any) => {
+        const merchant = merchantMap[p.merchant_id] ?? {};
+        // Read is_open directly from profile_merchants table (fast & accurate)
+        const isShopOpen = merchant.is_open !== undefined && merchant.is_open !== null ? Boolean(merchant.is_open) : true;
+        return {
+          id: p.id,
+          name: p.name,
+          category: p.categories?.name ?? 'Uncategorized',
+          price: Number(p.price),
+          unit: p.unit ?? '',
+          benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
+          description: p.description ?? '',
+          popularity: p.stock_quantity ?? 0,
+          rating: ratingMap[p.id] ?? 0,
+          isAvailable: p.is_active && p.stock_quantity > 0,
+          isShopOpen,
+          img: p.profile_pic_url || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
+          quantity: p.stock_quantity ?? 0,
+          harvestDate: p.harvest_date ?? '',
+          sellByDate: p.expire_date ?? '',
+          shopSlug: p.merchant_id ?? '',
+          shopName: merchant.community_name ?? merchant.full_name ?? 'Local Farm',
+          shopAvatar: merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant.community_name || merchant.full_name || 'Farm')}&background=0DB30D&color=fff&size=50`,
+          shopLocation: merchant.province ?? '',
+        };
       });
-      Object.entries(grouped).forEach(([pid, ratings]) => {
-        ratingMap[pid] = parseFloat((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1));
-      });
+
+      // Update cache & state
+      cachedShopProducts = mapped;
+      cachedShopProductsTime = Date.now();
+      setAllProducts(mapped);
+      setLoading(false);
     }
 
-    const mapped: Product[] = validData.map((p: any) => {
-      const merchant = merchantMap[p.merchant_id] ?? {};
-      const isShopOpen = p.merchant_id ? (shopStatusMap[p.merchant_id] ?? true) : true;
-      return {
-        id: p.id,
-        name: p.name,
-        category: p.categories?.name ?? 'Uncategorized',
-        price: Number(p.price),
-        unit: p.unit ?? '',
-        benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
-        description: p.description ?? '',
-        popularity: p.stock_quantity ?? 0,
-        rating: ratingMap[p.id] ?? 0,
-        isAvailable: p.is_active && p.stock_quantity > 0,
-        isShopOpen,
-        img: p.profile_pic_url || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
-        quantity: p.stock_quantity ?? 0,
-        harvestDate: p.harvest_date ?? '',
-        sellByDate: p.expire_date ?? '',
-        shopSlug: p.merchant_id ?? '',
-        shopName: merchant.community_name ?? merchant.full_name ?? 'Local Farm',
-        shopAvatar: merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant.community_name || merchant.full_name || 'Farm')}&background=0DB30D&color=fff&size=50`,
-        shopLocation: merchant.province ?? '',
-      };
-    });
-
-    setAllProducts(mapped);
-    setLoading(false);
-  }
-
-    fetchProducts();
+    // If cache is older than TTL or doesn't exist, fetch fresh
+    if (!cachedShopProducts || Date.now() - cachedShopProductsTime > CACHE_TTL_MS) {
+      fetchProducts();
+    } else {
+      // Revalidate quietly in the background without blocking UI
+      fetchProducts();
+    }
   }, []);
 
   

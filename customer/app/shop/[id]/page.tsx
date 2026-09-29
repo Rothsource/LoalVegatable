@@ -165,30 +165,43 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
   const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
 
+// In-memory cache for visited shops (0ms instant display)
+const shopDetailCache = new Map<string, { shop: any; products: Product[]; isOpen: boolean; time: number }>();
+const CACHE_TTL_MS = 60_000;
+
   // Fetch shop + products
   useEffect(() => {
     async function fetchShopData() {
-      const [merchantRes, statusRes] = await Promise.all([
-        supabase.from('profile_merchants').select('*').eq('id', id).single(),
-        fetch(`/api/shop-status?merchantId=${id}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      ]);
-
-      const merchant = merchantRes.data;
-      if (statusRes?.is_open !== undefined) {
-        setIsShopOpen(Boolean(statusRes.is_open));
-      } else if (merchant?.is_open !== undefined) {
-        setIsShopOpen(Boolean(merchant.is_open));
+      const cached = shopDetailCache.get(id);
+      if (!cached) {
+        setLoading(true);
+      } else {
+        setShop(cached.shop);
+        setProducts(cached.products);
+        setIsShopOpen(cached.isOpen);
+        setLoading(false);
       }
 
       const today = getTodayDateString();
 
-      const { data: prods } = await supabase
-        .from('products')
-        .select('*, categories(name)')
-        .eq('merchant_id', id)
-        .eq('is_active', true)
-        .or(`expire_date.is.null,expire_date.gte.${today}`);
+      // Parallelize merchant details and products in 1 single roundtrip
+      const [merchantRes, prodsRes] = await Promise.all([
+        supabase.from('profile_merchants').select('*').eq('id', id).maybeSingle(),
+        supabase
+          .from('products')
+          .select('id, name, price, unit, is_organic, description, stock_quantity, is_active, profile_pic_url, harvest_date, expire_date, categories(name)')
+          .eq('merchant_id', id)
+          .eq('is_active', true)
+          .or(`expire_date.is.null,expire_date.gte.${today}`),
+      ]);
 
+      const merchant = merchantRes.data;
+      if (merchant) {
+        const isOpen = merchant.is_open !== undefined && merchant.is_open !== null ? Boolean(merchant.is_open) : true;
+        setIsShopOpen(isOpen);
+      }
+
+      const prods = prodsRes.data;
       const validProds = (prods ?? []).filter((p: any) => !isProductExpired(p.expire_date));
       const productIds = validProds.map((p: any) => p.id);
       let ratingMap: Record<string, number> = {};
@@ -213,27 +226,31 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
         }
       }
 
+      const mappedProducts = validProds.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        category: p.categories?.name ?? 'Uncategorized',
+        price: Number(p.price),
+        unit: p.unit ?? '',
+        benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
+        description: p.description ?? '',
+        popularity: p.stock_quantity ?? 0,
+        rating: ratingMap[p.id] ?? 0,
+        isAvailable: p.is_active && p.stock_quantity > 0,
+        img: p.profile_pic_url ?? 'https://placehold.co/400x300?text=No+Image',
+        quantity: p.stock_quantity ?? 0,
+        harvestDate: p.harvest_date ?? '',
+        sellByDate: p.expire_date ?? '',
+      }));
+
+      const finalIsOpen = merchant?.is_open !== undefined && merchant?.is_open !== null ? Boolean(merchant.is_open) : true;
+      shopDetailCache.set(id, { shop: merchant, products: mappedProducts, isOpen: finalIsOpen, time: Date.now() });
+
       setShop(merchant);
-      setProducts(
-        validProds.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          category: p.categories?.name ?? 'Uncategorized',
-          price: Number(p.price),
-          unit: p.unit ?? '',
-          benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
-          description: p.description ?? '',
-          popularity: p.stock_quantity ?? 0,
-          rating: ratingMap[p.id] ?? 0,
-          isAvailable: p.is_active && p.stock_quantity > 0,
-          img: p.profile_pic_url ?? 'https://placehold.co/400x300?text=No+Image',
-          quantity: p.stock_quantity ?? 0,
-          harvestDate: p.harvest_date ?? '',
-          sellByDate: p.expire_date ?? '',
-        }))
-      );
+      setProducts(mappedProducts);
       setLoading(false);
     }
+
     fetchShopData();
   }, [id]);
 
