@@ -22,6 +22,22 @@ jobs:
         working-directory: customer
         continue-on-error: true
 
+      - name: Install dependencies (merchant)
+        run: npm ci
+        working-directory: merchant
+      - name: npm audit (merchant)
+        run: npm audit --audit-level=high
+        working-directory: merchant
+        continue-on-error: true
+
+      - name: Install dependencies (delivery)
+        run: npm ci
+        working-directory: delivery
+      - name: npm audit (delivery)
+        run: npm audit --audit-level=high
+        working-directory: delivery
+        continue-on-error: true
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:
