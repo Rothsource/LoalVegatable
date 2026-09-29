@@ -392,15 +392,15 @@ export default function ShopPage() {
   }, [allProducts, search, selectedCategory, sortBy, showOnlyAvailable, minPrice, maxPrice]);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fafafa', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#FBF8F2', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        @keyframes floatPulse { 0%, 100% { box-shadow: 0 8px 32px rgba(13,179,13,0.45); } 50% { box-shadow: 0 8px 40px rgba(13,179,13,0.65); } }
+        @keyframes floatPulse { 0%, 100% { box-shadow: 0 8px 32px rgba(27,67,50,0.35); } 50% { box-shadow: 0 8px 40px rgba(27,67,50,0.5); } }
         @keyframes badgePop { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
-        .float-cart-btn { position: fixed; bottom: 32px; right: 32px; z-index: 900; width: 62px; height: 62px; background: linear-gradient(135deg, #0DB30D, #0A490A); border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(13,179,13,0.45); transition: transform 0.2s ease, box-shadow 0.2s ease; animation: floatPulse 3s ease-in-out infinite; font-family: inherit; }
-        .float-cart-btn:hover { transform: scale(1.08) translateY(-2px); box-shadow: 0 12px 40px rgba(13,179,13,0.6); animation: none; }
+        .float-cart-btn { position: fixed; bottom: 32px; right: 32px; z-index: 900; width: 62px; height: 62px; background: linear-gradient(135deg, #2d6a4f, #1b4332); border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(27,67,50,0.35); transition: transform 0.2s ease, box-shadow 0.2s ease; animation: floatPulse 3s ease-in-out infinite; font-family: inherit; }
+        .float-cart-btn:hover { transform: scale(1.08) translateY(-2px); box-shadow: 0 12px 40px rgba(27,67,50,0.5); animation: none; }
         .float-cart-btn:active { transform: scale(0.96); }
         .float-cart-badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; min-width: 22px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #fff; animation: badgePop 0.3s cubic-bezier(0.16,1,0.3,1); font-family: inherit; }
         .cart-panel-scroll::-webkit-scrollbar { width: 4px; }

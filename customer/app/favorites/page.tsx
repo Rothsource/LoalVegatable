@@ -165,7 +165,7 @@ export default function FavoritesPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#FBF8F2', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <style>{`
         .qty-stepper { display: inline-flex; align-items: center; border: 1.5px solid #dfe6d9; border-radius: 12px; overflow: hidden; height: 38px; background: #fff; }
         .qty-btn { width: 34px; height: 38px; display: flex; align-items: center; justify-content: center; background: #fafbf9; border: none; cursor: pointer; transition: background 0.15s; }

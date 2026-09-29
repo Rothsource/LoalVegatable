@@ -37,7 +37,7 @@ type HarvestFilter = typeof harvestOptions[number];
 
 const fontStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-  body { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; background-color: #fafafa; color: #1a1a1a; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; background-color: #FBF8F2; color: #1a1a1a; }
   .filter-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); z-index: 1000; display: flex; justify-content: flex-end; }
   .filter-panel { background: #fff; width: 420px; max-width: 95vw; height: 100%; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,0.15); animation: slideIn 0.28s cubic-bezier(0.16,1,0.3,1); }
   @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -402,7 +402,7 @@ const CACHE_TTL_MS = 60_000;
   const shopVerified = shop.is_verified ?? false;
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#FBF8F2' }}>
       <style>{fontStyles}</style>
 
       {/* ── Product Detail Modal — UNCHANGED ── */}

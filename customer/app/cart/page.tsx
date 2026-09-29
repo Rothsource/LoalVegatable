@@ -30,8 +30,10 @@ interface CartProduct {
   description?: string;
 }
 
-const brandGreen = '#0DB30D';
-const deepGreen = '#0A490A';
+const brandGreen = '#1b4332';
+const deepGreen = '#1b4332';
+const warmBrown = '#765238';
+const soil = '#3B2B20';
 
 // Cambodia provinces
 const CAMBODIA_PROVINCES = [
@@ -896,7 +898,7 @@ export default function CartPage() {
       const currentTotal = total;
       const currentQty = totalQty;
 
-      // Submit order creation with paymentStatus: 'paid' (Simulated ABA PayWay)
+      // Submit order creation with paymentStatus: 'paid'
       const res = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -931,7 +933,7 @@ export default function CartPage() {
       setPlacing(false);
       setFlow('waiting-accept');
     } catch (err: any) {
-      setPlaceError(err.message || 'Payment simulation error.');
+      setPlaceError(err.message || 'Payment processing error.');
       setPlacing(false);
     }
   };
@@ -957,7 +959,7 @@ export default function CartPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fafafa', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#FBF8F2', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
@@ -972,47 +974,8 @@ export default function CartPage() {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.08); opacity: 0.85; }
         }
-        @keyframes softPulse {
-          0%, 100% { opacity: 1; transform: translateY(0); }
-          50% { opacity: 0.85; transform: translateY(-4px); }
-        }
-        .radar-box {
-          position: relative;
-          width: 120px;
-          height: 120px;
-          margin: 0 auto 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .radar-ring {
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          border: 1.5px solid rgba(45, 106, 79, 0.32);
-          animation: radarRipple 2.6s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
-          pointer-events: none;
-        }
-        .radar-ring:nth-child(2) {
-          animation-delay: 0.8s;
-        }
-        .radar-ring:nth-child(3) {
-          animation-delay: 1.6s;
-        }
-        .radar-core {
-          width: 72px;
-          height: 72px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 8px 24px rgba(27, 67, 50, 0.22);
-          z-index: 2;
-          animation: softPulse 2s ease-in-out infinite;
-        }
-        .checkout-btn { width: 100%; padding: 18px; background: #0A490A; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
-        .checkout-btn:hover { background: #0DB30D; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,179,13,0.3); }
+        .checkout-btn { width: 100%; padding: 18px; background: #1b4332; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+        .checkout-btn:hover { background: #2d6a4f; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(27,67,50,0.25); }
         .checkout-btn:active { transform: scale(0.98); }
         .checkout-btn:disabled { background: #d1d5db; cursor: not-allowed; transform: none; box-shadow: none; }
         .remove-btn { background: #fff5f5; border: none; border-radius: 10px; padding: 10px; cursor: pointer; color: #ef4444; display: flex; align-items: center; justify-content: center; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); flex-shrink: 0; }
@@ -1024,11 +987,11 @@ export default function CartPage() {
         .qty-btn:active:not(:disabled) { transform: scale(0.92); }
         .qty-val { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #111; border-left: 1.5px solid #e5e7eb; border-right: 1.5px solid #e5e7eb; }
         .cart-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); display: flex; gap: 16px; align-items: flex-start; cursor: pointer; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-        .cart-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(10,73,10,0.08); }
-        .form-input:focus { border-color: #0A490A !important; background: #fff !important; }
-        .province-select:focus { border-color: #0A490A !important; outline: none; }
-        .pay-confirm-btn { width: 100%; padding: 18px; background: #0066b2; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
-        .pay-confirm-btn:hover { background: #0052a3; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,102,178,0.35); }
+        .cart-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(27,67,50,0.08); }
+        .form-input:focus { border-color: #1b4332 !important; background: #fff !important; }
+        .province-select:focus { border-color: #1b4332 !important; outline: none; }
+        .pay-confirm-btn { width: 100%; padding: 18px; background: #1b4332; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+        .pay-confirm-btn:hover { background: #2d6a4f; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(27,67,50,0.28); }
         .pay-confirm-btn:active { transform: scale(0.98); }
         .leaflet-container { font-family: 'Plus Jakarta Sans', sans-serif !important; }
         .leaflet-popup-content-wrapper { border-radius: 12px !important; font-size: 13px; font-weight: 600; }
@@ -1195,41 +1158,41 @@ export default function CartPage() {
 
                 {/* Refund confirmation box */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                  border: '1.5px solid #86efac',
+                  background: '#f7f4ed',
+                  border: '1.5px solid #dfd5c6',
                   borderRadius: '20px',
                   padding: '24px 20px',
                   marginBottom: '28px',
                   textAlign: 'left',
-                  boxShadow: '0 4px 16px rgba(22, 163, 74, 0.08)',
+                  boxShadow: '0 4px 16px rgba(59, 43, 32, 0.04)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#16a34a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#1b4332', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <ShieldCheck size={22} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#765238', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                         Money Sent Back
                       </div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#14532d' }}>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#1b4332' }}>
                         100% Payment Refunded
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px solid #bbf7d0', borderBottom: '1px solid #bbf7d0', padding: '12px 0', margin: '10px 0' }}>
-                    <span style={{ fontSize: '13px', color: '#166534', fontWeight: '600' }}>Refunded Amount</span>
-                    <span style={{ fontSize: '22px', fontWeight: '900', color: '#14532d' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px solid #dfd5c6', borderBottom: '1px solid #dfd5c6', padding: '12px 0', margin: '10px 0' }}>
+                    <span style={{ fontSize: '13px', color: '#765238', fontWeight: '600' }}>Refunded Amount</span>
+                    <span style={{ fontSize: '22px', fontWeight: '900', color: '#1b4332' }}>
                       {(paidAmount || total).toLocaleString()} KHR
                     </span>
                   </div>
 
-                  <p style={{ margin: 0, fontSize: '12px', color: '#15803d', lineHeight: '1.5', fontWeight: '600' }}>
-                    ✓ Instant Reversal: Since you paid upfront using demo payment, your payment was cancelled and the total of <strong>{(paidAmount || total).toLocaleString()} KHR</strong> has been credited back to you in full.
+                  <p style={{ margin: 0, fontSize: '12px', color: '#3B2B20', lineHeight: '1.5', fontWeight: '600' }}>
+                    Instant Reversal: Since you paid upfront, your payment was cancelled and the total of <strong>{(paidAmount || total).toLocaleString()} KHR</strong> has been refunded back to you in full.
                   </p>
                   
                   {refundTimestamp && (
-                    <div style={{ fontSize: '11px', color: '#166534', marginTop: '8px', opacity: 0.85 }}>
+                    <div style={{ fontSize: '11px', color: '#765238', marginTop: '8px', opacity: 0.85 }}>
                       Refund confirmed at {refundTimestamp} · Order Ref #{waitingOrderIds[0]?.slice(0, 8).toUpperCase() || 'REF-VOID'}
                     </div>
                   )}
@@ -1245,8 +1208,8 @@ export default function CartPage() {
                     }}
                     style={{
                       flex: 1, padding: '14px', borderRadius: '14px',
-                      border: '1.5px solid #cbd5e1', background: '#fff',
-                      color: '#475569', fontWeight: '700', fontSize: '14px',
+                      border: '1.5px solid #dfd5c6', background: '#fff',
+                      color: '#765238', fontWeight: '700', fontSize: '14px',
                       cursor: 'pointer', fontFamily: 'inherit',
                     }}
                   >
@@ -1256,7 +1219,7 @@ export default function CartPage() {
                     href="/shop"
                     style={{
                       flex: 1.5, padding: '14px', borderRadius: '14px',
-                      background: deepGreen, color: '#fff',
+                      background: '#1b4332', color: '#fff',
                       fontWeight: '800', fontSize: '14px',
                       textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                     }}
@@ -1268,72 +1231,76 @@ export default function CartPage() {
             )}
 
             {flow === 'waiting-accept' && !merchantDeclined && (
-              <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '40px 32px', boxShadow: '0 16px 48px rgba(15, 23, 42, 0.08)', border: '1.5px solid #e2e8f0', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
+              <div style={{ maxWidth: '640px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '28px', padding: '40px 32px', boxShadow: '0 16px 48px rgba(59, 43, 32, 0.06)', border: '1.5px solid #e7e0d5', animation: 'fadeUp 0.4s ease', textAlign: 'center' }}>
                 <StepIndicator step={3} />
 
-                {/* Refined Radar Search Beacon */}
-                <div className="radar-box" style={{ margin: '10px auto 24px' }}>
-                  <div className="radar-ring" />
-                  <div className="radar-ring" />
-                  <div className="radar-ring" />
-                  <div className="radar-core">
-                    <Leaf size={28} color="#fff" />
-                  </div>
+                {/* Minimalist Brand Loading Emblem */}
+                <div style={{
+                  margin: '12px auto 20px',
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: '#f7f4ed',
+                  border: '2px solid #dfd5c6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Loader2 size={26} color="#765238" style={{ animation: 'spin 1.4s linear infinite' }} />
                 </div>
 
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ecfdf5', border: '1.5px solid #a7f3d0', padding: '6px 16px', borderRadius: '100px', marginBottom: '16px' }}>
-                  <CheckCircle2 size={14} color="#059669" />
-                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#065f46', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
-                    Payment Verified: {(paidAmount || total).toLocaleString()} KHR
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#f7f4ed', border: '1.5px solid #dfd5c6', padding: '6px 18px', borderRadius: '100px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#1b4332', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                    Payment Confirmed · {(paidAmount || total).toLocaleString()} KHR
                   </span>
                 </div>
 
-                <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px', letterSpacing: '-0.3px' }}>
-                  Waiting for Merchant Acceptance…
+                <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#3B2B20', fontFamily: "'Fraunces', Georgia, serif", margin: '0 0 10px', letterSpacing: '-0.3px' }}>
+                  Awaiting Merchant Confirmation
                 </h2>
-                <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', margin: '0 auto 24px', maxWidth: '480px' }}>
-                  Your order has been paid and broadcasted directly to the farmer. Once the merchant accepts your order, packaging begins immediately. If declined, your payment is 100% refunded.
+                <p style={{ color: '#6b635b', fontSize: '14px', lineHeight: '1.6', margin: '0 auto 24px', maxWidth: '480px' }}>
+                  Your order has been paid and broadcasted directly to the farmer. As soon as the merchant accepts your order, packaging begins immediately. If declined, your payment is 100% refunded.
                 </p>
 
                 {/* 3-Step Live Dispatch Progress */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 14px', marginBottom: '22px', textAlign: 'left' }}>
-                  <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✓ Step 1</div>
-                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Paid First</div>
-                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{(paidAmount || total).toLocaleString()} KHR</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', background: '#faf7f2', border: '1.5px solid #e7e0d5', borderRadius: '16px', padding: '16px 16px', marginBottom: '22px', textAlign: 'left' }}>
+                  <div style={{ borderRight: '1px solid #e7e0d5', paddingRight: '8px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#1b4332', textTransform: 'uppercase', letterSpacing: '0.4px' }}>1. Paid</div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#3B2B20', marginTop: '3px' }}>{(paidAmount || total).toLocaleString()} KHR</div>
+                    <div style={{ fontSize: '11px', color: '#1b4332', marginTop: '2px', fontWeight: '600' }}>Confirmed</div>
                   </div>
-                  <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>● Step 2</div>
-                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Merchant Review</div>
-                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Accept or Refund</div>
+                  <div style={{ borderRight: '1px solid #e7e0d5', paddingRight: '8px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#765238', textTransform: 'uppercase', letterSpacing: '0.4px' }}>2. Merchant</div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#3B2B20', marginTop: '3px' }}>Under Review</div>
+                    <div style={{ fontSize: '11px', color: '#765238', marginTop: '2px', fontWeight: '600' }}>Awaiting accept</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>○ Step 3</div>
-                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>Delivery Dispatch</div>
-                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Live GPS Map</div>
+                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#a89f91', textTransform: 'uppercase', letterSpacing: '0.4px' }}>3. Delivery</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#8c8275', marginTop: '3px' }}>Dispatch</div>
+                    <div style={{ fontSize: '11px', color: '#a89f91', marginTop: '2px', fontWeight: '600' }}>Pending</div>
                   </div>
                 </div>
 
                 {/* Destination summary card */}
-                <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '18px', padding: '16px 20px', marginBottom: '20px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <MapPin size={20} />
+                <div style={{ background: '#ffffff', border: '1.5px solid #e7e0d5', borderRadius: '16px', padding: '16px 20px', marginBottom: '20px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f7f4ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e7e0d5', color: '#765238' }}>
+                    <MapPin size={18} />
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#765238', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Delivery Location
                     </div>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#3B2B20', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
                       {address ? `${address}, ${province}` : province}
                     </div>
-                    {phone && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', fontWeight: '600' }}>Contact phone: <strong style={{ color: '#0f172a' }}>{phone}</strong></div>}
+                    {phone && <div style={{ fontSize: '11px', color: '#6b635b', marginTop: '2px', fontWeight: '600' }}>Contact phone: <strong style={{ color: '#3B2B20' }}>{phone}</strong></div>}
                   </div>
                 </div>
 
-                {/* Live pulsating banner */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fffbeb', border: '1.5px solid #fef3c7', padding: '12px 18px', borderRadius: '14px', marginBottom: '24px' }}>
-                  <Loader2 size={16} color="#d97706" style={{ animation: 'spin 1.2s linear infinite' }} />
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
+                {/* Live awaiting confirmation banner */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#f7f4ed', border: '1.5px solid #dfd5c6', padding: '12px 18px', borderRadius: '14px', marginBottom: '24px' }}>
+                  <Loader2 size={15} color="#765238" style={{ animation: 'spin 1.4s linear infinite' }} />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#765238' }}>
                     Notification pushed to merchant — awaiting acceptance…
                   </span>
                 </div>
@@ -1350,9 +1317,9 @@ export default function CartPage() {
                   style={{
                     padding: '11px 24px',
                     borderRadius: '12px',
-                    border: '1.5px solid #e2e8f0',
+                    border: '1.5px solid #dfd5c6',
                     background: '#fff',
-                    color: '#64748b',
+                    color: '#765238',
                     fontWeight: '700',
                     fontSize: '13px',
                     cursor: 'pointer',
@@ -1367,8 +1334,8 @@ export default function CartPage() {
                   }}
                   onMouseLeave={e => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = '#e2e8f0';
-                    el.style.color = '#64748b';
+                    el.style.borderColor = '#dfd5c6';
+                    el.style.color = '#765238';
                     el.style.background = '#fff';
                   }}
                 >
@@ -1408,7 +1375,7 @@ export default function CartPage() {
                         </>
                       ) : activeOrderStatus === 'out_for_delivery' ? (
                         <>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0DB30D', animation: 'pulse 1.5s infinite' }} />
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1b4332', animation: 'pulse 1.5s infinite' }} />
                           <Truck size={15} color={deepGreen} />
                           Driver On The Way
                         </>
@@ -2079,17 +2046,10 @@ export default function CartPage() {
                 </span>
               </div>
 
-              <h2 style={{ fontSize: '24px', fontWeight: '900', color: deepGreen, margin: '0 0 6px' }}>Pay First with ABA Bank</h2>
-              <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 16px' }}>
-                Scan the QR code with your ABA Mobile app or click Pay below to simulate payment and broadcast your paid order.
+              <h2 style={{ fontSize: '24px', fontWeight: '900', color: deepGreen, margin: '0 0 6px', fontFamily: "'Fraunces', serif" }}>Pay with Bakong KHQR</h2>
+              <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 20px' }}>
+                Scan the official KHQR code with your ABA Mobile, Bakong, or any Cambodian banking app to complete your order.
               </p>
-
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '8px', padding: '6px 12px', marginBottom: '22px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb' }} />
-                <span style={{ fontSize: '12px', fontWeight: '700', color: '#1d4ed8' }}>
-                  Simulated Payment (Demo Mode — Real ABA PayWay coming soon)
-                </span>
-              </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', backgroundColor: '#f0fdf0', border: '1.5px solid #d1fae5', borderRadius: '14px', padding: '14px 18px', marginBottom: '28px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -2134,7 +2094,7 @@ export default function CartPage() {
               <div style={{ backgroundColor: '#f9fafb', borderRadius: '14px', padding: '18px', marginBottom: '28px' }}>
                 <p style={{ fontSize: '12px', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 12px' }}>How Pay-First Works</p>
                 {[
-                  'Scan Bakong KHQR or tap simulated payment below',
+                  'Scan Bakong KHQR or tap Confirm Payment below',
                   'Payment is securely recorded in the platform',
                   'Live notification is sent directly to the farm merchant',
                   'If merchant accepts, delivery begins. If declined, 100% money back!',

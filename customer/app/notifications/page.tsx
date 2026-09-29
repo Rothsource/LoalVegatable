@@ -39,8 +39,8 @@ interface CustomerOrderNotification {
   items: OrderItem[];
 }
 
-const brandGreen = '#0DB30D';
-const deepGreen = '#0A490A';
+const brandGreen = '#1b4332';
+const deepGreen = '#1b4332';
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -261,7 +261,7 @@ export default function NotificationsPage() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fbf8f2', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#FBF8F2', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
