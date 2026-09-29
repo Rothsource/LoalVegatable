@@ -183,34 +183,45 @@ export async function POST(req: NextRequest) {
 
       const totalKHR = Math.round(orderTotal).toLocaleString();
 
-      // Notify Distributors via Web Push
+      // Notify Distributors via Web Push (only distributors belonging to this community farm)
       try {
-        const { data: distSubs } = await supabaseAdmin
-          .from('push_subscriptions')
-          .select('*')
-          .eq('role', 'distributor');
+        const { data: communityDists } = await supabaseAdmin
+          .from('profile_distributors')
+          .select('id')
+          .eq('merchant_id', merchantId)
+          .eq('status', 'active');
 
-        if (distSubs && distSubs.length > 0) {
-          const distPayload = JSON.stringify({
-            title: 'New harvest order to fulfil!',
-            body: `Order #${order.id.slice(0, 8)} · ${itemSummaries} · ${totalKHR} KHR`,
-            url: '/distributors/orders',
-          });
+        const communityDistUserIds = (communityDists || []).map((d: any) => d.id);
 
-          await Promise.all(
-            distSubs.map(async (sub) => {
-              try {
-                await webpush.sendNotification(
-                  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-                  distPayload
-                );
-              } catch (err: any) {
-                if (err.statusCode === 410 || err.statusCode === 404) {
-                  await supabaseAdmin.from('push_subscriptions').delete().eq('id', sub.id);
+        if (communityDistUserIds.length > 0) {
+          const { data: distSubs } = await supabaseAdmin
+            .from('push_subscriptions')
+            .select('*')
+            .eq('role', 'distributor')
+            .in('user_id', communityDistUserIds);
+
+          if (distSubs && distSubs.length > 0) {
+            const distPayload = JSON.stringify({
+              title: 'New harvest order to fulfil!',
+              body: `Order #${order.id.slice(0, 8)} · ${itemSummaries} · ${totalKHR} KHR`,
+              url: '/distributors/orders',
+            });
+
+            await Promise.all(
+              distSubs.map(async (sub) => {
+                try {
+                  await webpush.sendNotification(
+                    { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                    distPayload
+                  );
+                } catch (err: any) {
+                  if (err.statusCode === 410 || err.statusCode === 404) {
+                    await supabaseAdmin.from('push_subscriptions').delete().eq('id', sub.id);
+                  }
                 }
-              }
-            })
-          );
+              })
+            );
+          }
         }
       } catch (err) {
         console.error('Distributor push notification error:', err);

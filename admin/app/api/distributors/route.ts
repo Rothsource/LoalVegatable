@@ -47,6 +47,7 @@ export async function PATCH(req: Request) {
     }
 
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      email_confirm: true,
       user_metadata: { status: "active" },
     });
     if (authError) return NextResponse.json({ error: authError.message }, { status: 500 });

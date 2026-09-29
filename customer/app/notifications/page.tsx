@@ -50,9 +50,35 @@ export default function NotificationsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [liveUpdateText, setLiveUpdateText] = useState<string | null>(null);
   const [expandedOrderIds, setExpandedOrderIds] = useState<Record<string, boolean>>({});
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const markAsRead = (id: string) => {
+    if (!userId) return;
+    setReadIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      try {
+        localStorage.setItem(`customer_read_notifications_${userId}`, JSON.stringify(next));
+        window.dispatchEvent(new Event("customer-notification-read"));
+      } catch {}
+      return next;
+    });
+  };
+
+  const markAllAsRead = () => {
+    if (!userId) return;
+    const allIds = notifications.map((n) => n.id);
+    setReadIds(allIds);
+    try {
+      localStorage.setItem(`customer_read_notifications_${userId}`, JSON.stringify(allIds));
+      window.dispatchEvent(new Event("customer-notification-read"));
+    } catch {}
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedOrderIds((prev) => ({ ...prev, [id]: !prev[id] }));
+    markAsRead(id);
   };
 
   const fetchOrderNotifications = async () => {
@@ -68,6 +94,12 @@ export default function NotificationsPage() {
         return;
       }
       setIsLoggedIn(true);
+      setUserId(user.id);
+
+      try {
+        const stored = JSON.parse(localStorage.getItem(`customer_read_notifications_${user.id}`) || "[]");
+        setReadIds(stored);
+      } catch {}
 
       // 1. Fetch all orders for this customer
       const { data: orders, error: ordersError } = await supabase
@@ -193,6 +225,10 @@ export default function NotificationsPage() {
       return true;
     });
   }, [notifications, statusFilter]);
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter(n => !readIds.includes(n.id)).length;
+  }, [notifications, readIds]);
 
   const getOrderStatusConfig = (status: string, paymentStatus: string) => {
     switch (status) {
@@ -338,20 +374,40 @@ export default function NotificationsPage() {
             </p>
           </div>
 
-          <button
-            onClick={fetchOrderNotifications}
-            disabled={loading}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 18px', borderRadius: '12px',
-              background: '#fff', border: '1.5px solid #dfe6d9',
-              color: '#182216', fontSize: '13px', fontWeight: '700',
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            Refresh Status
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllAsRead}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '10px 18px', borderRadius: '12px',
+                  background: '#eff6ef', border: '1.5px solid #cce8cc',
+                  color: deepGreen, fontSize: '13px', fontWeight: '700',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <CheckCircle2 size={15} color={deepGreen} />
+                Mark all as read ({unreadCount})
+              </button>
+            )}
+
+            <button
+              onClick={fetchOrderNotifications}
+              disabled={loading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 18px', borderRadius: '12px',
+                background: '#fff', border: '1.5px solid #dfe6d9',
+                color: '#182216', fontSize: '13px', fontWeight: '700',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+              Refresh Status
+            </button>
+          </div>
         </div>
 
         {(loading || isLoggedIn === null) && (
@@ -460,16 +516,39 @@ export default function NotificationsPage() {
                 {filtered.map(order => {
                   const statusConfig = getOrderStatusConfig(order.status, order.payment_status);
                   const isPaid = order.payment_status === 'paid';
+                  const isUnread = !readIds.includes(order.id);
                   const dateStr = new Date(order.created_at).toLocaleString('en-US', {
                     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                   });
 
                   return (
-                    <article key={order.id} className="notification-card" style={{ padding: '24px' }}>
+                    <article
+                      key={order.id}
+                      onClick={() => markAsRead(order.id)}
+                      className="notification-card"
+                      style={{
+                        padding: '24px',
+                        border: isUnread ? '1.5px solid #a3d99e' : '1.5px solid #edf0ea',
+                        background: isUnread ? '#fcfdfa' : '#fff',
+                        cursor: isUnread ? 'pointer' : 'default',
+                      }}
+                    >
                       {/* Top Header Row */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '14px', borderBottom: '1.5px solid #f3f5f0', paddingBottom: '18px', marginBottom: '18px', flexWrap: 'wrap' }}>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {isUnread && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                padding: '2px 8px', borderRadius: '100px',
+                                fontSize: '10px', fontWeight: '800',
+                                background: '#ecfdf5', color: '#047857',
+                                border: '1px solid #a7f3d0',
+                              }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                                NEW
+                              </span>
+                            )}
                             <span style={{ fontSize: '15px', fontWeight: '800', color: '#182216' }}>
                               Order #{order.id.slice(0, 8)}
                             </span>

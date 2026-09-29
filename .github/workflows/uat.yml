@@ -1,0 +1,58 @@
+name: UAT Security Scan
+
+on:
+  push:
+    branches: [UAT]
+  pull_request:
+    branches: [UAT]
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies (customer)
+        run: npm ci
+        working-directory: customer
+      - name: npm audit (customer)
+        run: npm audit --audit-level=high
+        working-directory: customer
+        continue-on-error: true
+
+      - name: Install dependencies (merchant)
+        run: npm ci
+        working-directory: merchant
+      - name: npm audit (merchant)
+        run: npm audit --audit-level=high
+        working-directory: merchant
+        continue-on-error: true
+
+      - name: Install dependencies (delivery)
+        run: npm ci
+        working-directory: delivery
+      - name: npm audit (delivery)
+        run: npm audit --audit-level=high
+        working-directory: delivery
+        continue-on-error: true
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  code-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: semgrep/semgrep-action@v1
+        with:
+          config: p/security-audit
+        continue-on-error: true

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "../components/Sidebar";
+import AdminNotificationBell from "../components/AdminNotificationBell";
 
 export default function DashboardLayout({
   children,
@@ -56,6 +57,9 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Realtime Admin Alerts */}
+            <AdminNotificationBell />
+
             {admin ? (
               <div className="flex items-center gap-2.5 bg-white border border-[#dfe6d9] rounded-xl px-3.5 py-1.5 shadow-2xs">
                 <div className="w-7 h-7 rounded-lg bg-[var(--leaf)] text-white font-black text-xs flex items-center justify-center">

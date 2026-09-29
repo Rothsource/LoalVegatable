@@ -41,7 +41,7 @@ export default function DistributorLoginPage() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
-  // 1. Submit email to check approval & send 8-digit code
+  // 1. Submit email to check approval & send verification code
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -62,7 +62,7 @@ export default function DistributorLoginPage() {
         return;
       }
 
-      // Step B: Send 8-digit OTP code to the email via Supabase
+      // Step B: Send OTP code to the email via Supabase
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
       });
@@ -99,11 +99,11 @@ export default function DistributorLoginPage() {
     if (otpError) {
       setError(otpError.message);
     } else {
-      setSuccessMsg(`A new 8-digit code has been sent to ${cleanEmail}.`);
+      setSuccessMsg(`A new verification code has been sent to ${cleanEmail}.`);
     }
   }
 
-  // 2. Verify 8-digit OTP code
+  // 2. Verify OTP code
   async function handleVerifySubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -192,6 +192,7 @@ export default function DistributorLoginPage() {
       setSuccessMsg("Password set successfully! Redirecting to distributor dashboard…");
 
       // Redirect into distributor workspace
+      // nosemgrep: javascript.lang.security.detect-eval-with-expression.detect-eval-with-expression -- safe: function argument, not a string, no dynamic eval
       setTimeout(() => {
         window.location.href = "/distributors/products";
       }, 700);
@@ -238,7 +239,7 @@ export default function DistributorLoginPage() {
         stage === "email"
           ? "Distributor Verification"
           : stage === "verify"
-          ? "Enter 8-Digit Code"
+          ? "Enter Verification Code"
           : stage === "setPassword"
           ? "Create Your Password"
           : "Distributor Sign In"
@@ -336,7 +337,7 @@ export default function DistributorLoginPage() {
                 </>
               ) : (
                 <>
-                  <span>Send 8-Digit Code</span>
+                  <span>Send Verification Code</span>
                   <ArrowRight size={16} />
                 </>
               )}
@@ -360,7 +361,7 @@ export default function DistributorLoginPage() {
         </div>
       )}
 
-      {/* STAGE 2: ENTER 8-DIGIT VERIFICATION CODE */}
+      {/* STAGE 2: ENTER VERIFICATION CODE */}
       {stage === "verify" && (
         <div className="space-y-5">
           <div className="flex items-center justify-between rounded-xl border border-[#dfe6d9] bg-[#f8faf7] px-4 py-3 text-xs font-medium text-[#435449]">
@@ -385,7 +386,7 @@ export default function DistributorLoginPage() {
           <form onSubmit={handleVerifySubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#435449]">
-                8-Digit Verification Code
+                Verification Code (8 Digits)
               </label>
               <div className="relative mt-1.5">
                 <KeyRound size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#68746a]" />

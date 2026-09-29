@@ -25,6 +25,8 @@ type PendingOrder = {
   id: string;
   total_amount: number;
   created_at: string;
+  community_name?: string;
+  merchant_id?: string;
   address: { street: string | null; province: string | null; phone: string | null } | null;
   items: OrderItem[];
 };
@@ -34,6 +36,8 @@ type ActiveOrder = {
   status: string;
   total_amount: number;
   created_at: string;
+  community_name?: string;
+  merchant_id?: string;
   address: { street: string | null; province: string | null; phone: string | null } | null;
   items: OrderItem[];
 };
@@ -98,6 +102,7 @@ export default function DistributorOrdersPage() {
   const [advancingId, setAdvancingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [distributorId, setDistributorId] = useState<string | null>(null);
+  const [communityName, setCommunityName] = useState<string>("");
   const [previewOrder, setPreviewOrder] = useState<OrderPreviewModalData | null>(null);
 
   const load = useCallback(async () => {
@@ -120,6 +125,9 @@ export default function DistributorOrdersPage() {
         throw new Error(errData.error || "Failed to load orders");
       }
       const data = await res.json();
+      if (data.community_name) {
+        setCommunityName(data.community_name);
+      }
       const denied = getDenied();
       const pendingFiltered = ((data.pending as PendingOrder[]) || []).filter((o) => !denied.includes(o.id));
       setOrders(pendingFiltered);
@@ -152,33 +160,30 @@ export default function DistributorOrdersPage() {
     setAcceptingId(orderId);
     setError("");
 
-    const { data, error: updateError } = await supabase
-      .from("orders")
-      .update({
-        status: "accepted",
-        distributor_id: distributorId,
-        accepted_at: new Date().toISOString(),
-      })
-      .eq("id", orderId)
-      .eq("status", "pending")
-      .is("distributor_id", null)
-      .select("id");
+    try {
+      const res = await fetch("/api/distributor/orders/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, distributorId }),
+      });
 
-    setAcceptingId(null);
+      const resData = await res.json().catch(() => ({}));
 
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-    if (!data || data.length === 0) {
-      setError("Another distributor just claimed this order.");
+      if (!res.ok) {
+        setError(resData.error || "Could not claim this order.");
+        setAcceptingId(null);
+        load();
+        return;
+      }
+
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setActiveTab("active");
       load();
-      return;
+    } catch (err: any) {
+      setError(err.message || "Failed to claim this order.");
+    } finally {
+      setAcceptingId(null);
     }
-
-    setOrders((prev) => prev.filter((o) => o.id !== orderId));
-    setActiveTab("active");
-    load();
   };
 
   const deny = async (orderId: string) => {
@@ -227,7 +232,8 @@ export default function DistributorOrdersPage() {
             Order Management
           </h1>
           <p className="mt-1 text-sm font-medium text-[#52604f]">
-            Accept new vegetable customer orders and update packing progress.
+            Accept new vegetable customer orders for partner community:{" "}
+            <strong className="text-[#1b4332] font-black">{communityName || "Local Community"}</strong>
           </p>
         </div>
 
@@ -319,13 +325,18 @@ export default function DistributorOrdersPage() {
                   {/* Card Header: Order #, Amount, Status Badge */}
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0f4ee] pb-4">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-base sm:text-lg font-black text-[#182216]">
                           Order #{order.id.slice(0, 8).toUpperCase()}
                         </span>
                         <span className="rounded-full bg-[#fef3c7] border border-[#fde68a] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#92400e]">
                           ⚡ New Request
                         </span>
+                        {order.community_name && (
+                          <span className="rounded-full bg-[#eaf4e7] border border-[#d2e6ce] px-2.5 py-0.5 text-[11px] font-black text-[#1b4332]">
+                            🌱 {order.community_name}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#647060] mt-0.5">
                         Received {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -499,7 +510,7 @@ export default function DistributorOrdersPage() {
                   {/* Header */}
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0f4ee] pb-4">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-base sm:text-lg font-black text-[#182216]">
                           Order #{order.id.slice(0, 8).toUpperCase()}
                         </span>
@@ -508,6 +519,11 @@ export default function DistributorOrdersPage() {
                         >
                           {meta.label}
                         </span>
+                        {order.community_name && (
+                          <span className="rounded-full bg-[#eaf4e7] border border-[#d2e6ce] px-2.5 py-0.5 text-[11px] font-black text-[#1b4332]">
+                            🌱 {order.community_name}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#647060] mt-0.5">
                         Destination: {order.address?.province ?? "Local"}, {order.address?.street ?? "Street"}

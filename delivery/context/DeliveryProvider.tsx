@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deliveryService } from "@/lib/delivery-service";
+import { createClient } from "@/lib/supabase";
 import type { DemoDeliveryState, ServiceResult } from "@/lib/types";
 
 type DeliveryContextValue = DemoDeliveryState & {
@@ -16,6 +17,7 @@ type DeliveryContextValue = DemoDeliveryState & {
   acceptDelivery: (id: string) => Promise<ServiceResult>;
   markArrived: (id: string) => Promise<ServiceResult>;
   markNotificationsRead: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
   setAvailability: (available: boolean) => Promise<void>;
   resetDemo: (mode: "incoming" | "empty") => Promise<void>;
 };
@@ -48,10 +50,20 @@ export function DeliveryProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     });
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("delivery-realtime-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        refresh();
+      })
+      .subscribe();
+
     return () => {
       active = false;
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [refresh]);
 
   const runAndRefresh = useCallback(
     async (operation: () => Promise<ServiceResult>) => {
@@ -80,6 +92,10 @@ export function DeliveryProvider({ children }: { children: React.ReactNode }) {
       markArrived: (id) => runAndRefresh(() => deliveryService.markArrived(id)),
       markNotificationsRead: async () => {
         await deliveryService.markNotificationsRead();
+        await refresh();
+      },
+      markNotificationRead: async (id: string) => {
+        await deliveryService.markNotificationRead(id);
         await refresh();
       },
       setAvailability: async (available) => {

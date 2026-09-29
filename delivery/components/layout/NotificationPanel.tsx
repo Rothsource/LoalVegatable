@@ -9,9 +9,10 @@ type NotificationPanelProps = {
   notifications: DeliveryNotification[];
   onClose: () => void;
   onMarkRead: () => void;
+  onMarkOneRead: (id: string) => void;
 };
 
-export function NotificationPanel({ notifications, onClose, onMarkRead }: NotificationPanelProps) {
+export function NotificationPanel({ notifications, onClose, onMarkRead, onMarkOneRead }: NotificationPanelProps) {
   return (
     <>
       <button className="fixed inset-0 z-40 cursor-default bg-[#152012]/20 backdrop-blur-[1px] md:hidden" onClick={onClose} aria-label="Close notifications" />
@@ -32,7 +33,7 @@ export function NotificationPanel({ notifications, onClose, onMarkRead }: Notifi
         ) : (
           <div className="max-h-[420px] overflow-y-auto p-2">
             {notifications.map((notification) => (
-              <Link key={notification.id} href={`/request/${notification.deliveryId}`} onClick={onClose} className={`flex gap-3 rounded-2xl p-3.5 transition hover:bg-[#f4f8f1] ${notification.read ? "" : "bg-[#eef5e9]"}`}>
+              <Link key={notification.id} href={`/request/${notification.deliveryId}`} onClick={() => { onMarkOneRead(notification.id); onClose(); }} className={`flex gap-3 rounded-2xl p-3.5 transition hover:bg-[#f4f8f1] ${notification.read ? "" : "bg-[#eef5e9]"}`}>
                 <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${notification.read ? "bg-[#edf0ea] text-[#73806f]" : "bg-[var(--leaf)] text-white"}`}><Bell size={17} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-start justify-between gap-3">

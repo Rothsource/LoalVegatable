@@ -2,7 +2,7 @@ import { Box, Clock3, MessageSquareText, Phone, UserRound } from "lucide-react";
 import type { DeliveryRequest } from "@/lib/types";
 
 export function DeliveryDetails({ delivery }: { delivery: DeliveryRequest }) {
-  const itemCount = delivery.items.reduce((total, item) => total + item.quantity, 0);
+  const itemCount = (delivery.items ?? []).reduce((total, item) => total + (item.quantity || 1), 0);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -25,17 +25,21 @@ export function DeliveryDetails({ delivery }: { delivery: DeliveryRequest }) {
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--surface-soft)] text-[var(--leaf)]"><Box size={19} aria-hidden="true" /></span>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.1em] text-[#869181]">Order summary</p>
-            <h2 className="mt-0.5 font-extrabold">{itemCount} items</h2>
+            <h2 className="mt-0.5 font-extrabold">{itemCount} {itemCount === 1 ? "item" : "items"}</h2>
           </div>
         </div>
-        <ul className="mt-4 divide-y divide-[#eef1eb]">
-          {delivery.items.map((item) => (
-            <li key={item.name} className="flex justify-between gap-3 py-2.5 text-sm">
-              <span className="font-semibold text-[#455143]">{item.name}</span>
-              <span className="shrink-0 font-extrabold">{item.quantity} {item.unit}</span>
-            </li>
-          ))}
-        </ul>
+        {(delivery.items ?? []).length === 0 ? (
+          <p className="mt-4 text-xs text-[var(--muted)]">No item details available</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-[#eef1eb]">
+            {delivery.items.map((item, idx) => (
+              <li key={`${item.name}-${idx}`} className="flex justify-between gap-3 py-2.5 text-sm">
+                <span className="font-semibold text-[#455143]">{item.name}</span>
+                <span className="shrink-0 font-extrabold">{item.quantity} {item.unit}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {delivery.note && (

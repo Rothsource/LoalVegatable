@@ -63,7 +63,19 @@ type OrderRow = {
     lng?: number | string | null;
   } | null;
   customer: { first_name: string | null; last_name: string | null } | null;
-  items: { quantity: number; product: { name: string; unit: string } | null }[];
+  items: {
+    id?: string;
+    quantity: number;
+    unit_price?: number;
+    total_price?: number;
+    product?: { name: string; unit: string; profile_pic_url?: string } | null;
+    products?: { name: string; unit: string; profile_pic_url?: string } | null;
+  }[];
+  pickup?: {
+    label: string;
+    address: string;
+    coordinates?: { latitude: number; longitude: number };
+  };
 };
 
 const ORDER_SELECT = `
@@ -111,7 +123,7 @@ async function resolvePickup(distributorId: string | null): Promise<{ label: str
 }
 
 async function mapOrderToRequest(row: OrderRow, riderStatus: DeliveryRequest["status"]): Promise<DeliveryRequest> {
-  const pickup = await resolvePickup(row.distributor_id);
+  const pickup = row.pickup || (await resolvePickup(row.distributor_id));
 
   const rawLat = row.address?.lat != null ? Number(row.address.lat) : NaN;
   const rawLng = row.address?.lng != null ? Number(row.address.lng) : NaN;
@@ -158,11 +170,18 @@ async function mapOrderToRequest(row: OrderRow, riderStatus: DeliveryRequest["st
       name: [row.customer?.first_name, row.customer?.last_name].filter(Boolean).join(" ") || "Customer",
       phone: row.address?.phone ?? "",
     },
-    items: (row.items ?? []).map((it) => ({
-      name: it.product?.name ?? "Item",
-      quantity: Number(it.quantity),
-      unit: it.product?.unit ?? "",
-    })),
+    items: (row.items ?? []).map((it: any) => {
+      const prod = Array.isArray(it.product)
+        ? it.product[0]
+        : Array.isArray(it.products)
+        ? it.products[0]
+        : (it.product || it.products);
+      return {
+        name: prod?.name || "Fresh Produce",
+        quantity: Number(it.quantity || 1),
+        unit: prod?.unit || "kg",
+      };
+    }),
   };
 }
 
@@ -177,8 +196,10 @@ export interface DeliveryService {
   getIncomingDeliveries(): Promise<DeliveryRequest[]>;
   getCurrentDelivery(): Promise<DeliveryRequest | null>;
   getDeliveryHistory(): Promise<DeliveryHistoryItem[]>;
+  getDeliveryById(id: string): Promise<DeliveryRequest | null>;
   getNotifications(): Promise<DeliveryNotification[]>;
   markNotificationsRead(): Promise<void>;
+  markNotificationRead(id: string): Promise<void>;
   acceptDelivery(id: string): Promise<ServiceResult>;
   markArrived(id: string): Promise<ServiceResult>;
   setAvailability(available: boolean): Promise<void>;
@@ -243,6 +264,21 @@ class SupabaseDeliveryService implements DeliveryService {
         return { ok: false, message: data.error || "This email has not been authorized for Delivery access." };
       }
       setPendingEmail(email);
+
+      // Trigger Supabase OTP verification email
+      const supabase = createClient();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false },
+      });
+
+      if (otpError) {
+        console.warn("Delivery signInWithOtp warning:", otpError.message);
+        if (otpError.status === 429) {
+          return { ok: false, message: "Too many attempts. Please wait a minute before requesting another code." };
+        }
+      }
+
       return { ok: true, message: `Welcome ${data.name || ""}`.trim() };
     } catch (err: any) {
       return { ok: false, message: err?.message || "Failed to verify email authorization." };
@@ -304,9 +340,21 @@ class SupabaseDeliveryService implements DeliveryService {
     await supabase.auth.signOut();
   }
 
-  // ---- Below: real orders table, replacing the old localStorage mock ----
+  // ---- Below: real orders fetching via secure server API with client fallback ----
 
   async getIncomingDeliveries(): Promise<DeliveryRequest[]> {
+    try {
+      const res = await fetch("/api/delivery/orders?type=incoming");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.orders)) {
+          return Promise.all(data.orders.map((row: OrderRow) => mapOrderToRequest(row, "incoming")));
+        }
+      }
+    } catch (err) {
+      console.warn("Falling back to client query for incoming orders:", err);
+    }
+
     const supabase = createClient();
     const { data, error } = await supabase
       .from("orders")
@@ -322,6 +370,19 @@ class SupabaseDeliveryService implements DeliveryService {
   async getCurrentDelivery(): Promise<DeliveryRequest | null> {
     const riderId = await this.getRiderId();
     if (!riderId) return null;
+
+    try {
+      const res = await fetch(`/api/delivery/orders?type=current&riderId=${encodeURIComponent(riderId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.order) {
+          return mapOrderToRequest(data.order as OrderRow, "accepted");
+        }
+        return null;
+      }
+    } catch (err) {
+      console.warn("Falling back to client query for current delivery:", err);
+    }
 
     const supabase = createClient();
     const { data, error } = await supabase
@@ -340,6 +401,21 @@ class SupabaseDeliveryService implements DeliveryService {
     const riderId = await this.getRiderId();
     if (!riderId) return [];
 
+    try {
+      const res = await fetch(`/api/delivery/orders?type=history&riderId=${encodeURIComponent(riderId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.orders)) {
+          const mapped = await Promise.all(
+            data.orders.map((row: OrderRow) => mapOrderToRequest(row, "completed"))
+          );
+          return mapped as DeliveryHistoryItem[];
+        }
+      }
+    } catch (err) {
+      console.warn("Falling back to client query for delivery history:", err);
+    }
+
     const supabase = createClient();
     const { data, error } = await supabase
       .from("orders")
@@ -353,60 +429,213 @@ class SupabaseDeliveryService implements DeliveryService {
     return mapped as DeliveryHistoryItem[];
   }
 
+  async getDeliveryById(id: string): Promise<DeliveryRequest | null> {
+    try {
+      const res = await fetch(`/api/delivery/orders?type=single&id=${encodeURIComponent(id)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.order) {
+          const status = data.order.status === "delivered" ? "completed" : data.order.delivery_id ? "accepted" : "incoming";
+          return mapOrderToRequest(data.order as OrderRow, status as DeliveryRequest["status"]);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch delivery by id:", err);
+    }
+    return null;
+  }
+
   async getNotifications(): Promise<DeliveryNotification[]> {
-    // Notifications are push-based now (see delivery/lib/push.ts), not stored
-    // per-rider in the DB yet. Returning empty until an in-app notification
-    // log table exists.
-    return [];
+    const riderId = await this.getRiderId();
+    const readIds: string[] = (() => {
+      if (typeof window === "undefined") return [];
+      try {
+        return JSON.parse(localStorage.getItem("delivery_read_notifications") || "[]");
+      } catch {
+        return [];
+      }
+    })();
+
+    const notifications: DeliveryNotification[] = [];
+
+    try {
+      const res = await fetch(`/api/delivery/orders?type=notifications${riderId ? `&riderId=${encodeURIComponent(riderId)}` : ""}`);
+      if (res.ok) {
+        const data = await res.json();
+        (data.incoming ?? []).forEach((order: any) => {
+          const notifId = `incoming-${order.id}`;
+          notifications.push({
+            id: notifId,
+            deliveryId: order.id,
+            title: "Dispatch Available",
+            message: `Order #${String(order.id).slice(0, 8)} ($${Number(order.total_amount).toFixed(2)}) is ready for courier delivery.`,
+            createdAt: order.created_at,
+            read: readIds.includes(notifId),
+          });
+        });
+
+        (data.assigned ?? []).forEach((order: any) => {
+          const notifId = `assigned-${order.id}-${order.status}`;
+          const isDelivered = order.status === "delivered";
+          notifications.push({
+            id: notifId,
+            deliveryId: order.id,
+            title: isDelivered ? "Delivery Completed" : "Active Dispatch",
+            message: isDelivered
+              ? `Order #${String(order.id).slice(0, 8)} was delivered successfully.`
+              : `Order #${String(order.id).slice(0, 8)} is assigned to you for delivery.`,
+            createdAt: order.completed_at || order.accepted_at || order.created_at,
+            read: readIds.includes(notifId),
+          });
+        });
+
+        return notifications.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }
+    } catch (err) {
+      console.warn("Falling back to client query for notifications:", err);
+    }
+
+    const supabase = createClient();
+
+    // 1. Available incoming dispatch requests
+    const { data: incomingOrders } = await supabase
+      .from("orders")
+      .select("id, total_amount, created_at")
+      .eq("status", "out_for_delivery")
+      .is("delivery_id", null)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    (incomingOrders ?? []).forEach((order) => {
+      const notifId = `incoming-${order.id}`;
+      notifications.push({
+        id: notifId,
+        deliveryId: order.id,
+        title: "Dispatch Available",
+        message: `Order #${String(order.id).slice(0, 8)} ($${Number(order.total_amount).toFixed(2)}) is ready for courier delivery.`,
+        createdAt: order.created_at,
+        read: readIds.includes(notifId),
+      });
+    });
+
+    // 2. Assigned orders for this rider
+    if (riderId) {
+      const { data: assignedOrders } = await supabase
+        .from("orders")
+        .select("id, status, total_amount, created_at, accepted_at, completed_at")
+        .eq("delivery_id", riderId)
+        .order("created_at", { ascending: false })
+        .limit(6);
+
+      (assignedOrders ?? []).forEach((order) => {
+        const notifId = `assigned-${order.id}-${order.status}`;
+        const isDelivered = order.status === "delivered";
+        notifications.push({
+          id: notifId,
+          deliveryId: order.id,
+          title: isDelivered ? "Delivery Completed" : "Active Dispatch",
+          message: isDelivered
+            ? `Order #${String(order.id).slice(0, 8)} was delivered successfully.`
+            : `Order #${String(order.id).slice(0, 8)} is assigned to you for delivery.`,
+          createdAt: order.completed_at || order.accepted_at || order.created_at,
+          read: readIds.includes(notifId),
+        });
+      });
+    }
+
+    return notifications.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 
   async markNotificationsRead(): Promise<void> {
-    // no-op — see getNotifications note above
+    if (typeof window === "undefined") return;
+    try {
+      const current = await this.getNotifications();
+      const allIds = current.map((n) => n.id);
+      localStorage.setItem("delivery_read_notifications", JSON.stringify(allIds));
+    } catch {}
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    if (typeof window === "undefined") return;
+    try {
+      const readIds: string[] = JSON.parse(
+        localStorage.getItem("delivery_read_notifications") || "[]"
+      );
+      if (!readIds.includes(id)) {
+        readIds.push(id);
+        localStorage.setItem("delivery_read_notifications", JSON.stringify(readIds));
+      }
+    } catch {}
   }
 
   async acceptDelivery(id: string): Promise<ServiceResult> {
     const riderId = await this.getRiderId();
     if (!riderId) return { ok: false, message: "Your rider account isn't set up correctly." };
 
-    const supabase = createClient();
-    // Atomic claim: only succeeds if still out_for_delivery and unclaimed —
-    // same pattern as the distributor's accept().
-    const { data, error } = await supabase
-      .from("orders")
-      .update({ delivery_id: riderId })
-      .eq("id", id)
-      .eq("status", "out_for_delivery")
-      .is("delivery_id", null)
-      .select("id");
+    try {
+      const res = await fetch("/api/delivery/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "accept", orderId: id, riderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { ok: false, message: data.error || "Someone else already accepted this delivery." };
+      }
+      return { ok: true };
+    } catch {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("orders")
+        .update({ delivery_id: riderId, accepted_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("status", "out_for_delivery")
+        .is("delivery_id", null)
+        .select("id");
 
-    if (error) return { ok: false, message: error.message };
-    if (!data || data.length === 0) {
-      return { ok: false, message: "Someone else already accepted this delivery." };
+      if (error) return { ok: false, message: error.message };
+      if (!data || data.length === 0) {
+        return { ok: false, message: "Someone else already accepted this delivery." };
+      }
+      return { ok: true };
     }
-    return { ok: true };
   }
 
   async markArrived(id: string): Promise<ServiceResult> {
     const riderId = await this.getRiderId();
     if (!riderId) return { ok: false, message: "Your rider account isn't set up correctly." };
 
-    const supabase = createClient();
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from("orders")
-      .update({ status: "delivered", arrived_at: now, completed_at: now })
-      .eq("id", id)
-      .eq("delivery_id", riderId)
-      .select("id");
+    try {
+      const res = await fetch("/api/delivery/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "arrive", orderId: id, riderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { ok: false, message: data.error || "We couldn't find that active delivery." };
+      }
+    } catch {
+      const supabase = createClient();
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("orders")
+        .update({ status: "delivered", arrived_at: now, completed_at: now })
+        .eq("id", id)
+        .eq("delivery_id", riderId)
+        .select("id");
 
-    if (error) return { ok: false, message: error.message };
-    if (!data || data.length === 0) {
-      return { ok: false, message: "We couldn't find that active delivery." };
+      if (error) return { ok: false, message: error.message };
+      if (!data || data.length === 0) {
+        return { ok: false, message: "We couldn't find that active delivery." };
+      }
     }
 
-    // Best-effort — don't block the UI if the notify call fails.
-    // TODO: set NEXT_PUBLIC_CUSTOMER_APP_URL once merchant/customer cross-app
-    // URLs are confirmed; same pattern as merchant's out_for_delivery call.
+    // Best-effort notify customer
     fetch(`${process.env.NEXT_PUBLIC_CUSTOMER_APP_URL ?? ""}/api/notify-delivered`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

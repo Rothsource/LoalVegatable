@@ -20,6 +20,20 @@ export default function VerifyPage() {
   const [resending, setResending] = useState(false);
   const [seconds, setSeconds] = useState(30);
   const refs = useRef<Array<HTMLInputElement | null>>([]);
+  const [targetEmail, setTargetEmail] = useState(activationEmail);
+
+  useEffect(() => {
+    if (!activationEmail && typeof window !== "undefined") {
+      const stored = window.sessionStorage.getItem("localveg-delivery-pending-email");
+      if (!stored) {
+        router.replace("/activate");
+      } else {
+        setTargetEmail(stored);
+      }
+    } else {
+      setTargetEmail(activationEmail);
+    }
+  }, [activationEmail, router]);
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -51,9 +65,9 @@ export default function VerifyPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const code = digits.join("");
-    if (code.length !== 8) {
-      setError("Enter all 8 digits from your verification code.");
+    const code = digits.join("").trim();
+    if (code.length !== 8 && code.length !== 6) {
+      setError("Enter the 8-digit verification code sent to your email.");
       return;
     }
     setLoading(true);
@@ -93,7 +107,7 @@ export default function VerifyPage() {
       <p className="mt-3 text-sm leading-6 text-[#5d685f]">
         Enter the 8-digit code sent to{" "}
         <strong className="text-[#24382d]">
-          {maskEmail(activationEmail || DEMO_AUTH.authorizedEmail)}
+          {maskEmail(targetEmail || DEMO_AUTH.authorizedEmail)}
         </strong>
         .
       </p>
@@ -102,7 +116,7 @@ export default function VerifyPage() {
           <legend className="mb-3 text-xs font-bold uppercase tracking-wider text-[#435449]">
             Verification code
           </legend>
-          <div className="grid grid-cols-8 gap-1.5 sm:gap-2" onPaste={handlePaste}>
+          <div className="grid grid-cols-8 gap-1.5 sm:gap-2.5" onPaste={handlePaste}>
             {digits.map((digit, index) => (
               <input
                 key={index}
@@ -116,7 +130,7 @@ export default function VerifyPage() {
                 autoComplete={index === 0 ? "one-time-code" : "off"}
                 aria-label={`Verification digit ${index + 1}`}
                 maxLength={1}
-                className={`h-12 min-w-0 rounded-xl border bg-[#ffffff] text-center text-lg sm:text-xl font-bold text-[#24382d] outline-none transition focus:border-[#765238] focus:ring-4 focus:ring-[#765238]/15 sm:h-14 ${
+                className={`h-11 sm:h-14 min-w-0 rounded-xl border bg-[#ffffff] text-center text-base sm:text-xl font-bold text-[#24382d] outline-none transition focus:border-[#765238] focus:ring-4 focus:ring-[#765238]/15 px-0 ${
                   error ? "border-[#fecaca] bg-[#fef2f2]" : "border-[#e0e5de] hover:border-[#d9dfd8]"
                 }`}
               />
