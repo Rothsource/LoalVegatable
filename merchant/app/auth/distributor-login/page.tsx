@@ -192,6 +192,7 @@ export default function DistributorLoginPage() {
       setSuccessMsg("Password set successfully! Redirecting to distributor dashboard…");
 
       // Redirect into distributor workspace
+      // nosemgrep: javascript.lang.security.detect-eval-with-expression.detect-eval-with-expression -- safe: function argument, not a string, no dynamic eval
       setTimeout(() => {
         window.location.href = "/distributors/products";
       }, 700);

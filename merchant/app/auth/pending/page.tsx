@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 export default function PendingPage() {
   useEffect(() => {
     // poll every 5 seconds to check if approved
+    // nosemgrep: javascript.lang.security.detect-eval-with-expression.detect-eval-with-expression -- safe: function argument, not a string, no dynamic eval
     const interval = setInterval(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
