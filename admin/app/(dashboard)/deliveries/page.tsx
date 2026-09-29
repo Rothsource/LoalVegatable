@@ -19,6 +19,7 @@ export default function DeliveriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ email: "", first_name: "", last_name: "", phone: "" });
   const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     fetchDeliveries();
@@ -41,6 +42,7 @@ export default function DeliveriesPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError("");
+    setSuccessMessage("");
     setActionLoading(true);
     try {
       const res = await fetch("/api/deliveries", {
@@ -53,6 +55,7 @@ export default function DeliveriesPage() {
         setFormError(data.error ?? "Failed to create delivery account.");
         return;
       }
+      setSuccessMessage(`Courier ${data.first_name} ${data.last_name} (${data.email}) added! They can now activate their account and set their own password in the Delivery app.`);
       setForm({ email: "", first_name: "", last_name: "", phone: "" });
       setShowForm(false);
       fetchDeliveries();
@@ -106,9 +109,22 @@ export default function DeliveriesPage() {
         <p className="mt-1.5 text-xs sm:text-sm text-[#667262]">Manage active delivery drivers, dispatch accounts, and field status.</p>
       </div>
 
+      {successMessage && (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 flex items-start justify-between shadow-sm">
+          <div>
+            <p className="font-bold text-sm">Courier account authorized successfully!</p>
+            <p className="text-xs mt-1 text-emerald-800">{successMessage}</p>
+          </div>
+          <button onClick={() => setSuccessMessage("")} className="text-emerald-700 hover:text-emerald-900 font-bold text-sm cursor-pointer">✕</button>
+        </div>
+      )}
+
       <div className="rounded-2xl bg-white p-6 border border-[#dfe6d9] shadow-sm">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <h3 className="text-lg font-bold text-[var(--foreground)] font-heading">Registered Drivers</h3>
+          <div>
+            <h3 className="text-lg font-bold text-[var(--foreground)] font-heading">Registered Drivers</h3>
+            <p className="text-xs text-[#667262]">Drivers added here can activate and create their own password in the Delivery portal.</p>
+          </div>
           <button
             onClick={() => setShowForm((v) => !v)}
             className="rounded-xl bg-[var(--leaf)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--leaf-dark)] transition-colors cursor-pointer"
@@ -154,7 +170,7 @@ export default function DeliveriesPage() {
               disabled={actionLoading}
               className="rounded-xl bg-[var(--leaf)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--leaf-dark)] disabled:opacity-50 sm:col-span-2 transition-colors cursor-pointer"
             >
-              {actionLoading ? "Creating…" : "Register Courier Account"}
+              {actionLoading ? "Authorizing…" : "Authorize Courier"}
             </button>
           </form>
         )}

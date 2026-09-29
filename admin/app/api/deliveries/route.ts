@@ -19,23 +19,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
+
+  // Check if a delivery entry already exists with this email
+  const { data: existingDel } = await supabaseAdmin
+    .from("deliveries")
+    .select("id")
+    .eq("email", cleanEmail)
+    .maybeSingle();
+
+  if (existingDel) {
+    return NextResponse.json({ error: "A courier account with this email already exists." }, { status: 400 });
+  }
+
+  let authUserId: string | null = null;
+
+  // Create auth user without password (courier sets their own password upon activating)
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email,
+    email: cleanEmail,
     email_confirm: true,
+    user_metadata: { role: "delivery" },
   });
 
   if (authError || !authData.user) {
-    return NextResponse.json({ error: authError?.message ?? "Could not create auth user." }, { status: 400 });
+    // If the user was already in auth.users (e.g. customer account), link to that auth user
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+    const existingAuth = users?.find((u) => u.email?.toLowerCase() === cleanEmail);
+
+    if (existingAuth) {
+      authUserId = existingAuth.id;
+      await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+        email_confirm: true,
+        user_metadata: { ...(existingAuth.user_metadata || {}), role: "delivery" },
+      });
+    } else {
+      return NextResponse.json({ error: authError?.message ?? "Could not create auth user." }, { status: 400 });
+    }
+  } else {
+    authUserId = authData.user.id;
   }
 
   const { data, error } = await supabaseAdmin
     .from("deliveries")
-    .insert({ email, first_name, last_name, phone, is_active: true, user_id: authData.user.id })
+    .insert({
+      email: cleanEmail,
+      first_name: first_name.trim(),
+      last_name: last_name.trim(),
+      phone: phone?.trim() || null,
+      is_active: true,
+      user_id: authUserId,
+    })
     .select()
     .single();
 
   if (error) {
-    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
@@ -44,8 +81,16 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const { id, is_active } = await req.json();
-  const { error } = await supabaseAdmin.from("deliveries").update({ is_active }).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  if (!id) {
+    return NextResponse.json({ error: "Missing delivery id." }, { status: 400 });
+  }
+
+  if (typeof is_active === "boolean") {
+    const { error } = await supabaseAdmin.from("deliveries").update({ is_active }).eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
   return NextResponse.json({ ok: true });
 }
 

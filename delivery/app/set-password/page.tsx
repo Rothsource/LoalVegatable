@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Check, CheckCircle2, Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +10,7 @@ import { useDelivery } from "@/context/DeliveryProvider";
 
 export default function SetPasswordPage() {
   const router = useRouter();
-  const { setPassword } = useDelivery();
+  const { setPassword, activationEmail } = useDelivery();
   const [password, setPasswordValue] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,6 +22,21 @@ export default function SetPasswordPage() {
     { label: "Upper and lowercase letters", met: /[A-Z]/.test(password) && /[a-z]/.test(password) },
     { label: "At least one number", met: /\d/.test(password) },
   ];
+
+  const [activeEmail, setActiveEmail] = useState(activationEmail);
+
+  useEffect(() => {
+    if (!activationEmail && typeof window !== "undefined") {
+      const stored = window.sessionStorage.getItem("localveg-delivery-pending-email");
+      if (!stored) {
+        router.replace("/activate");
+      } else {
+        setActiveEmail(stored);
+      }
+    } else {
+      setActiveEmail(activationEmail);
+    }
+  }, [activationEmail, router]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -47,21 +62,23 @@ export default function SetPasswordPage() {
 
   if (success) {
     return (
-      <AuthShell step={3}>
+      <AuthShell step={2}>
         <div className="text-center" role="status">
           <span className="mx-auto grid h-20 w-20 place-items-center rounded-[26px] border border-[#e0e5de] bg-[#f6f2ec] text-[#765238] shadow-[0_20px_44px_rgba(0,0,0,0.4)]"><CheckCircle2 size={38} /></span>
           <h1 className="mt-7 text-[34px] font-black tracking-[-0.045em] text-[#24382d]">You&apos;re ready to deliver</h1>
-          <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#5d685f]">Your demo rider account is active. Taking you to your delivery dashboard…</p>
+          <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#5d685f]">Your courier account is active. Taking you to your delivery dashboard…</p>
         </div>
       </AuthShell>
     );
   }
 
   return (
-    <AuthShell step={3}>
+    <AuthShell step={2}>
       <span className="grid h-14 w-14 place-items-center rounded-[18px] border border-[#e0e5de] bg-[#f6f2ec] text-[#765238]"><LockKeyhole size={25} /></span>
       <h1 className="mt-6 text-[34px] font-black tracking-[-0.045em] text-[#24382d] sm:text-[40px]">Create your password</h1>
-      <p className="mt-3 text-sm leading-6 text-[#5d685f]">Choose a secure password for future Delivery Portal sign-ins.</p>
+      <p className="mt-3 text-sm leading-6 text-[#5d685f]">
+        Setting password for <strong className="text-[#24382d]">{activeEmail || "your account"}</strong>. Choose a secure password for future Delivery Portal sign-ins.
+      </p>
       <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
         <FormField label="New password" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Create a password" value={password} onChange={(event) => { setPasswordValue(event.target.value); setError(""); }} trailing={<button type="button" onClick={() => setShowPassword((visible) => !visible)} className="grid h-10 w-10 place-items-center rounded-xl text-[#68746a] hover:bg-[#f6f7f3] hover:text-[#24382d]" aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>} />
         <FormField label="Confirm password" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Repeat your password" value={confirm} onChange={(event) => { setConfirm(event.target.value); setError(""); }} error={error} />

@@ -236,16 +236,17 @@ class SupabaseDeliveryService implements DeliveryService {
   }
 
   async startActivation(email: string): Promise<ServiceResult> {
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false },
-    });
-    if (error) {
-      return { ok: false, message: "This email has not been authorized for Delivery access." };
+    try {
+      const res = await fetch(`/api/auth/activate?email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        return { ok: false, message: data.error || "This email has not been authorized for Delivery access." };
+      }
+      setPendingEmail(email);
+      return { ok: true, message: `Welcome ${data.name || ""}`.trim() };
+    } catch (err: any) {
+      return { ok: false, message: err?.message || "Failed to verify email authorization." };
     }
-    setPendingEmail(email);
-    return { ok: true };
   }
 
   async verifyCode(code: string): Promise<ServiceResult> {
@@ -269,16 +270,33 @@ class SupabaseDeliveryService implements DeliveryService {
   }
 
   async setPassword(password: string): Promise<ServiceResult> {
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.updateUser({
-      password,
-      data: { password_set: true },
-    });
-    if (error || !data.user) {
-      return { ok: false, message: "Unable to set your password. Try again." };
+    const email = getPendingEmail();
+    if (!email) {
+      return { ok: false, message: "Session expired. Please restart activation." };
     }
-    clearPendingEmail();
-    return { ok: true };
+
+    try {
+      const res = await fetch("/api/auth/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { ok: false, message: data.error || "Unable to set your password." };
+      }
+
+      // Automatically sign in the rider with their newly set password
+      const loginResult = await this.login(email, password);
+      if (!loginResult.ok) {
+        return { ok: false, message: loginResult.message || "Password set, but automatic sign in failed. Please sign in." };
+      }
+
+      clearPendingEmail();
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, message: err?.message || "Unable to set your password. Try again." };
+    }
   }
 
   async logout(): Promise<void> {
