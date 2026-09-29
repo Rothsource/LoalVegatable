@@ -143,7 +143,7 @@ export default function ShopPage() {
         .from('products')
         .select(`
           id, name, slug, description, price, stock_quantity, unit,
-          profile_pic_url, is_active, harvest_date, expire_date, is_organic,
+          profile_pic_url, background_pic_urls, is_active, harvest_date, expire_date, is_organic,
           merchant_id, category_id,
           categories ( name )
         `)
@@ -157,24 +157,30 @@ export default function ShopPage() {
       const merchantIds = [...new Set(validData.map((p: any) => p.merchant_id).filter(Boolean))];
       const productIds = validData.map((p: any) => p.id);
 
-      // Fast parallel fetch: merchants (with is_open) + reviews in 1 roundtrip (no slow /api/shop-status)
-      const [merchantsRes, reviewsRes] = await Promise.all([
+      // Fast parallel fetch: merchants + reviews + live shop status
+      const [merchantsRes, reviewsRes, shopStatusRes] = await Promise.all([
         merchantIds.length > 0
           ? supabase
               .from('profile_merchants')
-              .select('id, full_name, community_name, province, profile_url, is_open')
+              .select('id, full_name, community_name, province, profile_url, background_urls')
               .in('id', merchantIds)
           : Promise.resolve({ data: [] as any[] }),
         productIds.length > 0
           ? supabase.from('reviews').select('product_id, rating').in('product_id', productIds)
           : Promise.resolve({ data: [] as any[] }),
+        merchantIds.length > 0
+          ? fetch(`/api/shop-status?merchantIds=${merchantIds.join(',')}`)
+              .then(r => r.json())
+              .catch(() => ({ statuses: {} }))
+          : Promise.resolve({ statuses: {} }),
       ]);
 
-      const merchants = merchantsRes.data;
-      const reviews = reviewsRes.data;
+      const merchants = merchantsRes.data ?? [];
+      const reviews = reviewsRes.data ?? [];
+      const shopStatuses: Record<string, boolean> = shopStatusRes?.statuses || {};
 
       const merchantMap: Record<string, any> = {};
-      (merchants ?? []).forEach(m => { merchantMap[m.id] = m; });
+      merchants.forEach(m => { merchantMap[m.id] = m; });
 
       const ratingMap: Record<string, number> = {};
       if (reviews) {
@@ -190,8 +196,11 @@ export default function ShopPage() {
 
       const mapped: Product[] = validData.map((p: any) => {
         const merchant = merchantMap[p.merchant_id] ?? {};
-        // Read is_open directly from profile_merchants table (fast & accurate)
-        const isShopOpen = merchant.is_open !== undefined && merchant.is_open !== null ? Boolean(merchant.is_open) : true;
+        const isShopOpen = p.merchant_id ? (shopStatuses[p.merchant_id] ?? true) : true;
+        const realVegImg = p.profile_pic_url || (Array.isArray(p.background_pic_urls) ? p.background_pic_urls[0] : null) || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop';
+        const rawShopName = merchant.community_name || merchant.full_name || 'Local Farm';
+        const shopAvatarUrl = merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(rawShopName)}&background=1b4332&color=fff&size=50`;
+
         return {
           id: p.id,
           name: p.name,
@@ -204,13 +213,13 @@ export default function ShopPage() {
           rating: ratingMap[p.id] ?? 0,
           isAvailable: p.is_active && p.stock_quantity > 0,
           isShopOpen,
-          img: p.profile_pic_url || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
+          img: realVegImg,
           quantity: p.stock_quantity ?? 0,
           harvestDate: p.harvest_date ?? '',
           sellByDate: p.expire_date ?? '',
           shopSlug: p.merchant_id ?? '',
-          shopName: merchant.community_name ?? merchant.full_name ?? 'Local Farm',
-          shopAvatar: merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant.community_name || merchant.full_name || 'Farm')}&background=0DB30D&color=fff&size=50`,
+          shopName: rawShopName,
+          shopAvatar: shopAvatarUrl,
           shopLocation: merchant.province ?? '',
         };
       });
@@ -471,10 +480,10 @@ export default function ShopPage() {
                 <p style={{ fontSize: '11px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px' }}>Sold By</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <img
-                    src={selectedProduct.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`}
+                    src={selectedProduct.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=1b4332&color=fff&size=50`}
                     alt=""
                     style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #eff6ef' }}
-                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`; }}
+                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProduct.shopName || 'Shop')}&background=1b4332&color=fff&size=50`; }}
                   />
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: '800', fontSize: '15px', color: deepGreen }}>{selectedProduct.shopName}</span>
@@ -784,10 +793,10 @@ export default function ShopPage() {
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px', padding: '8px 10px', backgroundColor: '#f9fafb', borderRadius: '10px' }}>
                       <img
-                        src={product.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`}
+                        src={product.shopAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=1b4332&color=fff&size=50`}
                         style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                         alt=""
-                        onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=0DB30D&color=fff&size=50`; }}
+                        onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.shopName || 'Shop')}&background=1b4332&color=fff&size=50`; }}
                       />
                       <div style={{ minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#444', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.shopName}</p>

@@ -61,13 +61,20 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
         setActiveOrderCount(0);
         return;
       }
-      const { count } = await supabase
+      const { data: orders } = await supabase
         .from("orders")
-        .select("id", { count: "exact", head: true })
+        .select("id, status")
         .eq("user_id", user.id)
         .in("status", ["pending", "accepted", "out_for_delivery", "delivering"]);
 
-      if (count !== null) setActiveOrderCount(count);
+      if (orders) {
+        let readIds: string[] = [];
+        try {
+          readIds = JSON.parse(localStorage.getItem(`customer_read_notifications_${user.id}`) || "[]");
+        } catch {}
+        const unread = orders.filter((o) => !readIds.includes(o.id));
+        setActiveOrderCount(unread.length);
+      }
     } catch {
       // silent
     }
@@ -81,8 +88,12 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
       setIsLoggedIn(!!data?.session?.user);
     });
 
-    const onStorage = () => syncCart();
+    const onStorage = () => {
+      syncCart();
+      syncOrders();
+    };
     window.addEventListener("storage", onStorage);
+    window.addEventListener("customer-notification-read", syncOrders);
     const interval = setInterval(syncCart, 2000);
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -90,10 +101,19 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
       syncOrders();
     });
 
+    const channel = supabase
+      .channel("customer-shell-orders-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        syncOrders();
+      })
+      .subscribe();
+
     return () => {
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("customer-notification-read", syncOrders);
       clearInterval(interval);
       listener.subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [pathname]);
 
@@ -165,7 +185,10 @@ export default function CustomerShell({ children }: { children: React.ReactNode 
                       item.badgeKey === "orders" ? "bg-[#d97706]" : "bg-[#0DB30D]"
                     }`}
                   >
-                    {badge > 99 ? "99+" : badge}
+                    {item.badgeKey === "orders" && (
+                      <span className="absolute inset-0 rounded-full bg-amber-400 animate-ping opacity-75" />
+                    )}
+                    <span className="relative z-10">{badge > 99 ? "99+" : badge}</span>
                   </span>
                 )}
               </div>

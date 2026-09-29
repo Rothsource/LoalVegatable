@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Clock3, Navigation } from "lucide-react";
 import { DeliveryDetails } from "@/components/delivery/DeliveryDetails";
 import { RouteSummary } from "@/components/delivery/RouteSummary";
@@ -11,6 +11,8 @@ import { PageSkeleton } from "@/components/ui/StateViews";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useDelivery } from "@/context/DeliveryProvider";
 import { formatRelativeTime } from "@/lib/format";
+import { deliveryService } from "@/lib/delivery-service";
+import type { DeliveryRequest } from "@/lib/types";
 
 export default function RequestDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -18,7 +20,23 @@ export default function RequestDetailsPage() {
   const { incoming, current, loading, acceptDelivery } = useDelivery();
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState("");
-  const delivery = incoming.find((item) => item.id === params.id) ?? (current?.id === params.id ? current : null);
+  const [fallbackDelivery, setFallbackDelivery] = useState<DeliveryRequest | null>(null);
+  const [fetching, setFetching] = useState(false);
+
+  const delivery =
+    incoming.find((item) => item.id === params.id) ??
+    (current?.id === params.id ? current : null) ??
+    fallbackDelivery;
+
+  useEffect(() => {
+    if (!loading && !delivery && params.id) {
+      setFetching(true);
+      deliveryService.getDeliveryById(params.id).then((res) => {
+        setFallbackDelivery(res);
+        setFetching(false);
+      });
+    }
+  }, [loading, delivery, params.id]);
 
   async function accept() {
     if (!delivery) return;
@@ -33,7 +51,7 @@ export default function RequestDetailsPage() {
     router.push("/current");
   }
 
-  if (loading) return <PageSkeleton />;
+  if (loading || fetching) return <PageSkeleton />;
   if (!delivery) {
     return <section className="mx-auto max-w-xl rounded-[26px] border border-[#efd8d3] bg-white p-7 text-center"><h1 className="text-xl font-black">Request no longer available</h1><p className="mt-2 text-sm leading-6 text-[var(--muted)]">It may have been accepted already or removed from the demo queue.</p><Link href="/home" className="mt-6 inline-flex min-h-12 items-center justify-center rounded-[14px] bg-[var(--leaf)] px-5 text-sm font-extrabold text-white">Return home</Link></section>;
   }

@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
     .from("orders")
     .select(`
       id, created_at, status, payment_status, total_amount, user_id, address_id,
-      addresses ( street, province, phone )
+      addresses ( street, province, phone, recipient_name ),
+      customer:user_id ( first_name, last_name )
     `)
     .in("id", orderIds)
     .order("created_at", { ascending: false });
@@ -89,6 +90,10 @@ export async function GET(request: NextRequest) {
       });
 
     const addr = Array.isArray(o.addresses) ? o.addresses[0] : o.addresses;
+    const custName =
+      [o.customer?.first_name, o.customer?.last_name].filter(Boolean).join(" ") ||
+      addr?.recipient_name ||
+      "Customer";
 
     return {
       id: o.id,
@@ -96,6 +101,7 @@ export async function GET(request: NextRequest) {
       status: o.status || "pending",
       payment_status: o.payment_status || "pending",
       total_amount: o.total_amount || 0,
+      customer_name: custName,
       customer_phone: addr?.phone || "",
       address_street: addr?.street || "",
       address_province: addr?.province || "",

@@ -37,19 +37,26 @@ export default function DistributorLayout({ children }: { children: React.ReactN
         setDistributorName(profile.full_name);
       }
 
-      // Check pending orders count
-      const { count } = await supabase
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending")
-        .is("distributor_id", null);
-
-      if (count !== null && active) {
-        setPendingCount(count);
-      }
+      // Check pending orders count scoped to this distributor's community
+      try {
+        const res = await fetch(`/api/distributor/orders?distributorId=${user.id}`);
+        if (res.ok && active) {
+          const data = await res.json();
+          let readIds: string[] = [];
+          try {
+            readIds = JSON.parse(localStorage.getItem(`notif_read_distributor_${user.id}`) || "[]");
+          } catch {}
+          const unreadPending = (data.pending || []).filter((o: any) => !readIds.includes(o.id));
+          setPendingCount(unreadPending.length);
+        }
+      } catch {}
     }
 
     syncHeader();
+
+    const onReadUpdated = () => syncHeader();
+    window.addEventListener("notif-read-updated", onReadUpdated);
+    window.addEventListener("storage", onReadUpdated);
 
     const channel = supabase
       .channel("distributor-layout-orders")
@@ -60,6 +67,8 @@ export default function DistributorLayout({ children }: { children: React.ReactN
 
     return () => {
       active = false;
+      window.removeEventListener("notif-read-updated", onReadUpdated);
+      window.removeEventListener("storage", onReadUpdated);
       supabase.removeChannel(channel);
     };
   }, [pathname]);

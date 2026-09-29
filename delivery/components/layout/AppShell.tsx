@@ -19,7 +19,7 @@ const NAV_ITEMS = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, notifications, markNotificationsRead } = useDelivery();
+  const { user, loading, notifications, markNotificationsRead, markNotificationRead } = useDelivery();
   const [notificationPath, setNotificationPath] = useState<string | null>(null);
   const notificationOpen = notificationPath === pathname;
   const unreadCount = notifications.filter((notification) => !notification.read).length;
@@ -49,15 +49,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="relative flex items-center gap-2">
-            <button type="button" onClick={() => setNotificationPath(notificationOpen ? null : pathname)} className="relative grid h-11 w-11 place-items-center rounded-[14px] border border-[var(--line)] bg-white text-[var(--muted)] transition hover:border-[var(--soil)] hover:bg-[var(--surface-soft)]" aria-label={`${unreadCount} unread notifications`} aria-expanded={notificationOpen}>
-              <Bell size={19} aria-hidden="true" />
-              {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full border-2 border-[var(--background)] bg-[var(--danger)] px-1 text-[9px] font-black text-white">{unreadCount}</span>}
+            <button type="button" onClick={() => setNotificationPath(notificationOpen ? null : pathname)} className="relative grid h-11 w-11 place-items-center rounded-[14px] border border-[var(--line)] bg-white text-[var(--muted)] transition hover:border-[var(--soil)] hover:bg-[var(--surface-soft)] cursor-pointer" aria-label={`${unreadCount} unread notifications`} aria-expanded={notificationOpen}>
+              <Bell size={19} aria-hidden="true" className={unreadCount > 0 ? "text-[#c53929]" : ""} />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  <span className="relative grid h-5 min-w-5 place-items-center rounded-full border-2 border-white bg-[#c53929] px-1 text-[9px] font-black text-white">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                </span>
+              )}
             </button>
             <Link href="/profile" className="hidden h-11 items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-white px-2.5 pr-3.5 transition hover:border-[var(--soil)] hover:bg-[var(--surface-soft)] sm:flex">
               <span className="grid h-7 w-7 place-items-center rounded-[10px] bg-[var(--soil)] text-[10px] font-black text-white">SC</span>
               <span className="max-w-28 truncate text-xs font-extrabold text-[var(--ink)]">{user.name}</span>
             </Link>
-            {notificationOpen && <NotificationPanel notifications={notifications} onClose={() => setNotificationPath(null)} onMarkRead={() => void markNotificationsRead()} />}
+            {notificationOpen && (
+              <NotificationPanel
+                notifications={notifications}
+                onClose={() => setNotificationPath(null)}
+                onMarkRead={() => void markNotificationsRead()}
+                onMarkOneRead={(id) => void markNotificationRead(id)}
+              />
+            )}
           </div>
         </div>
       </header>

@@ -30,7 +30,7 @@ export default function ActivatePage() {
       setError(result.message ?? "This email is not authorized.");
       return;
     }
-    router.push("/set-password");
+    router.push("/verify");
   }
 
   return (
@@ -41,7 +41,7 @@ export default function ActivatePage() {
       <p className="mt-3 text-sm leading-6 text-[#5d685f]">Enter the email address approved by Admin for Delivery access. Once verified, you will set your rider password.</p>
       <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
         <FormField label="Authorized Courier Email" type="email" autoComplete="email" placeholder="rider@domain.com" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} error={error} />
-        <Button type="submit" fullWidth loading={loading} icon={<ArrowRight size={18} />} className="!border-[#1b4332] !bg-[#1b4332] shadow-[0_4px_16px_rgba(140,82,40,0.25)] hover:!bg-[#123327]">Continue to Set Password</Button>
+        <Button type="submit" fullWidth loading={loading} icon={<ArrowRight size={18} />} className="!border-[#1b4332] !bg-[#1b4332] shadow-[0_4px_16px_rgba(140,82,40,0.25)] hover:!bg-[#123327]">Continue to Verification</Button>
       </form>
       <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-[#68746a]"><Info size={14} className="mt-0.5 shrink-0" />Your courier account must be registered in the Admin dashboard by a manager before activating.</p>
     </AuthShell>

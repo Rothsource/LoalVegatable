@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ArrowLeft, CalendarCheck2 } from "lucide-react";
 import { DeliveryDetails } from "@/components/delivery/DeliveryDetails";
 import { RouteSummary } from "@/components/delivery/RouteSummary";
@@ -10,12 +11,34 @@ import { PageSkeleton } from "@/components/ui/StateViews";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useDelivery } from "@/context/DeliveryProvider";
 import { formatDateTime } from "@/lib/format";
+import { deliveryService } from "@/lib/delivery-service";
+import type { DeliveryHistoryItem } from "@/lib/types";
 
 export default function HistoryDetailsPage() {
   const params = useParams<{ id: string }>();
   const { history, loading } = useDelivery();
-  const delivery = history.find((item) => item.id === params.id);
-  if (loading) return <PageSkeleton />;
+  const [fallbackDelivery, setFallbackDelivery] = useState<DeliveryHistoryItem | null>(null);
+  const [fetching, setFetching] = useState(false);
+
+  const delivery = history.find((item) => item.id === params.id) ?? fallbackDelivery;
+
+  useEffect(() => {
+    if (!loading && !delivery && params.id) {
+      setFetching(true);
+      deliveryService.getDeliveryById(params.id).then((res) => {
+        if (res) {
+          setFallbackDelivery({
+            ...res,
+            status: "completed",
+            completedAt: res.completedAt || res.receivedAt,
+          });
+        }
+        setFetching(false);
+      });
+    }
+  }, [loading, delivery, params.id]);
+
+  if (loading || fetching) return <PageSkeleton />;
   if (!delivery) return <div className="rounded-[24px] border border-[var(--line)] bg-white p-8 text-center"><h1 className="text-xl font-black">Delivery not found</h1><Link href="/history" className="mt-5 inline-flex min-h-12 items-center rounded-[14px] bg-[var(--leaf)] px-5 text-sm font-extrabold text-white">Back to history</Link></div>;
   return (
     <div className="enter-up space-y-5">

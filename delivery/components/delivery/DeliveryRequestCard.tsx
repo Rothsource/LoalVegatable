@@ -13,7 +13,7 @@ type DeliveryRequestCardProps = {
 };
 
 export function DeliveryRequestCard({ delivery, onAccept, accepting, emphasized = false }: DeliveryRequestCardProps) {
-  const itemCount = delivery.items?.length || 0;
+  const itemCount = (delivery.items ?? []).reduce((total, item) => total + (item.quantity || 1), 0);
 
   return (
     <article className={`overflow-hidden rounded-[26px] border bg-white transition-all duration-300 ${emphasized ? "border-[#54a457] shadow-xl shadow-green-900/5 ring-4 ring-[#edf6e9]" : "border-[var(--line)] shadow-sm"}`}>

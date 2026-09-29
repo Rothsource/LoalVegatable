@@ -48,18 +48,47 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!isLoggedIn) { setActiveOrderCount(0); return; }
-    supabase.auth.getSession().then(({ data }) => {
-      const user = data?.session?.user;
-      if (!user) return;
-      supabase
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('status', ['pending', 'accepted', 'out_for_delivery', 'delivering'])
-        .then(({ count }) => {
-          if (count !== null) setActiveOrderCount(count);
-        });
-    });
+    
+    const fetchOrders = () => {
+      supabase.auth.getSession().then(({ data }) => {
+        const user = data?.session?.user;
+        if (!user) return;
+        supabase
+          .from('orders')
+          .select('id, status')
+          .eq('user_id', user.id)
+          .in('status', ['pending', 'accepted', 'out_for_delivery', 'delivering'])
+          .then(({ data: orders }) => {
+            if (orders) {
+              let readIds: string[] = [];
+              try {
+                readIds = JSON.parse(localStorage.getItem(`customer_read_notifications_${user.id}`) || "[]");
+              } catch {}
+              const unread = orders.filter((o) => !readIds.includes(o.id));
+              setActiveOrderCount(unread.length);
+            }
+          });
+      });
+    };
+
+    fetchOrders();
+
+    const onStorage = () => fetchOrders();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("customer-notification-read", onStorage);
+
+    const channel = supabase
+      .channel('customer-navbar-orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("customer-notification-read", onStorage);
+    };
   }, [isLoggedIn, pathname]);
 
   useEffect(() => {
@@ -283,7 +312,31 @@ export default function Navbar() {
               return (
                 <li key={href}>
                   <Link href={targetHref} className={`nav-link${isActive(href) ? " active" : ""}`} style={{ position: 'relative' }}>
-                    {icon} {label}
+                    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                      {icon}
+                      {isNotif && activeOrderCount > 0 && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '-4px',
+                          right: '-4px',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#d97706',
+                          display: 'inline-block',
+                        }}>
+                          <span style={{
+                            position: 'absolute',
+                            inset: 0,
+                            borderRadius: '50%',
+                            backgroundColor: '#f59e0b',
+                            animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+                            opacity: 0.75,
+                          }} />
+                        </span>
+                      )}
+                    </span>
+                    {label}
                     {isCart && cartCount > 0 && (
                       <span style={{
                         background: '#0DB30D',
@@ -365,7 +418,30 @@ export default function Navbar() {
                   className={`mobile-link${isActive(href) ? " active" : ""}`}
                   onClick={() => setMenuOpen(false)}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                    {icon} {label}
+                    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                      {icon}
+                      {isNotif && activeOrderCount > 0 && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '-3px',
+                          right: '-3px',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#d97706',
+                        }}>
+                          <span style={{
+                            position: 'absolute',
+                            inset: 0,
+                            borderRadius: '50%',
+                            backgroundColor: '#f59e0b',
+                            animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+                            opacity: 0.75,
+                          }} />
+                        </span>
+                      )}
+                    </span>
+                    {label}
                   </span>
                   {isCart && cartCount > 0 && (
                     <span style={{

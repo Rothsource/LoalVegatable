@@ -23,22 +23,8 @@ export async function GET(request: NextRequest) {
     try {
       const statuses: Record<string, boolean> = {};
 
-      // 1. Check profile_merchants table first
-      const { data: profiles } = await supabaseAdmin
-        .from("profile_merchants")
-        .select("id, is_open")
-        .in("id", ids);
-
-      (profiles ?? []).forEach((p: any) => {
-        if (p.is_open !== undefined && p.is_open !== null) {
-          statuses[p.id] = Boolean(p.is_open);
-        }
-      });
-
-      // 2. For any merchant not found in table or with null is_open, check auth metadata
-      const missing = ids.filter((id) => statuses[id] === undefined);
       await Promise.all(
-        missing.map(async (id) => {
+        ids.map(async (id) => {
           try {
             const { data } = await supabaseAdmin.auth.admin.getUserById(id);
             const isOpenMeta = data?.user?.user_metadata?.is_open;
@@ -60,20 +46,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 1. Try auth user metadata
     const { data: userData } = await supabaseAdmin.auth.admin.getUserById(merchantId);
     const isOpenMeta = userData?.user?.user_metadata?.is_open;
+    const isOpen = isOpenMeta !== undefined ? Boolean(isOpenMeta) : true;
 
-    // 2. Try profile_merchants table
-    const { data: profile } = await supabaseAdmin
-      .from("profile_merchants")
-      .select("*")
-      .eq("id", merchantId)
-      .maybeSingle();
-
-    const isOpen = profile?.is_open !== undefined ? profile.is_open : (isOpenMeta !== undefined ? isOpenMeta : true);
-
-    return NextResponse.json({ is_open: Boolean(isOpen) });
+    return NextResponse.json({ is_open: isOpen });
   } catch (e) {
     return NextResponse.json({ is_open: true });
   }

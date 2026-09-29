@@ -184,8 +184,8 @@ const CACHE_TTL_MS = 60_000;
 
       const today = getTodayDateString();
 
-      // Parallelize merchant details and products in 1 single roundtrip
-      const [merchantRes, prodsRes] = await Promise.all([
+      // Parallelize merchant details, products, and live shop status
+      const [merchantRes, prodsRes, statusRes] = await Promise.all([
         supabase.from('profile_merchants').select('*').eq('id', id).maybeSingle(),
         supabase
           .from('products')
@@ -193,13 +193,12 @@ const CACHE_TTL_MS = 60_000;
           .eq('merchant_id', id)
           .eq('is_active', true)
           .or(`expire_date.is.null,expire_date.gte.${today}`),
+        fetch(`/api/shop-status?merchantId=${id}`).then((r) => r.json()).catch(() => ({ is_open: true })),
       ]);
 
       const merchant = merchantRes.data;
-      if (merchant) {
-        const isOpen = merchant.is_open !== undefined && merchant.is_open !== null ? Boolean(merchant.is_open) : true;
-        setIsShopOpen(isOpen);
-      }
+      const isOpen = statusRes?.is_open !== undefined ? Boolean(statusRes.is_open) : true;
+      setIsShopOpen(isOpen);
 
       const prods = prodsRes.data;
       const validProds = (prods ?? []).filter((p: any) => !isProductExpired(p.expire_date));
@@ -334,7 +333,7 @@ const CACHE_TTL_MS = 60_000;
     try {
       const stored = JSON.parse(localStorage.getItem('cart-products') || '{}');
       const sName = shop?.community_name ?? shop?.full_name ?? 'Local Farm';
-      const sAvatar = shop?.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sName)}&background=0DB30D&color=fff&size=50`;
+      const sAvatar = shop?.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sName)}&background=1b4332&color=fff&size=50`;
       stored[product.id] = { ...product, qty: newQty, shopName: sName, shopSlug: shop?.id ?? '', shopAvatar: sAvatar };
       localStorage.setItem('cart-products', JSON.stringify(stored));
     } catch (e) {}
@@ -397,7 +396,7 @@ const CACHE_TTL_MS = 60_000;
   const shopName = shop.community_name ?? shop.full_name ?? 'Unknown Shop';
   const shopOwner = shop.full_name ?? '';
   const shopLocation = shop.province ?? '';
-  const shopAvatar = shop.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(shopName)}&background=0DB30D&color=fff&size=80`;
+  const shopAvatar = shop.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(shopName)}&background=1b4332&color=fff&size=80`;
   const shopCover = shop.background_urls?.[0] || 'https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&w=1200&q=80';
   const shopVerified = shop.is_verified ?? false;
 

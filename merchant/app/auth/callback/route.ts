@@ -20,7 +20,10 @@ export async function GET(request: Request) {
         }
       }
     )
-    await supabase.auth.exchangeCodeForSession(code)
+    const { data } = await supabase.auth.exchangeCodeForSession(code)
+    if (data?.session?.user?.user_metadata?.role === 'distributor') {
+      return NextResponse.redirect(`${origin}/distributors/products`)
+    }
   }
 
   // if it's a password reset, go to reset page

@@ -27,7 +27,12 @@ export async function POST(req: NextRequest) {
   // Also confirms the order is real and still pending before waking anyone up.
   const { data: order, error: orderError } = await supabaseAdmin
     .from('orders')
-    .select('id, status, total_amount')
+    .select(`
+      id, status, total_amount,
+      items:order_items (
+        products ( merchant_id )
+      )
+    `)
     .eq('id', orderId)
     .single();
 
@@ -39,10 +44,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, sent: 0, reason: 'Order is no longer pending' });
   }
 
+  const orderMerchantId = (order as any)?.items?.[0]?.products?.merchant_id;
+  if (!orderMerchantId) {
+    return NextResponse.json({ ok: true, sent: 0, reason: 'No community merchant found for order' });
+  }
+
+  // Find distributors belonging to this specific community farm
+  const { data: communityDists, error: distError } = await supabaseAdmin
+    .from('profile_distributors')
+    .select('id')
+    .eq('merchant_id', orderMerchantId)
+    .eq('status', 'active');
+
+  if (distError) {
+    return NextResponse.json({ ok: false, error: distError.message }, { status: 500 });
+  }
+
+  const communityDistIds = (communityDists || []).map((d: any) => d.id);
+  if (communityDistIds.length === 0) {
+    return NextResponse.json({ ok: true, sent: 0, reason: 'No distributors registered for this community' });
+  }
+
   const { data: subs, error } = await supabaseAdmin
     .from('push_subscriptions')
     .select('*')
-    .eq('role', 'distributor');
+    .eq('role', 'distributor')
+    .in('user_id', communityDistIds);
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   if (!subs || subs.length === 0) return NextResponse.json({ ok: true, sent: 0 });

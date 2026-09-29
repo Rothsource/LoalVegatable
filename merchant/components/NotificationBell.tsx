@@ -27,15 +27,26 @@ function getDenied(): string[] {
 }
 
 // role="distributor" → can Accept/Deny from the dropdown.
+// role="distributor" → can Accept/Deny from the dropdown.
 // role="merchant"    → view customer orders for their produce with item details.
 export default function NotificationBell({ role }: { role: "distributor" | "merchant" }) {
   const [orders, setOrders] = useState<OrderNotif[]>([]);
   const [open, setOpen] = useState(false);
   const [distributorId, setDistributorId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [readIds, setReadIds] = useState<string[]>([]);
+
+  const getStorageKey = useCallback((uid: string) => `notif_read_${role}_${uid}`, [role]);
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    setUserId(user.id);
+
+    try {
+      const stored = localStorage.getItem(getStorageKey(user.id));
+      if (stored) setReadIds(JSON.parse(stored));
+    } catch {}
 
     if (role === "distributor") {
       setDistributorId(user.id);
@@ -45,7 +56,9 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
           const data = await res.json();
           const denied = getDenied();
           const pending = (data.pending || []).filter((o: OrderNotif) => !denied.includes(o.id));
-          setOrders(pending);
+          const active = (data.active || []);
+          // Combine pending and active so notifications load reliably
+          setOrders([...pending, ...active]);
         }
       } catch (err) {
         console.error("Distributor bell load error:", err);
@@ -62,7 +75,7 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
         console.error("Merchant bell load error:", err);
       }
     }
-  }, [role]);
+  }, [role, getStorageKey]);
 
   useEffect(() => {
     load();
@@ -74,7 +87,31 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
     return () => { supabase.removeChannel(channel); };
   }, [load, role]);
 
+  const markAsRead = (orderId: string) => {
+    if (readIds.includes(orderId)) return;
+    const next = [...readIds, orderId];
+    setReadIds(next);
+    if (userId) {
+      try {
+        localStorage.setItem(getStorageKey(userId), JSON.stringify(next));
+        window.dispatchEvent(new Event("notif-read-updated"));
+      } catch {}
+    }
+  };
+
+  const markAllAsRead = () => {
+    const allIds = orders.map((o) => o.id);
+    setReadIds(allIds);
+    if (userId) {
+      try {
+        localStorage.setItem(getStorageKey(userId), JSON.stringify(allIds));
+        window.dispatchEvent(new Event("notif-read-updated"));
+      } catch {}
+    }
+  };
+
   const accept = async (orderId: string) => {
+    markAsRead(orderId);
     if (role === "merchant") {
       try {
         await fetch("/api/merchant/orders/respond", {
@@ -94,18 +131,27 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
     }
 
     if (!distributorId) return;
-    const { data } = await supabase
-      .from("orders")
-      .update({ status: "accepted", distributor_id: distributorId, accepted_at: new Date().toISOString() })
-      .eq("id", orderId).eq("status", "pending").is("distributor_id", null)
-      .select("id");
-    if (data && data.length > 0) {
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    try {
+      const res = await fetch("/api/distributor/orders/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, distributorId }),
+      });
+      if (res.ok) {
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        load();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Cannot accept order from another community.");
+        load();
+      }
+    } catch {
       load();
     }
   };
 
   const deny = async (orderId: string) => {
+    markAsRead(orderId);
     if (role === "merchant") {
       try {
         await fetch("/api/merchant/orders/respond", {
@@ -131,29 +177,48 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
     load();
   };
 
-  const pendingCount = orders.filter((o) => o.status === "pending").length;
+  // Messenger-style unread count: only orders not yet clicked/read
+  const unreadCount = orders.filter((o) => !readIds.includes(o.id)).length;
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen((v) => !v)} className="relative rounded-full p-2 hover:bg-gray-100 transition cursor-pointer">
-        <Bell size={20} className="text-gray-600" />
-        {pendingCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white animate-pulse">
-            {pendingCount}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="relative rounded-full p-2 hover:bg-gray-100 transition cursor-pointer"
+        aria-label="Order notifications"
+      >
+        <Bell size={20} className={`transition-colors ${unreadCount > 0 ? "text-[#c53929]" : "text-gray-600"}`} />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+            <span className="relative flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-84 rounded-2xl border border-[#dfe6d9] bg-white p-3 shadow-xl card-shadow">
+        <div className="absolute right-0 z-50 mt-2 w-88 rounded-2xl border border-[#dfe6d9] bg-white p-3 shadow-xl card-shadow">
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 px-1">
-            <p className="text-xs font-black uppercase tracking-wider text-[var(--leaf-dark)]">
-              {role === "distributor" ? "Pending Delivery Orders" : "Recent Store Orders"}
-            </p>
-            {pendingCount > 0 && (
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">
-                {pendingCount} new
-              </span>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-[var(--leaf-dark)]">
+                {role === "distributor" ? "Distributor Orders" : "Recent Store Orders"}
+              </p>
+              {unreadCount > 0 && (
+                <span className="text-[10px] font-medium text-gray-500">
+                  {unreadCount} unread
+                </span>
+              )}
+            </div>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllAsRead}
+                className="text-[11px] font-bold text-[var(--leaf)] hover:underline cursor-pointer"
+              >
+                Mark all as read
+              </button>
             )}
           </div>
 
@@ -162,14 +227,28 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
           ) : (
             <div className="max-h-84 space-y-2 overflow-y-auto pr-1">
               {orders.slice(0, 10).map((o) => {
+                const isUnread = !readIds.includes(o.id);
                 const itemSummary = (o.items || [])
                   .map((i) => `${i.product_name || i.name || "Produce"} ×${i.quantity} ${i.unit || "kg"}`)
                   .join(", ");
 
                 return (
-                  <div key={o.id} className="rounded-xl p-3 bg-[#fafbf9] border border-[#e2e8dd] hover:border-[#c8dfc5] transition">
+                  <div
+                    key={o.id}
+                    onClick={() => markAsRead(o.id)}
+                    className={`rounded-xl p-3 border transition cursor-pointer ${
+                      isUnread
+                        ? "bg-[#f4f9f2] border-[#c8dfc5] shadow-2xs"
+                        : "bg-[#fafbf9] border-[#e2e8dd] opacity-90 hover:opacity-100"
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-900">#{o.id.slice(0, 8)}</span>
+                      <div className="flex items-center gap-1.5">
+                        {isUnread && (
+                          <span className="h-2 w-2 rounded-full bg-[var(--leaf)] shrink-0" aria-label="Unread" />
+                        )}
+                        <span className="text-xs font-bold text-gray-900">#{o.id.slice(0, 8)}</span>
+                      </div>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         o.status === "pending"
                           ? "bg-amber-100 text-amber-800"
@@ -200,13 +279,13 @@ export default function NotificationBell({ role }: { role: "distributor" | "merc
                     {o.status === "pending" && (
                       <div className="mt-2.5 flex gap-2 pt-2 border-t border-gray-100">
                         <button
-                          onClick={() => deny(o.id)}
+                          onClick={(e) => { e.stopPropagation(); deny(o.id); }}
                           className="flex-1 rounded-xl border border-red-200 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 transition cursor-pointer"
                         >
                           {role === "merchant" ? "Decline (Refund)" : "Pass"}
                         </button>
                         <button
-                          onClick={() => accept(o.id)}
+                          onClick={(e) => { e.stopPropagation(); accept(o.id); }}
                           className="flex-1 rounded-xl bg-[#0DB30D] hover:bg-[#0A490A] py-1.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
                         >
                           Accept

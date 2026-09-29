@@ -15,6 +15,8 @@ import {
   Bike,
   CheckCircle2,
   ArrowRight,
+  RotateCcw,
+  Clock,
 } from "lucide-react";
 import type { DeliveryLocation } from "@/lib/types";
 
@@ -72,23 +74,65 @@ function computeDistanceKm(lat1: number, lon1: number, lat2: number, lon2: numbe
   return Math.round(R * c * 10) / 10;
 }
 
-interface DeliveryMapProps {
-  destination: DeliveryLocation;
-  pickup?: DeliveryLocation;
+// Real road route fetcher via OSRM (driving profile, street geometry)
+async function fetchRoadRoute(
+  startLat: number,
+  startLng: number,
+  endLat: number,
+  endLng: number
+): Promise<{ coordinates: [number, number][]; distanceKm: number; durationMin: number } | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.code === "Ok" && data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      const coords: [number, number][] = route.geometry.coordinates.map(
+        (c: [number, number]) => [c[1], c[0]] // convert GeoJSON [lng, lat] to Leaflet [lat, lng]
+      );
+      const distanceKm = Math.round((route.distance / 1000) * 10) / 10;
+      const durationMin = Math.max(1, Math.round(route.duration / 60));
+      return { coordinates: coords, distanceKm, durationMin };
+    }
+  } catch (err) {
+    console.warn("OSRM road route fetch fallback:", err);
+  }
+  return null;
 }
 
-export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
+export interface DeliveryMapProps {
+  destination: DeliveryLocation;
+  pickup?: DeliveryLocation;
+  stage?: "to_pickup" | "to_consumer";
+  onStageChange?: (stage: "to_pickup" | "to_consumer") => void;
+  onArrivedAtPickup?: () => void;
+}
+
+export function DeliveryMap({
+  destination,
+  pickup,
+  stage: controlledStage,
+  onStageChange,
+  onArrivedAtPickup,
+}: DeliveryMapProps) {
   const mapNode = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const riderMarkerRef = useRef<any>(null);
-  const leg1LineRef = useRef<any>(null); // Courier -> Pickup
-  const leg2LineRef = useRef<any>(null); // Pickup -> Consumer
+  const activeRouteLineRef = useRef<any>(null);
+  const activeRouteCasingRef = useRef<any>(null);
+  const previewRouteLineRef = useRef<any>(null);
   const leafletModuleRef = useRef<any>(null);
   const timersRef = useRef<number[]>([]);
 
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
-  // 1. Resolved Coordinates for all 3 key stops
+  // 1. Resolved Coordinates for all 3 key points
   const [resolvedDestCoords, setResolvedDestCoords] = useState<{ latitude: number; longitude: number } | null>(
     destination.coordinates ?? null
   );
@@ -97,11 +141,20 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
   );
   const [riderCoords, setRiderCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // Live rider GPS tracking state
+  // Stage state: "to_pickup" (Leg 1) vs "to_consumer" (Leg 2)
+  const [internalStage, setInternalStage] = useState<"to_pickup" | "to_consumer">("to_pickup");
+  const currentStage = controlledStage ?? internalStage;
+
+  // Directions state
+  const [isRouting, setIsRouting] = useState(false);
+  const [roadDistanceKm, setRoadDistanceKm] = useState<number | null>(null);
+  const [roadDurationMin, setRoadDurationMin] = useState<number | null>(null);
+  const [roadCoordinates, setRoadCoordinates] = useState<[number, number][]>([]);
+
+  // Live GPS & Simulation
   const [gpsStatus, setGpsStatus] = useState<"searching" | "active" | "denied" | "simulating">("searching");
   const [autoFollow, setAutoFollow] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [currentStage, setCurrentStage] = useState<"to_pickup" | "at_pickup" | "to_consumer" | "arrived">("to_pickup");
   const simIntervalRef = useRef<number | null>(null);
 
   const addTimer = (id: number) => {
@@ -114,7 +167,15 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
     timersRef.current = [];
   };
 
-  // 1. Resolve Destination Coordinates
+  const setStage = useCallback(
+    (nextStage: "to_pickup" | "to_consumer") => {
+      setInternalStage(nextStage);
+      onStageChange?.(nextStage);
+    },
+    [onStageChange]
+  );
+
+  // 1. Geocode Destination Coordinates if missing
   useEffect(() => {
     if (destination.coordinates?.latitude && destination.coordinates?.longitude) {
       setResolvedDestCoords(destination.coordinates);
@@ -156,7 +217,7 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
     };
   }, [destination.address, destination.coordinates]);
 
-  // 2. Resolve Pickup Coordinates (Guarantees Pickup Pin always renders!)
+  // 2. Geocode Pickup Coordinates if missing
   useEffect(() => {
     if (pickup?.coordinates?.latitude && pickup?.coordinates?.longitude) {
       setResolvedPickupCoords(pickup.coordinates);
@@ -164,7 +225,6 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
     }
 
     if (!pickup?.address) {
-      // Offset slightly from destination if no pickup specified
       const fallbackBase = resolvedDestCoords || { latitude: 11.5564, longitude: 104.9282 };
       setResolvedPickupCoords({
         latitude: fallbackBase.latitude - 0.015,
@@ -216,10 +276,9 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
     };
   }, [pickup?.address, pickup?.coordinates, resolvedDestCoords]);
 
-  // 3. Initialize Realistic Initial Courier Location near Pickup
+  // 3. Initialize Realistic Initial Courier Location
   useEffect(() => {
     if (resolvedPickupCoords && !riderCoords && !isSimulating) {
-      // Place courier 1.2km away from pickup so all 3 pins appear immediately
       setRiderCoords({
         latitude: resolvedPickupCoords.latitude - 0.010,
         longitude: resolvedPickupCoords.longitude - 0.009,
@@ -260,13 +319,97 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
     };
   }, [isSimulating]);
 
-  // 5. Initialize and Render Leaflet Map with all 3 Pins and 2 Consecutive Legs
+  // 5. Calculate and Render Directions (Google Maps-Style Road Route)
+  const calculateAndDrawRoute = useCallback(
+    async (targetStage = currentStage) => {
+      if (!resolvedDestCoords || !resolvedPickupCoords) return;
+
+      const effectiveCourier = riderCoords || {
+        latitude: resolvedPickupCoords.latitude - 0.010,
+        longitude: resolvedPickupCoords.longitude - 0.009,
+      };
+
+      setIsRouting(true);
+
+      let originLat: number;
+      let originLng: number;
+      let destLat: number;
+      let destLng: number;
+
+      if (targetStage === "to_pickup") {
+        // Leg 1: Delivery Rider -> Pickup Farm
+        originLat = effectiveCourier.latitude;
+        originLng = effectiveCourier.longitude;
+        destLat = resolvedPickupCoords.latitude;
+        destLng = resolvedPickupCoords.longitude;
+      } else {
+        // Leg 2: Pickup / Courier -> Consumer Destination
+        originLat = riderCoords ? riderCoords.latitude : resolvedPickupCoords.latitude;
+        originLng = riderCoords ? riderCoords.longitude : resolvedPickupCoords.longitude;
+        destLat = resolvedDestCoords.latitude;
+        destLng = resolvedDestCoords.longitude;
+      }
+
+      const roadRoute = await fetchRoadRoute(originLat, originLng, destLat, destLng);
+
+      const coords: [number, number][] =
+        roadRoute?.coordinates && roadRoute.coordinates.length > 1
+          ? roadRoute.coordinates
+          : [
+              [originLat, originLng],
+              [destLat, destLng],
+            ];
+
+      const dist = roadRoute ? roadRoute.distanceKm : computeDistanceKm(originLat, originLng, destLat, destLng);
+      const dur = roadRoute ? roadRoute.durationMin : Math.max(1, Math.round((dist / 30) * 60));
+
+      setRoadCoordinates(coords);
+      setRoadDistanceKm(dist);
+      setRoadDurationMin(dur);
+      setIsRouting(false);
+
+      // Update Map Lines
+      if (activeRouteCasingRef.current && activeRouteLineRef.current && mapInstance.current) {
+        activeRouteCasingRef.current.setLatLngs(coords);
+        activeRouteLineRef.current.setLatLngs(coords);
+
+        // Highlight line color based on stage
+        const routeColor = targetStage === "to_pickup" ? "#2563eb" : "#10b981"; // Vibrant Google Blue or Emerald
+        activeRouteLineRef.current.setStyle({ color: routeColor });
+
+        // Update preview line for the other leg
+        if (previewRouteLineRef.current) {
+          if (targetStage === "to_pickup") {
+            // Preview Leg 2 (Pickup -> Consumer)
+            previewRouteLineRef.current.setLatLngs([
+              [resolvedPickupCoords.latitude, resolvedPickupCoords.longitude],
+              [resolvedDestCoords.latitude, resolvedDestCoords.longitude],
+            ]);
+            previewRouteLineRef.current.setStyle({ opacity: 0.45, color: "#64748b" });
+          } else {
+            // Leg 1 is completed
+            previewRouteLineRef.current.setLatLngs([]);
+          }
+        }
+
+        try {
+          const L = leafletModuleRef.current;
+          if (L) {
+            const bounds = L.latLngBounds(coords);
+            mapInstance.current.fitBounds(bounds, { padding: [55, 55], maxZoom: 16, animate: true });
+          }
+        } catch {}
+      }
+    },
+    [currentStage, resolvedDestCoords, resolvedPickupCoords, riderCoords]
+  );
+
+  // 6. Initialize Leaflet Map
   useEffect(() => {
     if (!resolvedDestCoords || !resolvedPickupCoords || !mapNode.current) return;
 
     let cancelled = false;
 
-    // Inject stylesheet safely if needed
     if (typeof document !== "undefined" && !document.querySelector('link[href*="leaflet"]')) {
       const link = document.createElement("link");
       link.rel = "stylesheet";
@@ -280,7 +423,6 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
         const L = module.default;
         leafletModuleRef.current = L;
 
-        // Clean up previous map safely
         if (mapInstance.current) {
           try {
             const oldMap = mapInstance.current;
@@ -315,7 +457,7 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
           scrollWheelZoom: false,
         });
 
-        // OpenStreetMap Tile Layer
+        // OpenStreetMap Crisp Tiles
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           maxZoom: 19,
@@ -328,8 +470,8 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
           className: "custom-courier-pin",
           html: `
             <div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">
-              <div style="position:absolute;inset:0;border-radius:50%;background:rgba(27,67,50,0.28);animation:ping 2s cubic-bezier(0,0,0.2,1) infinite;"></div>
-              <div style="position:relative;width:34px;height:34px;border-radius:50%;background:#1b4332;border:3px solid #ffffff;box-shadow:0 6px 20px rgba(27,67,50,0.45);display:flex;align-items:center;justify-content:center;color:#ffffff;">
+              <div style="position:absolute;inset:0;border-radius:50%;background:rgba(37,99,235,0.25);animation:ping 2s cubic-bezier(0,0,0.2,1) infinite;"></div>
+              <div style="position:relative;width:34px;height:34px;border-radius:50%;background:#2563eb;border:3px solid #ffffff;box-shadow:0 6px 20px rgba(37,99,235,0.45);display:flex;align-items:center;justify-content:center;color:#ffffff;">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
               </div>
             </div>
@@ -346,26 +488,26 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
 
         courierMarker.bindPopup(`
           <div style="padding:6px;font-family:system-ui,sans-serif;font-size:13px;color:#231b14;min-width:180px;">
-            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;color:#1b4332;margin-bottom:3px;">
-              📍 Stop 1 • Live Courier
+            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;color:#2563eb;margin-bottom:3px;">
+              📍 Live Courier (You)
             </div>
-            <strong style="font-size:14px;color:#1b4332;display:block;">Delivery Rider (You)</strong>
-            <p style="margin:4px 0 0 0;color:#68594e;font-size:11px;line-height:1.4;">
-              Departing to pickup fresh vegetables at the farm.
+            <strong style="font-size:14px;color:#1e3a8a;display:block;">Delivery Rider Pin</strong>
+            <p style="margin:4px 0 0 0;color:#64748b;font-size:11px;line-height:1.4;">
+              ${currentStage === "to_pickup" ? "En route to collect fresh produce." : "En route to customer drop-off."}
             </p>
           </div>
         `);
         riderMarkerRef.current = courierMarker;
 
         // ==========================================
-        // PIN 2: Pickup Location (Merchant / Hub)
+        // PIN 2: Pickup Location (Farm / Community)
         // ==========================================
         const pickupIcon = L.divIcon({
           className: "custom-pickup-pin",
           html: `
             <div style="position:relative;width:42px;height:42px;display:flex;align-items:center;justify-content:center;">
-              <div style="position:absolute;width:38px;height:38px;border-radius:50% 50% 50% 0;background:#4a3525;border:3px solid #ffffff;box-shadow:0 8px 24px rgba(74,53,37,0.4);transform:rotate(-45deg);"></div>
-              <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:center;color:#ddb892;">
+              <div style="position:absolute;width:38px;height:38px;border-radius:50% 50% 50% 0;background:#935626;border:3px solid #ffffff;box-shadow:0 8px 24px rgba(147,86,38,0.4);transform:rotate(-45deg);"></div>
+              <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:center;color:#ffffff;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/></svg>
               </div>
             </div>
@@ -383,11 +525,11 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
         pickupMarker.bindPopup(`
           <div style="padding:6px;font-family:system-ui,sans-serif;font-size:13px;color:#231b14;min-width:180px;">
             <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;color:#935626;margin-bottom:3px;">
-              📦 Stop 2 • Produce Pickup
+              📦 Stop 1 • Pickup Hub
             </div>
             <strong style="font-size:14px;color:#4a3525;display:block;">${pickup?.label || "Farm & Harvest Hub"}</strong>
-            <p style="margin:4px 0 0 0;color:#68594e;font-size:11px;line-height:1.4;">
-              ${pickup?.address || "Grower dispatch location"}
+            <p style="margin:4px 0 0 0;color:#64748b;font-size:11px;line-height:1.4;">
+              ${pickup?.address || "Producer harvest location"}
             </p>
           </div>
         `);
@@ -399,8 +541,8 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
           className: "custom-dest-pin",
           html: `
             <div style="position:relative;width:42px;height:42px;display:flex;align-items:center;justify-content:center;">
-              <div style="position:absolute;width:38px;height:38px;border-radius:50% 50% 50% 0;background:#2d6a4f;border:3px solid #ffffff;box-shadow:0 8px 24px rgba(45,106,79,0.4);transform:rotate(-45deg);"></div>
-              <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:center;color:#d8e2dc;">
+              <div style="position:absolute;width:38px;height:38px;border-radius:50% 50% 50% 0;background:#059669;border:3px solid #ffffff;box-shadow:0 8px 24px rgba(5,150,105,0.4);transform:rotate(-45deg);"></div>
+              <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:center;color:#ffffff;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               </div>
             </div>
@@ -417,59 +559,56 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
 
         destMarker.bindPopup(`
           <div style="padding:6px;font-family:system-ui,sans-serif;font-size:13px;color:#231b14;min-width:180px;">
-            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;color:#2d6a4f;margin-bottom:3px;">
-              🏠 Stop 3 • Consumer Drop-off
+            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;color:#059669;margin-bottom:3px;">
+              🏠 Stop 2 • Consumer Destination
             </div>
-            <strong style="font-size:14px;color:#1b4332;display:block;">${destination.label || "Customer Destination"}</strong>
-            <p style="margin:4px 0 0 0;color:#68594e;font-size:11px;line-height:1.4;">${destination.address}</p>
+            <strong style="font-size:14px;color:#065f46;display:block;">${destination.label || "Customer Home"}</strong>
+            <p style="margin:4px 0 0 0;color:#64748b;font-size:11px;line-height:1.4;">${destination.address}</p>
           </div>
         `);
 
         // ==========================================
-        // ROUTE LEG 1: Delivery Location -> Pickup
-        // (Courier en route to collect produce)
+        // Google Maps-Style Driving Polyline (Casing + Core)
         // ==========================================
-        const leg1Line = L.polyline(
+        const initialCoords: [number, number][] = [
+          [effectiveCourier.latitude, effectiveCourier.longitude],
+          [pickLat, pickLng],
+        ];
+
+        // Outer glow/casing line (dark blue border)
+        const activeRouteCasing = L.polyline(initialCoords, {
+          color: "#1e3a8a",
+          weight: 8,
+          opacity: 0.6,
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(map);
+        activeRouteCasingRef.current = activeRouteCasing;
+
+        // Inner core road line (Google Blue)
+        const activeRouteLine = L.polyline(initialCoords, {
+          color: "#2563eb",
+          weight: 5,
+          opacity: 0.95,
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(map);
+        activeRouteLineRef.current = activeRouteLine;
+
+        // Secondary Leg Preview (dashed line)
+        const previewRouteLine = L.polyline(
           [
-            [effectiveCourier.latitude, effectiveCourier.longitude],
             [pickLat, pickLng],
+            [destLat, destLng],
           ],
           {
-            color: "#935626", // Warm earthy brown
-            weight: 4,
-            opacity: 0.9,
+            color: "#64748b",
+            weight: 3.5,
+            opacity: 0.45,
             dashArray: "6, 8",
           }
         ).addTo(map);
-        leg1LineRef.current = leg1Line;
-
-        // ==========================================
-        // ROUTE LEG 2: Pickup -> Consumer Destination
-        // (From farm to customer home)
-        // ==========================================
-        const leg2Line = L.polyline(
-          [
-            [pickLat, pickLng],
-            [destLat, destLng],
-          ],
-          {
-            color: "#1b4332", // Deep forest green
-            weight: 4.5,
-            opacity: 0.95,
-            dashArray: "8, 6",
-          }
-        ).addTo(map);
-        leg2LineRef.current = leg2Line;
-
-        // Automatically Fit Camera to Enclose All 3 Pins
-        try {
-          const bounds = L.latLngBounds([
-            [effectiveCourier.latitude, effectiveCourier.longitude],
-            [pickLat, pickLng],
-            [destLat, destLng],
-          ]);
-          map.fitBounds(bounds, { padding: [55, 55], maxZoom: 15, animate: false });
-        } catch {}
+        previewRouteLineRef.current = previewRouteLine;
 
         mapInstance.current = map;
         setState("ready");
@@ -485,6 +624,9 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
 
         addTimer(window.setTimeout(safeInvalidate, 80));
         addTimer(window.setTimeout(safeInvalidate, 350));
+
+        // Draw initial real road directions
+        void calculateAndDrawRoute(currentStage);
       })
       .catch((err) => {
         console.error("Leaflet load error:", err);
@@ -504,28 +646,27 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
         mapInstance.current = null;
       }
       riderMarkerRef.current = null;
-      leg1LineRef.current = null;
-      leg2LineRef.current = null;
+      activeRouteLineRef.current = null;
+      activeRouteCasingRef.current = null;
+      previewRouteLineRef.current = null;
     };
   }, [resolvedDestCoords, resolvedPickupCoords, destination, pickup]);
 
-  // 6. Update Delivery Rider Marker & Leg 1 Polyline when GPS moves
+  // Recalculate road route whenever stage changes
   useEffect(() => {
-    if (!mapInstance.current || !riderCoords || !resolvedPickupCoords) return;
+    if (state === "ready") {
+      void calculateAndDrawRoute(currentStage);
+    }
+  }, [currentStage, calculateAndDrawRoute, state]);
+
+  // Update Rider Marker when GPS updates
+  useEffect(() => {
+    if (!mapInstance.current || !riderCoords) return;
 
     if (riderMarkerRef.current) {
       riderMarkerRef.current.setLatLng([riderCoords.latitude, riderCoords.longitude]);
     }
 
-    // Update Leg 1 route line (Courier -> Pickup)
-    if (leg1LineRef.current) {
-      leg1LineRef.current.setLatLngs([
-        [riderCoords.latitude, riderCoords.longitude],
-        [resolvedPickupCoords.latitude, resolvedPickupCoords.longitude],
-      ]);
-    }
-
-    // Optional Auto-follow
     if (autoFollow && mapInstance.current) {
       try {
         mapInstance.current.panTo([riderCoords.latitude, riderCoords.longitude], {
@@ -534,9 +675,9 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
         });
       } catch {}
     }
-  }, [riderCoords, resolvedPickupCoords, autoFollow]);
+  }, [riderCoords, autoFollow]);
 
-  // Recenter on complete 3-pin bounding box
+  // Recenter complete view
   const recenterAllPins = useCallback(() => {
     if (!mapInstance.current || !resolvedDestCoords || !resolvedPickupCoords) return;
     try {
@@ -550,70 +691,53 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
     } catch {}
   }, [riderCoords, resolvedPickupCoords, resolvedDestCoords]);
 
-  // 7. Multi-stage Simulation: Courier -> Pickup, THEN Pickup -> Consumer!
+  // Handle "Arrive at Pickup" transition to Step 2
+  const handleArriveAtPickupInternal = () => {
+    setStage("to_consumer");
+    onArrivedAtPickup?.();
+  };
+
+  // Simulation: Move Courier along the actual OSRM road coordinates
   const toggleSimulation = () => {
     if (isSimulating) {
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
       simIntervalRef.current = null;
       setIsSimulating(false);
       setGpsStatus("searching");
-      setCurrentStage("to_pickup");
       return;
     }
 
-    if (!resolvedDestCoords || !resolvedPickupCoords) return;
+    if (!roadCoordinates || roadCoordinates.length < 2) return;
 
     setIsSimulating(true);
     setGpsStatus("simulating");
 
-    const pickLat = resolvedPickupCoords.latitude;
-    const pickLng = resolvedPickupCoords.longitude;
-    const destLat = resolvedDestCoords.latitude;
-    const destLng = resolvedDestCoords.longitude;
+    let idx = 0;
+    const totalPoints = roadCoordinates.length;
+    // Step forward every 400ms along the real road polyline
+    const stepSize = Math.max(1, Math.floor(totalPoints / 25));
 
-    // Courier initial point 1.2km away from pickup
-    const startCourierLat = pickLat - 0.010;
-    const startCourierLng = pickLng - 0.009;
-
-    let step = 0;
-    const totalStepsStage1 = 12; // Courier -> Pickup
-    const pauseSteps = 4;        // Produce loading pause at pickup
-    const totalStepsStage2 = 16; // Pickup -> Consumer
-    const totalSteps = totalStepsStage1 + pauseSteps + totalStepsStage2;
-
-    setRiderCoords({ latitude: startCourierLat, longitude: startCourierLng });
-    setCurrentStage("to_pickup");
+    setRiderCoords({ latitude: roadCoordinates[0][0], longitude: roadCoordinates[0][1] });
 
     simIntervalRef.current = window.setInterval(() => {
-      step++;
-
-      if (step <= totalStepsStage1) {
-        // Stage 1: Moving from Courier position to Pickup
-        setCurrentStage("to_pickup");
-        const progress1 = step / totalStepsStage1;
-        const curLat = startCourierLat + (pickLat - startCourierLat) * progress1;
-        const curLng = startCourierLng + (pickLng - startCourierLng) * progress1;
-        setRiderCoords({ latitude: curLat, longitude: curLng });
-      } else if (step <= totalStepsStage1 + pauseSteps) {
-        // Stage 2: Arrived at Pickup (Loading fresh produce)
-        setCurrentStage("at_pickup");
-        setRiderCoords({ latitude: pickLat, longitude: pickLng });
-      } else if (step < totalSteps) {
-        // Stage 3: Moving from Pickup to Consumer
-        setCurrentStage("to_consumer");
-        const stepInStage2 = step - (totalStepsStage1 + pauseSteps);
-        const progress2 = stepInStage2 / totalStepsStage2;
-        const curLat = pickLat + (destLat - pickLat) * progress2;
-        const curLng = pickLng + (destLng - pickLng) * progress2;
-        setRiderCoords({ latitude: curLat, longitude: curLng });
+      idx += stepSize;
+      if (idx < totalPoints) {
+        const point = roadCoordinates[idx];
+        setRiderCoords({ latitude: point[0], longitude: point[1] });
       } else {
-        // Stage 4: Arrived at Consumer destination
-        setCurrentStage("arrived");
-        setRiderCoords({ latitude: destLat, longitude: destLng });
+        const lastPoint = roadCoordinates[totalPoints - 1];
+        setRiderCoords({ latitude: lastPoint[0], longitude: lastPoint[1] });
         if (simIntervalRef.current) clearInterval(simIntervalRef.current);
         simIntervalRef.current = null;
+        setIsSimulating(false);
+        setGpsStatus("searching");
+
+        if (currentStage === "to_pickup") {
+          // Reached pickup during demo
+          handleArriveAtPickupInternal();
+        }
       }
-    }, 1100);
+    }, 450);
   };
 
   useEffect(() => {
@@ -622,89 +746,105 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
     };
   }, []);
 
-  // Distance calculations
-  const distCourierToPickup =
-    riderCoords && resolvedPickupCoords
-      ? computeDistanceKm(
-          riderCoords.latitude,
-          riderCoords.longitude,
-          resolvedPickupCoords.latitude,
-          resolvedPickupCoords.longitude
-        )
-      : null;
-
-  const distPickupToConsumer =
-    resolvedPickupCoords && resolvedDestCoords
-      ? computeDistanceKm(
-          resolvedPickupCoords.latitude,
-          resolvedPickupCoords.longitude,
-          resolvedDestCoords.latitude,
-          resolvedDestCoords.longitude
-        )
-      : null;
-
-  const navUrl = resolvedDestCoords
-    ? `https://www.google.com/maps/dir/?api=1&destination=${resolvedDestCoords.latitude},${resolvedDestCoords.longitude}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination.address)}`;
+  // External Navigation App link (Google Maps)
+  const targetCoords = currentStage === "to_pickup" ? resolvedPickupCoords : resolvedDestCoords;
+  const navUrl = targetCoords
+    ? riderCoords
+      ? `https://www.google.com/maps/dir/?api=1&origin=${riderCoords.latitude},${riderCoords.longitude}&destination=${targetCoords.latitude},${targetCoords.longitude}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.latitude},${targetCoords.longitude}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        currentStage === "to_pickup" ? pickup?.address || "Pickup" : destination.address
+      )}`;
 
   return (
     <section className="overflow-hidden rounded-3xl border border-[var(--line)] bg-white shadow-sm">
-      {/* Map Control Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-[#fbf9f4] px-5 py-3.5">
+      {/* Top Map Action Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-[#fbf9f4] px-4 py-3 sm:px-5">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">Live Dispatch Map</span>
-          <h4 className="text-sm font-black text-[var(--ink)] flex items-center gap-1.5">
-            <span>3-Pin Dispatch:</span>
-            <span className="text-[#935626]">Courier</span>
-            <ArrowRight size={13} className="text-[var(--muted)]" />
-            <span className="text-[#4a3525]">Pickup</span>
-            <ArrowRight size={13} className="text-[var(--muted)]" />
-            <span className="text-[#1b4332]">Consumer</span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                currentStage === "to_pickup"
+                  ? "bg-amber-100 text-amber-900 border border-amber-200"
+                  : "bg-emerald-100 text-emerald-900 border border-emerald-200"
+              }`}
+            >
+              {currentStage === "to_pickup" ? "Step 1: To Pickup" : "Step 2: To Consumer"}
+            </span>
+            <span className="text-xs font-bold text-[var(--muted)]">
+              {currentStage === "to_pickup" ? "Collect fresh harvest" : "Deliver to customer"}
+            </span>
+          </div>
+          <h4 className="mt-1 text-sm font-black text-[var(--ink)] flex items-center gap-1.5">
+            {currentStage === "to_pickup" ? (
+              <>
+                <Store size={15} className="text-[#935626]" />
+                <span>Pickup: {pickup?.label || pickup?.address || "Farm / Hub"}</span>
+              </>
+            ) : (
+              <>
+                <MapPin size={15} className="text-[#059669]" />
+                <span>Destination: {destination.label || destination.address || "Customer Home"}</span>
+              </>
+            )}
           </h4>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Follow Rider Toggle */}
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* DIRECTION BUTTON (Recalculate route like Google Maps) */}
+          <button
+            type="button"
+            onClick={() => void calculateAndDrawRoute(currentStage)}
+            disabled={isRouting}
+            title="Recalculate driving directions from current location"
+            className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-black text-white shadow-xs transition active:scale-95 disabled:opacity-60"
+          >
+            <Navigation size={14} className={isRouting ? "animate-spin" : ""} />
+            <span>{isRouting ? "Routing…" : "Direction"}</span>
+          </button>
+
+          {/* Follow Me Toggle */}
           <button
             type="button"
             onClick={() => setAutoFollow((prev) => !prev)}
             className={`cursor-pointer inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition active:scale-95 ${
               autoFollow
-                ? "border-[#1b4332] bg-[#edf6e9] text-[#1b4332]"
+                ? "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]"
                 : "border-[var(--line)] bg-white text-[var(--muted)] hover:text-[var(--ink)]"
             }`}
           >
-            <Crosshair size={13} className={autoFollow ? "text-[#1b4332]" : ""} />
-            <span>{autoFollow ? "Following" : "Free View"}</span>
+            <Crosshair size={13} className={autoFollow ? "text-[#2563eb]" : ""} />
+            <span>{autoFollow ? "Following" : "Auto-Follow"}</span>
           </button>
 
-          {/* View All 3 Pins */}
+          {/* Reset View */}
           <button
             type="button"
             onClick={recenterAllPins}
-            title="Fit all 3 pins in view"
-            className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--muted)] shadow-xs hover:border-[#1b4332] hover:text-[#1b4332] transition active:scale-95"
+            title="Fit all stops in view"
+            className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--ink)] transition active:scale-95"
           >
             <Compass size={14} />
-            <span>Show All 3 Pins</span>
+            <span className="hidden sm:inline">Fit View</span>
           </button>
         </div>
       </div>
 
       {/* Map Viewport */}
-      <div className="relative h-[340px] w-full bg-[#f4efe8] sm:h-[420px]">
+      <div className="relative h-[340px] w-full bg-[#f4efe8] sm:h-[430px]">
         <div
           ref={mapNode}
           className="absolute inset-0 z-0 h-full w-full"
-          aria-label={`Interactive delivery map with Courier, Pickup, and Destination`}
+          aria-label="Interactive road navigation map"
         />
 
         {state === "loading" && (
           <div className="absolute inset-0 z-10 grid place-items-center bg-[#f8f5ee]/90 backdrop-blur-xs text-center">
             <div>
-              <LoaderCircle className="mx-auto animate-spin text-[#1b4332]" size={32} />
-              <p className="mt-3 text-sm font-extrabold text-[var(--ink)]">Loading 3-point delivery route…</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">Plotting Courier → Pickup → Consumer</p>
+              <LoaderCircle className="mx-auto animate-spin text-[#2563eb]" size={32} />
+              <p className="mt-3 text-sm font-extrabold text-[var(--ink)]">Loading road map…</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">Connecting to OpenStreetMap &amp; directions</p>
             </div>
           </div>
         )}
@@ -715,104 +855,138 @@ export function DeliveryMap({ destination, pickup }: DeliveryMapProps) {
               <AlertTriangle className="mx-auto text-[#935626]" size={28} />
               <p className="mt-3 font-extrabold text-[var(--ink)]">Unable to load map tiles</p>
               <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                The map could not connect to tile servers, but your pickup and customer addresses are intact.
+                The tile server was unreachable, but your GPS location and destination are intact.
               </p>
             </div>
           </div>
         )}
 
-        {/* Dynamic Status Banner */}
+        {/* Live Road Route ETA Card (Overlay) */}
         {state === "ready" && (
-          <div className="absolute top-3 left-3 right-3 sm:right-auto z-10 flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2.5 rounded-2xl bg-white/95 px-3.5 py-2 shadow-md border border-[var(--line)] backdrop-blur-xs text-xs font-bold text-[var(--ink)]">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2d6a4f] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#1b4332]" />
-              </span>
-              <span>
-                {currentStage === "to_pickup" && (
-                  <span>
-                    <strong className="text-[#935626]">Step 1:</strong> En route to Pickup ({distCourierToPickup ?? "1.2"} km away)
-                  </span>
-                )}
-                {currentStage === "at_pickup" && (
-                  <span className="text-[#4a3525]">
-                    <strong>Step 1 Complete:</strong> At Pickup Farm • Loading produce
-                  </span>
-                )}
-                {currentStage === "to_consumer" && (
-                  <span>
-                    <strong className="text-[#1b4332]">Step 2:</strong> En route to Consumer ({distPickupToConsumer ?? "3.0"} km away)
-                  </span>
-                )}
-                {currentStage === "arrived" && (
-                  <span className="text-[#1b4332]">
-                    <strong>Completed:</strong> Arrived at Consumer Destination
-                  </span>
-                )}
-              </span>
-            </div>
+          <div className="absolute top-3 left-3 right-3 sm:right-auto z-10 flex flex-col gap-2 max-w-sm">
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/95 px-4 py-2.5 shadow-lg border border-[var(--line)] backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3 w-3 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2563eb] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#2563eb]" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-[var(--ink)]">
+                      {roadDistanceKm !== null ? `${roadDistanceKm} km` : "Calculating…"}
+                    </span>
+                    <span className="text-xs font-bold text-[#64748b] flex items-center gap-1">
+                      <Clock size={12} />
+                      {roadDurationMin !== null ? `~${roadDurationMin} mins` : ""}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium text-[var(--muted)] line-clamp-1">
+                    {currentStage === "to_pickup"
+                      ? "Following streets to Farm / Hub pickup"
+                      : "Following streets to Customer destination"}
+                  </p>
+                </div>
+              </div>
 
-            {/* Test Simulation Button */}
-            <button
-              type="button"
-              onClick={toggleSimulation}
-              className={`cursor-pointer inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold shadow-md border transition active:scale-95 ${
-                isSimulating
-                  ? "bg-[#935626] border-[#78461e] text-white"
-                  : "bg-white/95 border-[var(--line)] text-[var(--ink)] hover:border-[#1b4332]"
-              }`}
-            >
-              {isSimulating ? <Square size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
-              <span>{isSimulating ? "Stop Route Demo" : "Simulate Movement"}</span>
-            </button>
+              {/* Step Transition Trigger right on map */}
+              {currentStage === "to_pickup" ? (
+                <button
+                  type="button"
+                  onClick={handleArriveAtPickupInternal}
+                  className="cursor-pointer shrink-0 rounded-xl bg-[#935626] hover:bg-[#78461e] px-3 py-1.5 text-xs font-black text-white shadow-xs transition active:scale-95"
+                >
+                  Arrived at Pickup
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setStage("to_pickup")}
+                  className="cursor-pointer shrink-0 rounded-xl border border-[var(--line)] bg-white hover:bg-gray-50 px-2.5 py-1 text-[11px] font-bold text-[var(--muted)]"
+                  title="Switch back to pickup directions"
+                >
+                  ← Leg 1
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        {/* 3-Pin Interactive Legend */}
+        {/* Map Interactive Legend & Simulation controls */}
         {state === "ready" && (
-          <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-10 flex flex-wrap items-center gap-2.5 rounded-2xl bg-white/95 px-3.5 py-2 shadow-md border border-[var(--line)] backdrop-blur-xs text-[11px] font-bold text-[var(--ink)]">
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-[#1b4332] border border-white shadow-xs" />
-              1. Courier
-            </span>
-            <span className="text-[#c8beaf]">→</span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-[#4a3525] border border-white shadow-xs" />
-              2. Pickup Farm
-            </span>
-            <span className="text-[#c8beaf]">→</span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-[#2d6a4f] border border-white shadow-xs" />
-              3. Consumer
-            </span>
+          <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-10 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 rounded-2xl bg-white/95 px-3 py-1.5 shadow-md border border-[var(--line)] backdrop-blur-xs text-[11px] font-bold text-[var(--ink)]">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#2563eb] border border-white shadow-xs" />
+                You
+              </span>
+              <span className="text-[#cbd5e1]">→</span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#935626] border border-white shadow-xs" />
+                Pickup
+              </span>
+              <span className="text-[#cbd5e1]">→</span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#059669] border border-white shadow-xs" />
+                Consumer
+              </span>
+            </div>
+
+            {/* Test Simulation along road */}
+            <button
+              type="button"
+              onClick={toggleSimulation}
+              className={`cursor-pointer inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[11px] font-extrabold shadow-md border transition active:scale-95 ${
+                isSimulating
+                  ? "bg-[#2563eb] border-[#1d4ed8] text-white"
+                  : "bg-white/95 border-[var(--line)] text-[var(--ink)] hover:border-[#2563eb]"
+              }`}
+            >
+              {isSimulating ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+              <span>{isSimulating ? "Stop Demo" : "Simulate Road Drive"}</span>
+            </button>
           </div>
         )}
       </div>
 
-      {/* Two-Leg Distance & Navigation Summary Footer */}
+      {/* Road Navigation Footer with Turn-by-Turn Option */}
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between bg-white border-t border-[var(--line)]">
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-4 text-xs">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-wider text-[#935626] block">Leg 1: To Farm Pickup</span>
-            <span className="font-extrabold text-[var(--ink)]">{distCourierToPickup !== null ? `${distCourierToPickup} km` : "1.2 km"}</span>
-          </div>
-          <div className="sm:border-l sm:border-[#ece5db] sm:pl-4">
-            <span className="text-[10px] font-black uppercase tracking-wider text-[#2d6a4f] block">Leg 2: To Consumer</span>
-            <span className="font-extrabold text-[var(--ink)]">{distPickupToConsumer !== null ? `${distPickupToConsumer} km` : "3.0 km"}</span>
+        <div>
+          <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)] block">
+            {currentStage === "to_pickup" ? "Active Leg: Courier → Farm Pickup" : "Active Leg: Courier → Customer Drop-off"}
+          </span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-sm font-black text-[var(--ink)]">
+              {roadDistanceKm !== null ? `${roadDistanceKm} km` : "Estimating"}
+            </span>
+            <span className="text-xs text-[var(--muted)]">
+              {roadDurationMin !== null ? `(~${roadDurationMin} mins driving)` : ""}
+            </span>
           </div>
         </div>
 
-        <a
-          href={navUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1b4332] px-5 py-2.5 text-xs font-black text-white shadow-xs transition hover:bg-[#0f281e] active:scale-[0.98]"
-        >
-          <Navigation size={15} aria-hidden="true" />
-          <span>Turn-by-Turn GPS Navigation</span>
-          <ExternalLink size={13} className="opacity-80" aria-hidden="true" />
-        </a>
+        <div className="flex items-center gap-2">
+          {/* Quick toggle between legs */}
+          <button
+            type="button"
+            onClick={() => setStage(currentStage === "to_pickup" ? "to_consumer" : "to_pickup")}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--line)] bg-[#f8fafc] px-3.5 text-xs font-bold text-[var(--ink)] hover:bg-[#f1f5f9] transition cursor-pointer"
+          >
+            <RotateCcw size={13} />
+            <span>{currentStage === "to_pickup" ? "Switch to Leg 2 (Customer)" : "Switch to Leg 1 (Pickup)"}</span>
+          </button>
+
+          {/* Turn-by-Turn GPS Navigation App (Google Maps) */}
+          <a
+            href={navUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1b4332] hover:bg-[#123327] px-4 py-2 text-xs font-black text-white shadow-xs transition active:scale-[0.98]"
+          >
+            <Navigation size={15} aria-hidden="true" />
+            <span>Open in Google Maps</span>
+            <ExternalLink size={13} className="opacity-80" aria-hidden="true" />
+          </a>
+        </div>
       </div>
     </section>
   );
