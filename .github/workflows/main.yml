@@ -11,30 +11,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Install dependencies (customer)
         run: npm ci
         working-directory: customer
       - name: npm audit (customer)
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high || true
         working-directory: customer
-        continue-on-error: true
 
       - name: Install dependencies (merchant)
         run: npm ci
         working-directory: merchant
       - name: npm audit (merchant)
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high || true
         working-directory: merchant
-        continue-on-error: true
 
       - name: Install dependencies (delivery)
         run: npm ci
         working-directory: delivery
       - name: npm audit (delivery)
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high || true
         working-directory: delivery
-        continue-on-error: true
 
   secret-scan:
     runs-on: ubuntu-latest

@@ -140,3 +140,4 @@ desktop.ini
 
 .cache/
 .turbo/
+*.sql
