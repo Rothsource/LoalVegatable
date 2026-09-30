@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -99,6 +100,12 @@ export default function LoginPage() {
                 <label className="block text-sm font-semibold text-[#35473a]">
                   Secret Key / Password
                 </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-semibold text-[#765238] transition hover:text-[#1b4332] hover:underline"
+                >
+                  Forgot password?
+                </Link>
               </div>
               <div className="relative mt-1.5">
                 <input
