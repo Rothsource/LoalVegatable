@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Search, Loader2, ExternalLink, Pencil } from 'lucide-react';
+import { MapPin, Navigation, Search, Loader2, ExternalLink, Pencil, LogOut } from 'lucide-react';
 import { PageSkeleton, CircularLoader } from '@/components/CustomerSkeleton';
 import { supabase } from '@/lib/supabase';
 
@@ -34,6 +34,7 @@ export default function ProfilePage() {
   const [currentLocation, setCurrentLocation] = useState(''); // saved, joined string
   const [alert, setAlert] = useState<Alert>(null);
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // ── Location editor — only shown/active if the user chooses to change it ──
   const [editingLocation, setEditingLocation] = useState(false);
@@ -68,7 +69,14 @@ export default function ProfilePage() {
 
     async function loadAccount() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !active) { setLoading(false); return; }
+      if (!user) {
+        if (active) {
+          setLoading(false);
+          window.location.href = '/auth/login?redirectTo=/auth/profile';
+        }
+        return;
+      }
+      if (!active) return;
 
       setUserId(user.id);
       setEmail(user.email ?? '');
@@ -384,6 +392,25 @@ export default function ProfilePage() {
     }
   }
 
+  // ── Logout ──
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setAlert(null);
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      window.location.href = '/auth/login';
+    } catch (err) {
+      setAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Could not log out. Please try again.',
+      });
+      setLoggingOut(false);
+    }
+  }
+
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '12px 16px', borderRadius: '10px',
     border: '1px solid #e4dccb', outline: 'none', fontSize: '14px',
@@ -424,20 +451,84 @@ export default function ProfilePage() {
         .khmer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .profile-save-btn { transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .profile-save-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(59,43,32,0.2); }
+        .profile-logout-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 16px;
+          border-radius: 12px;
+          background: #ffffff;
+          border: 1.5px solid #ecd8d5;
+          color: #b33a2e;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        .profile-logout-btn:hover:not(:disabled) {
+          background: #fdf2f0;
+          border-color: #e5b8b2;
+          color: #96281e;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(179,58,46,0.12);
+        }
+        .profile-bottom-logout-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 8px 14px;
+          border-radius: 10px;
+          background: #fdf5f4;
+          border: 1px solid #f5cfc9;
+          color: #b33a2e;
+          font-size: 12.5px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .profile-bottom-logout-btn:hover:not(:disabled) {
+          background: #fce8e6;
+          border-color: #e8aba2;
+          color: #8f2319;
+        }
+        .profile-logout-btn:disabled, .profile-bottom-logout-btn:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+        .spin-icon {
+          animation: spin 1s linear infinite;
+        }
 
         @media (max-width: 640px) {
           .khmer-grid { grid-template-columns: 1fr; }
           .profile-card { padding: 22px; }
+          .profile-logout-btn { width: 100%; justify-content: center; margin-top: 4px; }
         }
       `}</style>
 
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '56px 5% 80px' }}>
-        <h1 className="profile-veg-heading" style={{ fontSize: '30px', fontWeight: '700', color: soil, margin: '0 0 6px' }}>
-          Your profile
-        </h1>
-        <p style={{ color: '#6b6155', margin: '0 0 28px', fontSize: '14.5px' }}>
-          Update your name, delivery location, and account details.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div>
+            <h1 className="profile-veg-heading" style={{ fontSize: '30px', fontWeight: '700', color: soil, margin: '0 0 6px' }}>
+              Your profile
+            </h1>
+            <p style={{ color: '#6b6155', margin: 0, fontSize: '14.5px' }}>
+              Update your name, delivery location, and account details.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="profile-logout-btn"
+            title="Log out of your account"
+          >
+            {loggingOut ? <Loader2 size={15} className="spin-icon" /> : <LogOut size={15} />}
+            <span>{loggingOut ? 'Logging out...' : 'Log out'}</span>
+          </button>
+        </div>
 
         {alert && (
           <div style={{
@@ -624,6 +715,37 @@ export default function ProfilePage() {
           >
             {saving ? 'Saving...' : 'Save changes'}
           </button>
+
+          {/* Account session & sign out */}
+          <div style={{
+            marginTop: '8px',
+            paddingTop: '20px',
+            borderTop: '1px solid #f0ede4',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: soil }}>
+                Signed in
+              </div>
+              <div style={{ fontSize: '12.5px', color: '#7a6f62', marginTop: '2px', wordBreak: 'break-all' }}>
+                {email || 'Customer account'}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="profile-bottom-logout-btn"
+            >
+              {loggingOut ? <Loader2 size={14} className="spin-icon" /> : <LogOut size={14} />}
+              <span>{loggingOut ? 'Logging out...' : 'Log out'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

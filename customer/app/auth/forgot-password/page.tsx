@@ -18,7 +18,6 @@ export default function CustomerForgotPasswordPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [dispatchedCode, setDispatchedCode] = useState("");
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -53,15 +52,25 @@ export default function CustomerForgotPasswordPage() {
       setLoading(false);
 
       if (!res.ok) {
+        const match = data.error?.match(/after (\d+) seconds/i);
+        if (match) {
+          const secs = parseInt(match[1], 10);
+          setEmail(normalizedEmail);
+          setStep("code");
+          setResendCooldown(secs);
+          setMessage(`A verification code was already dispatched to ${normalizedEmail}. Please check your email inbox.`);
+          setTimeout(() => inputRefs.current[0]?.focus(), 150);
+          return;
+        }
+
         setError(data.error || "Failed to generate verification code.");
         return;
       }
 
       setEmail(normalizedEmail);
-      setDispatchedCode(data.code || "");
       setStep("code");
-      setResendCooldown(30);
-      setMessage(`An 8-digit verification code has been dispatched to ${normalizedEmail}.`);
+      setResendCooldown(60);
+      setMessage(`An 8-digit verification code has been dispatched to ${normalizedEmail}. Please check your email.`);
       setTimeout(() => inputRefs.current[0]?.focus(), 150);
     } catch {
       setLoading(false);
@@ -163,10 +172,16 @@ export default function CustomerForgotPasswordPage() {
       const data = await res.json();
       setLoading(false);
       if (res.ok) {
-        setDispatchedCode(data.code || "");
-        setResendCooldown(30);
-        setMessage("A fresh 8-digit verification code has been dispatched.");
+        setResendCooldown(60);
+        setMessage("A fresh 8-digit verification code has been sent to your email.");
       } else {
+        const match = data.error?.match(/after (\d+) seconds/i);
+        if (match) {
+          const secs = parseInt(match[1], 10);
+          setResendCooldown(secs);
+          setError(`Security cooldown active: please wait ${secs}s before requesting a new code.`);
+          return;
+        }
         setError(data.error || "Failed to resend verification code.");
       }
     } catch {
@@ -304,19 +319,17 @@ export default function CustomerForgotPasswordPage() {
           {/* ── STEP 2: 8-Digit Code ── */}
           {step === "code" && (
             <form onSubmit={handleVerifyCode} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-              {dispatchedCode && (
-                <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "16px", padding: "16px", textAlign: "center" }}>
-                  <span style={{ display: "block", fontSize: "11px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1px", color: "#166534" }}>
-                    8-Digit Security Code
+              <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "16px", padding: "16px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                <Mail size={22} style={{ color: "#166534", flexShrink: 0, marginTop: "2px" }} />
+                <div>
+                  <span style={{ display: "block", fontSize: "12px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.8px", color: "#166534" }}>
+                    Check Your Email
                   </span>
-                  <span style={{ display: "block", fontFamily: "monospace", fontSize: "28px", fontWeight: "900", letterSpacing: "6px", color: "#1b4332", margin: "6px 0" }}>
-                    {dispatchedCode}
-                  </span>
-                  <span style={{ display: "block", fontSize: "11.5px", fontWeight: "500", color: "#15803d" }}>
-                    Enter these 8 digits into the boxes below to verify
+                  <span style={{ display: "block", fontSize: "13px", color: "#15803d", marginTop: "4px", lineHeight: "1.4" }}>
+                    We sent an 8-digit verification code to <strong>{email}</strong>. Please check your Gmail or email inbox (including spam folder) and enter the code below.
                   </span>
                 </div>
-              )}
+              </div>
 
               <div>
                 <label style={{ display: "block", fontSize: "11px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.8px", color: "#435449", marginBottom: "8px" }}>
