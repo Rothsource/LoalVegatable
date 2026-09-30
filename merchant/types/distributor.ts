@@ -8,6 +8,9 @@ export type Distributor = {
   email: string;
   status: DistributorStatus;
   createdAt: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type DistributorFormValues = {
@@ -22,4 +25,7 @@ export type DistributorRow = {
   email?: unknown;
   status?: unknown;
   created_at?: unknown;
+  address?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
 };

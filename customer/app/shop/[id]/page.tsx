@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, use, useCallback, useEffect } from 'react';
-import { Heart, Star, Leaf, X, Trash2, HeartOff, SlidersHorizontal, ChevronLeft, MapPin, ShieldCheck, Package, Calendar, Box, RotateCcw, Plus, Minus, ShoppingBasket } from 'lucide-react';
+import { Heart, Star, Leaf, X, Trash2, HeartOff, SlidersHorizontal, ChevronLeft, ChevronRight, MapPin, ShieldCheck, Package, Calendar, Box, RotateCcw, Plus, Minus, ShoppingBasket, Images, Camera } from 'lucide-react';
 import { CircularLoader } from '@/components/CustomerSkeleton';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -19,6 +19,7 @@ interface Product {
   rating: number;
   isAvailable: boolean;
   img: string;
+  galleryImgs?: string[];
   quantity: number;
   harvestDate: string;
   sellByDate: string;
@@ -161,6 +162,10 @@ export default function ShopPage({ params }: { params: Promise<{ id: string }> }
   const [isFavOpen, setIsFavOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isShopOpen, setIsShopOpen] = useState(true);
+  const [activeCoverIdx, setActiveCoverIdx] = useState(0);
+  const [galleryModalOpen, setGalleryModalOpen] = useState(false);
+  const [galleryActiveIdx, setGalleryActiveIdx] = useState(0);
+  const [modalImgIdx, setModalImgIdx] = useState(0);
 
   const handleDraftMinChange = useCallback((v: string) => setDraftMinPrice(v), []);
   const handleDraftMaxChange = useCallback((v: string) => setDraftMaxPrice(v), []);
@@ -189,7 +194,7 @@ const CACHE_TTL_MS = 60_000;
         supabase.from('profile_merchants').select('*').eq('id', id).maybeSingle(),
         supabase
           .from('products')
-          .select('id, name, price, unit, is_organic, description, stock_quantity, is_active, profile_pic_url, harvest_date, expire_date, categories(name)')
+          .select('id, name, price, unit, is_organic, description, stock_quantity, is_active, profile_pic_url, background_pic_urls, harvest_date, expire_date, categories(name)')
           .eq('merchant_id', id)
           .eq('is_active', true)
           .or(`expire_date.is.null,expire_date.gte.${today}`),
@@ -225,22 +230,31 @@ const CACHE_TTL_MS = 60_000;
         }
       }
 
-      const mappedProducts = validProds.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        category: p.categories?.name ?? 'Uncategorized',
-        price: Number(p.price),
-        unit: p.unit ?? '',
-        benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
-        description: p.description ?? '',
-        popularity: p.stock_quantity ?? 0,
-        rating: ratingMap[p.id] ?? 0,
-        isAvailable: p.is_active && p.stock_quantity > 0,
-        img: p.profile_pic_url ?? 'https://placehold.co/400x300?text=No+Image',
-        quantity: p.stock_quantity ?? 0,
-        harvestDate: p.harvest_date ?? '',
-        sellByDate: p.expire_date ?? '',
-      }));
+      const mappedProducts = validProds.map((p: any) => {
+        const mainImg = p.profile_pic_url || (Array.isArray(p.background_pic_urls) ? p.background_pic_urls[0] : null) || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop';
+        const extraImgs = Array.isArray(p.background_pic_urls)
+          ? p.background_pic_urls.filter((u: any) => typeof u === 'string' && u.trim().length > 0)
+          : [];
+        const gallery = Array.from(new Set([mainImg, ...extraImgs]));
+
+        return {
+          id: p.id,
+          name: p.name,
+          category: p.categories?.name ?? 'Uncategorized',
+          price: Number(p.price),
+          unit: p.unit ?? '',
+          benefit: p.is_organic ? 'Organically grown' : 'Locally sourced',
+          description: p.description ?? '',
+          popularity: p.stock_quantity ?? 0,
+          rating: ratingMap[p.id] ?? 0,
+          isAvailable: p.is_active && p.stock_quantity > 0,
+          img: mainImg,
+          galleryImgs: gallery,
+          quantity: p.stock_quantity ?? 0,
+          harvestDate: p.harvest_date ?? '',
+          sellByDate: p.expire_date ?? '',
+        };
+      });
 
       const finalIsOpen = merchant?.is_open !== undefined && merchant?.is_open !== null ? Boolean(merchant.is_open) : true;
       shopDetailCache.set(id, { shop: merchant, products: mappedProducts, isOpen: finalIsOpen, time: Date.now() });
@@ -381,6 +395,38 @@ const CACHE_TTL_MS = 60_000;
   const favProducts = products.filter(p => favorites.includes(p.id));
   const getPendingQty = (pid: string) => pendingQty[pid] ?? 1;
 
+  // Filter background images to ensure certificates are NEVER shown (must be before any early return)
+  const backgroundPhotos: string[] = useMemo(() => {
+    if (!shop) return [];
+    const certUrl = (shop.certificate_url || '').trim();
+    const rawList = Array.isArray(shop.background_urls)
+      ? shop.background_urls
+      : typeof shop.background_urls === 'string'
+        ? [shop.background_urls]
+        : [];
+
+    return rawList
+      .filter((url: any): url is string => typeof url === 'string' && url.trim().length > 0)
+      .filter((url: string) => url !== certUrl && !url.toLowerCase().includes('/certificate'));
+  }, [shop]);
+
+  const fallbackCover = 'https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&w=1200&q=80';
+  const displayPhotos = backgroundPhotos.length > 0 ? backgroundPhotos : [fallbackCover];
+  const currentCoverPhoto = displayPhotos[activeCoverIdx % displayPhotos.length] || fallbackCover;
+
+  // Lightbox keyboard navigation (must be before any early return)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (galleryModalOpen) {
+        if (e.key === 'Escape') setGalleryModalOpen(false);
+        if (e.key === 'ArrowLeft') setGalleryActiveIdx((prev) => (prev - 1 + displayPhotos.length) % displayPhotos.length);
+        if (e.key === 'ArrowRight') setGalleryActiveIdx((prev) => (prev + 1) % displayPhotos.length);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [galleryModalOpen, displayPhotos.length]);
+
   if (loading) return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <CircularLoader size={48} label="Loading shop details…" />
@@ -397,19 +443,83 @@ const CACHE_TTL_MS = 60_000;
   const shopOwner = shop.full_name ?? '';
   const shopLocation = shop.province ?? '';
   const shopAvatar = shop.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(shopName)}&background=1b4332&color=fff&size=80`;
-  const shopCover = shop.background_urls?.[0] || 'https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&w=1200&q=80';
   const shopVerified = shop.is_verified ?? false;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#FBF8F2' }}>
       <style>{fontStyles}</style>
 
-      {/* ── Product Detail Modal — UNCHANGED ── */}
+      {/* ── Product Detail Modal ── */}
       {selectedProduct && (
         <div className="info-modal-overlay" onClick={() => setSelectedProduct(null)}>
           <div className="info-modal-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <img src={selectedProduct.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'} style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }} alt="" />
-            <button onClick={() => setSelectedProduct(null)} style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {(() => {
+              const modalImages = selectedProduct.galleryImgs && selectedProduct.galleryImgs.length > 0
+                ? selectedProduct.galleryImgs
+                : [selectedProduct.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'];
+              const currentImg = modalImages[modalImgIdx % modalImages.length];
+              return (
+                <div style={{ position: 'relative', width: '100%', height: '240px' }}>
+                  <img
+                    src={currentImg}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '32px 32px 0 0' }}
+                    alt={selectedProduct.name}
+                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'; }}
+                  />
+                  {modalImages.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setModalImgIdx((prev) => (prev - 1 + modalImages.length) % modalImages.length); }}
+                        style={{
+                          position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                          border: 'none', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                          borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                        }}
+                        aria-label="Previous photo"
+                      >
+                        <ChevronLeft size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setModalImgIdx((prev) => (prev + 1) % modalImages.length); }}
+                        style={{
+                          position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                          border: 'none', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                          borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                        }}
+                        aria-label="Next photo"
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                      <div style={{
+                        position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)',
+                        display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+                        padding: '4px 8px', borderRadius: '100px',
+                      }}>
+                        {modalImages.map((_, idx) => (
+                          <div
+                            key={idx}
+                            onClick={(e) => { e.stopPropagation(); setModalImgIdx(idx); }}
+                            style={{
+                              width: (modalImgIdx % modalImages.length) === idx ? '16px' : '6px',
+                              height: '6px',
+                              borderRadius: '3px',
+                              background: (modalImgIdx % modalImages.length) === idx ? '#fff' : 'rgba(255,255,255,0.5)',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+            <button onClick={() => setSelectedProduct(null)} style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
               <X size={18} color="#fff" />
             </button>
             <div style={{ padding: '28px' }}>
@@ -641,12 +751,101 @@ const CACHE_TTL_MS = 60_000;
           <ChevronLeft size={16} /> Back to Shops
         </a>
 
-        {/* ── Shop Header — UNCHANGED ── */}
-        <div style={{ borderRadius: '32px', backgroundColor: surfaceWhite, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '50px', overflow: 'hidden' }}>
-          <div style={{ position: 'relative', height: '280px' }}>
-            <img src={shopCover} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt=""
-              onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&w=1200&q=80'; }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.6))' }} />
+        {/* ── Shop Header & Farm Cover ── */}
+        <div style={{ borderRadius: '32px', backgroundColor: surfaceWhite, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '32px', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', height: '300px' }}>
+            <img
+              src={currentCoverPhoto}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'all 0.3s ease' }}
+              alt={shopName}
+              onError={(e) => { (e.target as HTMLImageElement).src = fallbackCover; }}
+            />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 40%, rgba(0,0,0,0.7) 100%)' }} />
+
+            {/* Carousel navigation buttons on cover if multiple background photos */}
+            {displayPhotos.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveCoverIdx((prev) => (prev - 1 + displayPhotos.length) % displayPhotos.length)}
+                  aria-label="Previous farm background photo"
+                  style={{
+                    position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
+                    width: '42px', height: '42px', borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#1a1a1a', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+                    zIndex: 10, transition: 'transform 0.15s, background 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; }}
+                >
+                  <ChevronLeft size={22} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveCoverIdx((prev) => (prev + 1) % displayPhotos.length)}
+                  aria-label="Next farm background photo"
+                  style={{
+                    position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
+                    width: '42px', height: '42px', borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#1a1a1a', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+                    zIndex: 10, transition: 'transform 0.15s, background 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; }}
+                >
+                  <ChevronRight size={22} />
+                </button>
+
+                {/* Dot indicator */}
+                <div style={{
+                  position: 'absolute', top: '18px', left: '50%', transform: 'translateX(-50%)',
+                  display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)',
+                  padding: '5px 12px', borderRadius: '100px', zIndex: 10,
+                }}>
+                  {displayPhotos.map((_, i) => (
+                    <div
+                      key={i}
+                      onClick={() => setActiveCoverIdx(i)}
+                      style={{
+                        width: (activeCoverIdx % displayPhotos.length) === i ? '18px' : '7px',
+                        height: '7px',
+                        borderRadius: '4px',
+                        background: (activeCoverIdx % displayPhotos.length) === i ? '#fff' : 'rgba(255,255,255,0.45)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* "See All Photos" button */}
+            <button
+              type="button"
+              onClick={() => { setGalleryActiveIdx(activeCoverIdx); setGalleryModalOpen(true); }}
+              style={{
+                position: 'absolute', top: '18px', right: '18px', zIndex: 10,
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 18px', borderRadius: '100px',
+                background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)',
+                border: '1.5px solid rgba(255,255,255,0.7)',
+                color: deepGreen, fontWeight: '800', fontSize: '13px',
+                cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+                fontFamily: 'inherit',
+                transition: 'transform 0.15s, background 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#fff'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.92)'; }}
+            >
+              <Images size={16} color={brandGreen} />
+              <span>See All Photos ({displayPhotos.length})</span>
+            </button>
+
             <img src={shopAvatar} style={{ position: 'absolute', bottom: '20px', left: '40px', width: '80px', height: '80px', borderRadius: '50%', border: '4px solid white', objectFit: 'cover', backgroundColor: '#e5e7eb' }} alt={shopOwner}
               onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(shopName)}&background=0DB30D&color=fff&size=80`; }} />
             <div style={{ position: 'absolute', bottom: '20px', right: '40px', display: 'flex', gap: '30px' }}>
@@ -706,6 +905,87 @@ const CACHE_TTL_MS = 60_000;
           </div>
         </div>
 
+        {/* ── Farm & Growing Environment Gallery Section ── */}
+        {displayPhotos.length > 0 && (
+          <div style={{
+            backgroundColor: surfaceWhite,
+            borderRadius: '28px',
+            padding: '24px 30px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            marginBottom: '40px',
+            border: '1.5px solid #edf2ee',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#eff6ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Camera size={20} color={brandGreen} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: deepGreen }}>
+                    Farm & Growing Environment
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#888' }}>
+                    Real farm background photos uploaded by {shopName} ({displayPhotos.length} photo{displayPhotos.length > 1 ? 's' : ''})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setGalleryActiveIdx(0); setGalleryModalOpen(true); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '9px 18px', borderRadius: '12px',
+                  border: `1.5px solid ${brandGreen}`, background: '#eff6ef',
+                  color: deepGreen, fontWeight: '800', fontSize: '13px',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#e1f4e1'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ef'; }}
+              >
+                <Images size={15} /> See All ({displayPhotos.length})
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
+              {displayPhotos.map((photoUrl, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => { setGalleryActiveIdx(idx); setGalleryModalOpen(true); }}
+                  style={{
+                    position: 'relative',
+                    height: '140px',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    border: (activeCoverIdx % displayPhotos.length) === idx ? `2.5px solid ${brandGreen}` : '1.5px solid #e5e7eb',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
+                >
+                  <img
+                    src={photoUrl}
+                    alt={`Farm background photo ${idx + 1}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = fallbackCover; }}
+                  />
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)',
+                    display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+                    padding: '8px 10px',
+                  }}>
+                    <span style={{ fontSize: '11px', color: '#fff', fontWeight: '800' }}>Photo {idx + 1}</span>
+                    <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.25)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>View</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Products Section — UNCHANGED ── */}
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
@@ -754,7 +1034,7 @@ const CACHE_TTL_MS = 60_000;
               const inCart = cartItems[veg.id];
               const pQty = getPendingQty(veg.id);
               return (
-                <div key={veg.id} className="product-card" onClick={() => { setSelectedProduct(veg); setModalQty(1); }}
+                <div key={veg.id} className="product-card" onClick={() => { setSelectedProduct(veg); setModalQty(1); setModalImgIdx(0); }}
                   style={{ borderRadius: '24px', backgroundColor: surfaceWhite, position: 'relative', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
                   <button onClick={e => { e.stopPropagation(); toggleFavorite(veg.id); }}
                     style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10, backgroundColor: surfaceWhite, border: 'none', borderRadius: '50%', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -824,6 +1104,166 @@ const CACHE_TTL_MS = 60_000;
           </section>
         )}
       </main>
+
+      {/* ── Fullscreen Farm Background Photos Lightbox Modal ── */}
+      {galleryModalOpen && (
+        <div
+          onClick={() => setGalleryModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(5, 10, 6, 0.95)',
+            backdropFilter: 'blur(14px)',
+            zIndex: 3000,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            padding: '24px',
+            animation: 'fadeIn 0.2s ease',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }} onClick={e => e.stopPropagation()}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  Farm Background & Facilities
+                </span>
+                <span style={{ fontSize: '11px', color: '#9ca3af' }}>· (No certificates)</span>
+              </div>
+              <h3 style={{ margin: '2px 0 0', fontSize: '20px', fontWeight: '800', color: '#fff' }}>
+                {shopName}
+              </h3>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ color: '#d1d5db', fontSize: '14px', fontWeight: '700', background: 'rgba(255,255,255,0.1)', padding: '6px 14px', borderRadius: '100px' }}>
+                {galleryActiveIdx + 1} / {displayPhotos.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setGalleryModalOpen(false)}
+                style={{
+                  border: 'none', background: 'rgba(255,255,255,0.15)',
+                  borderRadius: '50%', width: '42px', height: '42px',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.3)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
+                aria-label="Close photo gallery"
+              >
+                <X size={22} />
+              </button>
+            </div>
+          </div>
+
+          {/* Main Photo with Navigation Arrows */}
+          <div
+            style={{
+              position: 'relative',
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '20px 0',
+              minHeight: 0,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {displayPhotos.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setGalleryActiveIdx(prev => (prev - 1 + displayPhotos.length) % displayPhotos.length)}
+                aria-label="Previous photo"
+                style={{
+                  position: 'absolute', left: '10px', zIndex: 10,
+                  width: '52px', height: '52px', borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)',
+                  border: '1.5px solid rgba(255,255,255,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.35)'; e.currentTarget.style.transform = 'scale(1.08)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                <ChevronLeft size={28} />
+              </button>
+            )}
+
+            <img
+              src={displayPhotos[galleryActiveIdx]}
+              alt={`Farm background photo ${galleryActiveIdx + 1}`}
+              style={{
+                maxWidth: '90%',
+                maxHeight: '100%',
+                objectFit: 'contain',
+                borderRadius: '16px',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              }}
+              onError={(e) => { (e.target as HTMLImageElement).src = fallbackCover; }}
+            />
+
+            {displayPhotos.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setGalleryActiveIdx(prev => (prev + 1) % displayPhotos.length)}
+                aria-label="Next photo"
+                style={{
+                  position: 'absolute', right: '10px', zIndex: 10,
+                  width: '52px', height: '52px', borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)',
+                  border: '1.5px solid rgba(255,255,255,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.35)'; e.currentTarget.style.transform = 'scale(1.08)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                <ChevronRight size={28} />
+              </button>
+            )}
+          </div>
+
+          {/* Bottom Thumbnails Strip */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '10px',
+              overflowX: 'auto',
+              padding: '10px 0',
+              zIndex: 10,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {displayPhotos.map((url, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setGalleryActiveIdx(idx)}
+                style={{
+                  width: '74px',
+                  height: '52px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  border: galleryActiveIdx === idx ? '3px solid #4ade80' : '2px solid rgba(255,255,255,0.25)',
+                  padding: 0,
+                  background: 'none',
+                  cursor: 'pointer',
+                  opacity: galleryActiveIdx === idx ? 1 : 0.6,
+                  transform: galleryActiveIdx === idx ? 'scale(1.06)' : 'none',
+                  transition: 'all 0.2s',
+                  flexShrink: 0,
+                }}
+              >
+                <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).src = fallbackCover; }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

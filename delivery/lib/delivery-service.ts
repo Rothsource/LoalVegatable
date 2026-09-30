@@ -85,9 +85,9 @@ const ORDER_SELECT = `
   items:order_items ( quantity, product:product_id ( name, unit ) )
 `;
 
-// Pickup location can't be joined in one query — orders.distributor_id points
-// to auth.users, not profile_distributors, so we resolve it in a second step:
-// distributor_id -> profile_distributors.merchant_id -> merchant_locations.
+// Pickup location priority:
+// 1. Distributor's own Phnom Penh hub (profile_distributors.address, latitude, longitude)
+// 2. Fallback: distributor_id -> profile_distributors.merchant_id -> merchant_locations.
 async function resolvePickup(distributorId: string | null): Promise<{ label: string; address: string; coordinates?: { latitude: number; longitude: number } }> {
   const fallback = { label: "Pickup location", address: "Address unavailable" };
   if (!distributorId) return fallback;
@@ -96,9 +96,20 @@ async function resolvePickup(distributorId: string | null): Promise<{ label: str
     const supabase = createClient();
     const { data: dist } = await supabase
       .from("profile_distributors")
-      .select("merchant_id")
+      .select("merchant_id, address, latitude, longitude")
       .eq("id", distributorId)
       .maybeSingle();
+
+    if (dist?.address) {
+      const lat = dist.latitude != null ? Number(dist.latitude) : NaN;
+      const lng = dist.longitude != null ? Number(dist.longitude) : NaN;
+      return {
+        label: "Distributor Hub (Phnom Penh)",
+        address: dist.address,
+        coordinates: !isNaN(lat) && !isNaN(lng) ? { latitude: lat, longitude: lng } : undefined,
+      };
+    }
+
     if (!dist?.merchant_id) return fallback;
 
     const { data: loc } = await supabase
