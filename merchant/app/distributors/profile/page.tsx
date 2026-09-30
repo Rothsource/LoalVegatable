@@ -2,19 +2,30 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { 
   User, Mail, Store, ShieldCheck, Bell, CheckCircle2, 
-  AlertCircle, Sparkles, RefreshCw, Smartphone
+  AlertCircle, Sparkles, RefreshCw, Smartphone, MapPin, Building,
+  Edit2, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { subscribeToPush, isPushSubscribed } from "@/lib/push/subscribe";
 import { DistributorSpinner } from "@/components/distributors/DistributorUI";
 
+const DistributorLocationPicker = dynamic(
+  () => import("@/components/distributors/DistributorLocationPicker"),
+  { ssr: false }
+);
+
 type Profile = {
+  id: string;
   full_name: string;
   email: string;
   status: string;
   merchant_name: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export default function DistributorProfilePage() {
@@ -24,6 +35,12 @@ export default function DistributorProfilePage() {
   const [subscribing, setSubscribing] = useState(false);
   const [pushError, setPushError] = useState("");
 
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [newLocation, setNewLocation] = useState<{ address: string; latitude: number; longitude: number } | null>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [locationSuccess, setLocationSuccess] = useState("");
+  const [locationError, setLocationError] = useState("");
+
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -31,7 +48,7 @@ export default function DistributorProfilePage() {
 
       const { data } = await supabase
         .from("profile_distributors")
-        .select("full_name, email, status, merchant_id")
+        .select("id, full_name, email, status, merchant_id, address, latitude, longitude")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -44,10 +61,14 @@ export default function DistributorProfilePage() {
         .maybeSingle();
 
       setProfile({
+        id: data.id,
         full_name: data.full_name,
         email: data.email,
         status: data.status,
         merchant_name: merchant?.community_name || merchant?.full_name || "Assigned Partner Farm",
+        address: data.address || null,
+        latitude: data.latitude != null ? Number(data.latitude) : null,
+        longitude: data.longitude != null ? Number(data.longitude) : null,
       });
       setLoading(false);
     })();
@@ -92,6 +113,49 @@ export default function DistributorProfilePage() {
       console.error(e);
     } finally {
       setTogglingStatus(false);
+    }
+  }
+
+  async function handleSaveProfileLocation() {
+    if (!profile || !newLocation || !newLocation.address) {
+      setLocationError("Please select or search for your hub location on the map.");
+      return;
+    }
+    setSavingLocation(true);
+    setLocationError("");
+    setLocationSuccess("");
+
+    try {
+      const res = await fetch("/api/distributor/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          distributorId: profile.id,
+          address: newLocation.address,
+          latitude: newLocation.latitude,
+          longitude: newLocation.longitude,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to update hub location.");
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              address: newLocation.address,
+              latitude: newLocation.latitude,
+              longitude: newLocation.longitude,
+            }
+          : prev
+      );
+      setLocationSuccess("Phnom Penh Distribution Hub location updated successfully!");
+      setEditingLocation(false);
+    } catch (err: any) {
+      setLocationError(err?.message || "Could not save hub location.");
+    } finally {
+      setSavingLocation(false);
     }
   }
 
@@ -185,6 +249,148 @@ export default function DistributorProfilePage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* ── Phnom Penh Distribution Hub & Pickup Location Card ── */}
+      <div className="rounded-[26px] border-2 border-[#e2e8dd] bg-white p-6 sm:p-8 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#f0f4ee] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e8f5e9] text-[#1b4332] border border-[#c8e6c9] flex-shrink-0">
+              <MapPin size={22} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-[#182216]">
+                Phnom Penh Distribution Hub
+              </h3>
+              <p className="text-xs text-[#52604f]">
+                Urban pickup depot where courier riders collect orders for Phnom Penh consumers.
+              </p>
+            </div>
+          </div>
+
+          {!editingLocation && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingLocation(true);
+                setLocationSuccess("");
+                setLocationError("");
+              }}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#f1f8f3] hover:bg-[#e1f0e4] text-[#1b4332] border border-[#c5dec9] text-xs font-bold transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              <Edit2 size={13} />
+              <span>{profile.address ? "Change Location" : "Set Location"}</span>
+            </button>
+          )}
+        </div>
+
+        {locationSuccess && (
+          <div className="flex items-center gap-2 rounded-xl bg-[#ecfdf5] border border-[#a7f3d0] p-3 text-xs font-bold text-[#065f46]">
+            <CheckCircle2 size={15} />
+            <span>{locationSuccess}</span>
+          </div>
+        )}
+
+        {locationError && (
+          <div className="flex items-center gap-2 rounded-xl border border-[#eedbd7] bg-[#fff5f4] p-3 text-xs font-bold text-[#c53929]">
+            <AlertCircle size={15} />
+            <span>{locationError}</span>
+          </div>
+        )}
+
+        {!editingLocation ? (
+          <div>
+            {profile.address ? (
+              <div className="rounded-2xl bg-[#fafbf9] border border-[#ecf1ea] p-4 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <Building size={16} className="text-[#2e7d32] mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#2E6F40]">Active Pickup Depot Address</p>
+                    <p className="text-sm font-bold text-[#182216] mt-0.5 break-words">
+                      {profile.address}
+                    </p>
+                  </div>
+                </div>
+
+                {profile.latitude && profile.longitude && (
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#edf2ea] text-xs text-gray-500">
+                    <span className="font-semibold text-gray-600">GPS Pin:</span>
+                    <span className="font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-[#dfe6d9] text-[#1b4332] font-bold">
+                      {profile.latitude.toFixed(5)}, {profile.longitude.toFixed(5)}
+                    </span>
+                    <span className="text-[10px] text-[#065f46] font-bold bg-[#ecfdf5] px-2 py-0.5 rounded-full border border-[#a7f3d0]">
+                      ✓ Active for courier pickup routing
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-[#fed7aa] bg-[#fffbeb] p-4 text-xs font-medium text-[#9a3412] space-y-2">
+                <div className="flex items-center gap-2 font-bold text-[#c2410c]">
+                  <AlertCircle size={15} />
+                  <span>No urban pickup depot configured yet</span>
+                </div>
+                <p>
+                  Your farm (<strong>{profile.merchant_name}</strong>) is outside Phnom Penh. Couriers will currently navigate to the rural farm location until you set your Phnom Penh depot.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEditingLocation(true)}
+                  className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <MapPin size={13} />
+                  <span>Set Hub Location Now</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4 pt-1">
+            <DistributorLocationPicker
+              initialAddress={profile.address || ""}
+              initialLat={profile.latitude || undefined}
+              initialLng={profile.longitude || undefined}
+              onChange={(loc) => {
+                setNewLocation(loc);
+                setLocationError("");
+              }}
+            />
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleSaveProfileLocation}
+                disabled={savingLocation}
+                className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#1b4332] hover:bg-[#123327] py-3 px-5 text-xs font-bold text-white shadow-sm active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {savingLocation ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Saving Location…</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin size={14} />
+                    <span>Confirm &amp; Update Hub Location</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingLocation(false);
+                  setNewLocation(null);
+                  setLocationError("");
+                }}
+                disabled={savingLocation}
+                className="w-full sm:w-auto px-4 py-3 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Operations & Synchronized Shop Status Card ── */}

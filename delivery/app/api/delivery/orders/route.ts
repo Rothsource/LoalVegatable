@@ -15,34 +15,51 @@ async function resolvePickups(admin: ReturnType<typeof createSupabaseAdmin>, dis
   try {
     const { data: distProfiles } = await admin
       .from("profile_distributors")
-      .select("id, merchant_id")
+      .select("id, merchant_id, address, latitude, longitude")
       .in("id", validIds);
 
-    const merchantIds = [...new Set((distProfiles || []).map((d) => d.merchant_id).filter(Boolean))];
-    if (merchantIds.length === 0) return pickupMap;
-
-    const { data: locations } = await admin
-      .from("merchant_locations")
-      .select("merchant_id, address, latitude, longitude")
-      .in("merchant_id", merchantIds);
-
-    const locByMerchant = new Map<string, { address: string; latitude: number | null; longitude: number | null }>();
-    (locations || []).forEach((l) => {
-      if (l.merchant_id) locByMerchant.set(l.merchant_id, l);
-    });
-
+    const pendingMerchantIds: string[] = [];
     (distProfiles || []).forEach((d) => {
-      const loc = locByMerchant.get(d.merchant_id);
-      if (loc && loc.address) {
-        const lat = loc.latitude != null ? Number(loc.latitude) : NaN;
-        const lng = loc.longitude != null ? Number(loc.longitude) : NaN;
+      if (d.address) {
+        const lat = d.latitude != null ? Number(d.latitude) : NaN;
+        const lng = d.longitude != null ? Number(d.longitude) : NaN;
         pickupMap.set(d.id, {
-          label: "Pickup location",
-          address: loc.address,
+          label: "Distributor Hub (Phnom Penh)",
+          address: d.address,
           coordinates: !isNaN(lat) && !isNaN(lng) ? { latitude: lat, longitude: lng } : undefined,
         });
+      } else if (d.merchant_id) {
+        pendingMerchantIds.push(d.merchant_id);
       }
     });
+
+    const merchantIds = [...new Set(pendingMerchantIds)];
+    if (merchantIds.length > 0) {
+      const { data: locations } = await admin
+        .from("merchant_locations")
+        .select("merchant_id, address, latitude, longitude")
+        .in("merchant_id", merchantIds);
+
+      const locByMerchant = new Map<string, { address: string; latitude: number | null; longitude: number | null }>();
+      (locations || []).forEach((l) => {
+        if (l.merchant_id) locByMerchant.set(l.merchant_id, l);
+      });
+
+      (distProfiles || []).forEach((d) => {
+        if (!pickupMap.has(d.id) && d.merchant_id) {
+          const loc = locByMerchant.get(d.merchant_id);
+          if (loc && loc.address) {
+            const lat = loc.latitude != null ? Number(loc.latitude) : NaN;
+            const lng = loc.longitude != null ? Number(loc.longitude) : NaN;
+            pickupMap.set(d.id, {
+              label: "Pickup location",
+              address: loc.address,
+              coordinates: !isNaN(lat) && !isNaN(lng) ? { latitude: lat, longitude: lng } : undefined,
+            });
+          }
+        }
+      });
+    }
   } catch (err) {
     console.error("Failed to resolve pickups:", err);
   }

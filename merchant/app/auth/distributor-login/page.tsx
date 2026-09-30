@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   AlertCircle,
   ArrowLeft,
@@ -14,10 +15,16 @@ import {
   Loader2,
   Lock,
   Mail,
+  MapPin,
   RotateCw,
 } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 import { supabase } from "@/lib/supabase";
+
+const DistributorLocationPicker = dynamic(
+  () => import("@/components/distributors/DistributorLocationPicker"),
+  { ssr: false }
+);
 
 export default function DistributorLoginPage() {
   const router = useRouter();
@@ -26,15 +33,20 @@ export default function DistributorLoginPage() {
   // "email": Step 1 - Enter work email
   // "verify": Step 2 - Enter 8-digit verification code sent to email
   // "setPassword": Step 3 - Set distributor password
+  // "setLocation": Step 4 - Set Phnom Penh pickup hub location
   // "login": Alternative - Direct login with email + existing password
-  const [stage, setStage] = useState<"email" | "verify" | "setPassword" | "login">("email");
+  const [stage, setStage] = useState<"email" | "verify" | "setPassword" | "setLocation" | "login">("email");
 
+  const [distributorId, setDistributorId] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [locationData, setLocationData] = useState<{ address: string; latitude: number; longitude: number } | null>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -60,6 +72,10 @@ export default function DistributorLoginPage() {
         setLoading(false);
         setError(statusData?.error || "This email is not authorized as a distributor.");
         return;
+      }
+
+      if (statusData?.id) {
+        setDistributorId(statusData.id);
       }
 
       // Step B: Send OTP code to the email via Supabase
@@ -189,20 +205,58 @@ export default function DistributorLoginPage() {
       }
 
       setLoading(false);
-      setSuccessMsg("Password set successfully! Redirecting to distributor dashboard…");
-
-      // Redirect into distributor workspace
-      // nosemgrep: javascript.lang.security.detect-eval-with-expression.detect-eval-with-expression -- safe: function argument, not a string, no dynamic eval
-      setTimeout(() => {
-        window.location.href = "/distributors/products";
-      }, 700);
+      setSuccessMsg("Password set successfully! Next, configure your distribution hub location in Phnom Penh.");
+      setStage("setLocation");
     } catch (err: any) {
       setLoading(false);
       setError(err?.message || "Could not save password. Please try again.");
     }
   }
 
-  // 4. Returning distributor login with password
+  // 4. Save distributor hub location
+  async function handleSaveLocation() {
+    if (!locationData || !locationData.address) {
+      setError("Please choose or pin your hub location on the map.");
+      return;
+    }
+
+    setSavingLocation(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const targetId = distributorId || user?.id;
+
+      const res = await fetch("/api/distributor/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          distributorId: targetId,
+          address: locationData.address,
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Could not save hub location.");
+
+      setSuccessMsg("Distribution hub location saved! Welcome to your dashboard.");
+      setTimeout(() => {
+        window.location.href = "/distributors/products";
+      }, 700);
+    } catch (err: any) {
+      setSavingLocation(false);
+      setError(err?.message || "Could not save hub location. Please try again.");
+    }
+  }
+
+  function handleSkipLocation() {
+    window.location.href = "/distributors/products";
+  }
+
+  // 5. Returning distributor login with password
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -242,6 +296,8 @@ export default function DistributorLoginPage() {
           ? "Enter Verification Code"
           : stage === "setPassword"
           ? "Create Your Password"
+          : stage === "setLocation"
+          ? "Set Phnom Penh Hub Location"
           : "Distributor Sign In"
       }
       description={
@@ -251,6 +307,8 @@ export default function DistributorLoginPage() {
           ? `We sent an 8-digit code to ${email}. Enter the code below to verify your email.`
           : stage === "setPassword"
           ? `Set a secure password for ${email} so you can sign in anytime.`
+          : stage === "setLocation"
+          ? "Your partner farm is located outside Phnom Penh. Pin your urban depot or pickup location so couriers in Phnom Penh know where to collect packages."
           : "Sign in with your email and password to coordinate dispatches and deliveries."
       }
       footer={
@@ -509,16 +567,66 @@ export default function DistributorLoginPage() {
             {loading ? (
               <>
                 <Loader2 size={17} className="animate-spin" />
-                <span>Saving password &amp; entering…</span>
+                <span>Saving password…</span>
               </>
             ) : (
               <>
-                <span>Save Password &amp; Enter Dashboard</span>
+                <span>Save Password &amp; Set Hub Location</span>
                 <ArrowRight size={16} />
               </>
             )}
           </button>
         </form>
+      )}
+
+      {/* STAGE 4: SET DISTRIBUTION HUB LOCATION (PHNOM PENH) */}
+      {stage === "setLocation" && (
+        <div className="space-y-5">
+          <div className="rounded-xl bg-[#e8f5e9]/70 border border-[#c8e6c9] p-3 text-xs text-[#1b4332] leading-relaxed">
+            <p className="font-bold">📍 Urban Pickup Depot Setup</p>
+            <p className="mt-0.5 text-[#2d6a4f]">
+              Use GPS or search to set your hub address in Phnom Penh. Couriers will navigate here to pick up packages.
+            </p>
+          </div>
+
+          <DistributorLocationPicker
+            initialAddress=""
+            onChange={(loc) => {
+              setLocationData(loc);
+              setError("");
+            }}
+          />
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleSaveLocation}
+              disabled={savingLocation}
+              className="flex-1 w-full flex items-center justify-center gap-2 rounded-xl bg-[#1b4332] py-3.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(27,67,50,0.25)] transition hover:bg-[#123327] active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+            >
+              {savingLocation ? (
+                <>
+                  <Loader2 size={17} className="animate-spin" />
+                  <span>Saving hub location…</span>
+                </>
+              ) : (
+                <>
+                  <MapPin size={17} />
+                  <span>Save Hub &amp; Go to Dashboard</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSkipLocation}
+              disabled={savingLocation}
+              className="w-full sm:w-auto px-5 py-3.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
       )}
 
       {/* STAGE 4: RETURNING DISTRIBUTOR PASSWORD LOGIN */}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Search, Star, Heart, ShoppingBasket, Store, ChevronDown, SlidersHorizontal, X, RotateCcw, Plus, Minus, Leaf, Box, Calendar, MapPin, Trash2 } from 'lucide-react';
+import { Search, Star, Heart, ShoppingBasket, Store, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, X, RotateCcw, Plus, Minus, Leaf, Box, Calendar, MapPin, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { CircularLoader } from '@/components/CustomerSkeleton';
 import { useAuth } from '@/lib/useAuth';
@@ -23,6 +23,7 @@ interface Product {
   rating: number;
   isAvailable: boolean;
   img: string;
+  galleryImgs?: string[];
   quantity: number;
   harvestDate: string;
   sellByDate: string;
@@ -198,6 +199,10 @@ export default function ShopPage() {
         const merchant = merchantMap[p.merchant_id] ?? {};
         const isShopOpen = p.merchant_id ? (shopStatuses[p.merchant_id] ?? true) : true;
         const realVegImg = p.profile_pic_url || (Array.isArray(p.background_pic_urls) ? p.background_pic_urls[0] : null) || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop';
+        const extraImgs = Array.isArray(p.background_pic_urls)
+          ? p.background_pic_urls.filter((u: any) => typeof u === 'string' && u.trim().length > 0)
+          : [];
+        const gallery = Array.from(new Set([realVegImg, ...extraImgs]));
         const rawShopName = merchant.community_name || merchant.full_name || 'Local Farm';
         const shopAvatarUrl = merchant.profile_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(rawShopName)}&background=1b4332&color=fff&size=50`;
 
@@ -214,6 +219,7 @@ export default function ShopPage() {
           isAvailable: p.is_active && p.stock_quantity > 0,
           isShopOpen,
           img: realVegImg,
+          galleryImgs: gallery,
           quantity: p.stock_quantity ?? 0,
           harvestDate: p.harvest_date ?? '',
           sellByDate: p.expire_date ?? '',
@@ -296,6 +302,7 @@ export default function ShopPage() {
   // Product detail modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalQty, setModalQty] = useState(1);
+  const [modalImgIdx, setModalImgIdx] = useState(0);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -426,14 +433,74 @@ export default function ShopPage() {
             onClick={e => e.stopPropagation()}
             style={{ background: '#fff', maxWidth: '560px', width: '100%', borderRadius: '32px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', maxHeight: '90vh', overflowY: 'auto', animation: 'modalIn 0.25s cubic-bezier(0.16,1,0.3,1)' }}
           >
-            <img
-              src={selectedProduct.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'}
-              alt={selectedProduct.name}
-              style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '32px 32px 0 0' }}
-              onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'; }}
-            />
+            {(() => {
+              const modalImages = selectedProduct.galleryImgs && selectedProduct.galleryImgs.length > 0
+                ? selectedProduct.galleryImgs
+                : [selectedProduct.img || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'];
+              const currentImg = modalImages[modalImgIdx % modalImages.length];
+              return (
+                <div style={{ position: 'relative', width: '100%', height: '240px' }}>
+                  <img
+                    src={currentImg}
+                    alt={selectedProduct.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '32px 32px 0 0' }}
+                    onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop'; }}
+                  />
+                  {modalImages.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setModalImgIdx((prev) => (prev - 1 + modalImages.length) % modalImages.length); }}
+                        style={{
+                          position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                          border: 'none', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                          borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                        }}
+                        aria-label="Previous photo"
+                      >
+                        <ChevronLeft size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setModalImgIdx((prev) => (prev + 1) % modalImages.length); }}
+                        style={{
+                          position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                          border: 'none', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                          borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                        }}
+                        aria-label="Next photo"
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                      <div style={{
+                        position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)',
+                        display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+                        padding: '4px 8px', borderRadius: '100px',
+                      }}>
+                        {modalImages.map((_, idx) => (
+                          <div
+                            key={idx}
+                            onClick={(e) => { e.stopPropagation(); setModalImgIdx(idx); }}
+                            style={{
+                              width: (modalImgIdx % modalImages.length) === idx ? '16px' : '6px',
+                              height: '6px',
+                              borderRadius: '3px',
+                              background: (modalImgIdx % modalImages.length) === idx ? '#fff' : 'rgba(255,255,255,0.5)',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
             <button onClick={() => setSelectedProduct(null)}
-              style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
               <X size={18} color="#fff" />
             </button>
             <div style={{ padding: '28px' }}>
@@ -748,7 +815,7 @@ export default function ShopPage() {
               const isFav = favorites.includes(product.id);
               return (
                 <div key={product.id}
-                  onClick={() => { setSelectedProduct(product); setModalQty(1); }}
+                  onClick={() => { setSelectedProduct(product); setModalQty(1); setModalImgIdx(0); }}
                   style={{ backgroundColor: '#fff', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', position: 'relative', transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'pointer' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 6px rgba(0,0,0,0.05)'; }}

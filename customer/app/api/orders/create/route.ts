@@ -129,9 +129,12 @@ export async function POST(req: NextRequest) {
 
     const createdOrderIds: string[] = [];
 
+    const DELIVERY_FEE = 6000;
+
     // 5. Process each merchant order
     for (const [merchantId, shopItems] of Object.entries(byShop)) {
-      const orderTotal = shopItems.reduce((sum, item) => sum + Number(item.dbProd?.price || item.price) * item.qty, 0);
+      const itemsTotal = shopItems.reduce((sum, item) => sum + Number(item.dbProd?.price || item.price) * item.qty, 0);
+      const orderTotal = itemsTotal + DELIVERY_FEE;
 
       // Create Order
       const { data: order, error: orderError } = await supabaseAdmin

@@ -62,21 +62,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, sent: 0, reason: 'Order is not out_for_delivery' }, { headers: CORS_HEADERS });
   }
 
-  // Pickup location: distributor -> merchant_id -> merchant_locations
+  // Pickup location: distributor hub location first -> fallback to merchant_locations
   let pickupAddress = 'Pickup location unavailable';
   if (order.distributor_id) {
     const { data: dist } = await supabaseAdmin
       .from('profile_distributors')
-      .select('merchant_id')
+      .select('merchant_id, address')
       .eq('id', order.distributor_id)
-      .single();
+      .maybeSingle();
 
-    if (dist?.merchant_id) {
+    if (dist?.address) {
+      pickupAddress = dist.address;
+    } else if (dist?.merchant_id) {
       const { data: loc } = await supabaseAdmin
         .from('merchant_locations')
         .select('address, latitude, longitude')
         .eq('merchant_id', dist.merchant_id)
-        .single();
+        .maybeSingle();
       if (loc?.address) pickupAddress = loc.address;
     }
   }

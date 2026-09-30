@@ -938,8 +938,10 @@ export default function CartPage() {
     }
   };
 
+  const DELIVERY_FEE = 6000;
   const totalQty = cartProducts.reduce((s, p) => s + (p.qty ?? 1), 0);
-  const total = cartProducts.reduce((s, p) => s + p.price * (p.qty ?? 1), 0);
+  const subtotal = cartProducts.reduce((s, p) => s + p.price * (p.qty ?? 1), 0);
+  const total = cartProducts.length > 0 ? subtotal + DELIVERY_FEE : 0;
 
   const inputStyle = (hasError: boolean): React.CSSProperties => ({
     width: '100%', boxSizing: 'border-box',
@@ -1662,8 +1664,12 @@ export default function CartPage() {
                   <span style={{ fontWeight: '700', color: '#111' }}>{totalQty}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#555' }}>
+                  <span>Subtotal</span>
+                  <span style={{ fontWeight: '700', color: '#111' }}>{subtotal.toLocaleString()} KHR</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#555' }}>
                   <span>Delivery fee</span>
-                  <span style={{ fontWeight: '700', color: brandGreen }}>Free</span>
+                  <span style={{ fontWeight: '700', color: '#111' }}>{DELIVERY_FEE.toLocaleString()} KHR</span>
                 </div>
                 <div style={{ height: '1px', backgroundColor: '#f0f0f0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '17px' }}>
@@ -2030,7 +2036,7 @@ export default function CartPage() {
               {checkoutError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px', textAlign: 'center' }}>{checkoutError}</p>}
             </div>
 
-            <MiniOrderSummary cartProducts={cartProducts} total={total} />
+            <MiniOrderSummary cartProducts={cartProducts} total={total} deliveryFee={DELIVERY_FEE} />
           </div>
         )}
 
@@ -2128,7 +2134,7 @@ export default function CartPage() {
               {placeError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px', textAlign: 'center', fontWeight: '600' }}>{placeError}</p>}
             </div>
 
-            <MiniOrderSummary cartProducts={cartProducts} total={total} />
+            <MiniOrderSummary cartProducts={cartProducts} total={total} deliveryFee={DELIVERY_FEE} />
           </div>
         )}
           </>
@@ -2138,9 +2144,17 @@ export default function CartPage() {
   );
 }
 
-function MiniOrderSummary({ cartProducts, total }: { cartProducts: CartProduct[]; total: number }) {
+function MiniOrderSummary({
+  cartProducts,
+  total,
+  deliveryFee = 6000,
+}: {
+  cartProducts: CartProduct[];
+  total: number;
+  deliveryFee?: number;
+}) {
   const deepGreen = '#0A490A';
-  const brandGreen = '#0DB30D';
+  const subtotal = cartProducts.reduce((s, p) => s + p.price * (p.qty ?? 1), 0);
   return (
     <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', position: 'sticky', top: '90px' }}>
       <h3 style={{ fontSize: '15px', fontWeight: '800', color: deepGreen, margin: '0 0 16px' }}>Order Summary</h3>
@@ -2161,13 +2175,18 @@ function MiniOrderSummary({ cartProducts, total }: { cartProducts: CartProduct[]
         })}
       </div>
       <div style={{ height: '1px', backgroundColor: '#f0f0f0', marginBottom: '14px' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#555' }}>
+        <span>Subtotal</span>
+        <span style={{ fontWeight: '700', color: '#111' }}>{subtotal.toLocaleString()} KHR</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '13px', color: '#555' }}>
+        <span>Delivery fee</span>
+        <span style={{ fontWeight: '700', color: '#111' }}>{deliveryFee.toLocaleString()} KHR</span>
+      </div>
+      <div style={{ height: '1px', backgroundColor: '#f0f0f0', marginBottom: '14px' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '14px', fontWeight: '700', color: '#555' }}>Total</span>
         <span style={{ fontSize: '16px', fontWeight: '800', color: deepGreen }}>{total.toLocaleString()} KHR</span>
-      </div>
-      <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#f0fdf0', padding: '10px 12px', borderRadius: '10px' }}>
-        <CheckCircle2 size={14} color={deepGreen} />
-        <span style={{ fontSize: '12px', fontWeight: '700', color: deepGreen }}>Free delivery</span>
       </div>
     </div>
   );
