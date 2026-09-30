@@ -31,21 +31,19 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const emailOtp = data.properties.email_otp;
-
-      // Dispatch Supabase reset email
-      try {
-        await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail);
-      } catch (err) {
-        console.warn("resetPasswordForEmail note:", err);
+      // Dispatch Supabase reset email to user's inbox
+      const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail);
+      if (resetError) {
+        console.error("resetPasswordForEmail error:", resetError);
+        return NextResponse.json(
+          { error: resetError.message || "Failed to send verification code to your email." },
+          { status: 400 }
+        );
       }
-
-      console.log(`[Customer Forgot Password] 8-digit code for ${cleanEmail}: ${emailOtp}`);
 
       return NextResponse.json({
         ok: true,
-        code: emailOtp,
-        message: `An 8-digit verification code has been dispatched to ${cleanEmail}.`,
+        message: `An 8-digit verification code has been sent to ${cleanEmail}. Please check your email inbox.`,
       });
     }
 

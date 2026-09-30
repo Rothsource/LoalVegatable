@@ -58,12 +58,8 @@ export default function AdminForgotPasswordPage() {
       }
 
       setStep("code");
-      setResendCooldown(30);
-      setInfo(
-        data.demoCode
-          ? `Code dispatched! For local development, your 8-digit verification code is: ${data.demoCode}`
-          : `An 8-digit verification code has been dispatched to ${cleanEmail}.`
-      );
+      setResendCooldown(60);
+      setInfo(`An 8-digit verification code has been dispatched to ${cleanEmail}. Please check your email inbox.`);
       setTimeout(() => inputRefs.current[0]?.focus(), 150);
     } catch {
       setLoading(false);
@@ -160,12 +156,8 @@ export default function AdminForgotPasswordPage() {
       const data = await res.json();
       setLoading(false);
       if (res.ok) {
-        setResendCooldown(30);
-        setInfo(
-          data.demoCode
-            ? `New 8-digit code: ${data.demoCode}`
-            : "A fresh 8-digit verification code has been dispatched."
-        );
+        setResendCooldown(60);
+        setInfo("A fresh 8-digit verification code has been dispatched to your email inbox.");
       } else {
         setError(data.error || "Failed to resend verification code.");
       }

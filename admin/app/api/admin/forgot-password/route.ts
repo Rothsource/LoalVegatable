@@ -44,9 +44,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         ok: true,
-        message: `An 8-digit verification code has been dispatched for ${cleanEmail}.`,
-        // In local development, return code for easy verification
-        demoCode: process.env.NODE_ENV !== "production" ? generatedCode : undefined,
+        message: `An 8-digit verification code has been dispatched for ${cleanEmail}. Please check your email inbox.`,
       });
     }
 

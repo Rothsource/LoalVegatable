@@ -19,7 +19,6 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [dispatchedCode, setDispatchedCode] = useState("");
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -54,15 +53,25 @@ export default function ForgotPasswordPage() {
       setLoading(false);
 
       if (!res.ok) {
+        const match = data.error?.match(/after (\d+) seconds/i);
+        if (match) {
+          const secs = parseInt(match[1], 10);
+          setEmail(normalizedEmail);
+          setStep("code");
+          setResendCooldown(secs);
+          setMessage(`A verification code was already dispatched to ${normalizedEmail}. Please check your email inbox.`);
+          setTimeout(() => inputRefs.current[0]?.focus(), 150);
+          return;
+        }
+
         setError(data.error || "Failed to generate verification code.");
         return;
       }
 
       setEmail(normalizedEmail);
-      setDispatchedCode(data.code || "");
       setStep("code");
-      setResendCooldown(30);
-      setMessage(`An 8-digit verification code has been dispatched to ${normalizedEmail}.`);
+      setResendCooldown(60);
+      setMessage(`An 8-digit verification code has been dispatched to ${normalizedEmail}. Please check your email inbox.`);
       setTimeout(() => inputRefs.current[0]?.focus(), 150);
     } catch {
       setLoading(false);
@@ -162,10 +171,16 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
       setLoading(false);
       if (res.ok) {
-        setDispatchedCode(data.code || "");
-        setResendCooldown(30);
-        setMessage("A fresh 8-digit verification code has been dispatched.");
+        setResendCooldown(60);
+        setMessage("A fresh 8-digit verification code has been dispatched to your email.");
       } else {
+        const match = data.error?.match(/after (\d+) seconds/i);
+        if (match) {
+          const secs = parseInt(match[1], 10);
+          setResendCooldown(secs);
+          setError(`Security cooldown active: please wait ${secs}s before requesting a new code.`);
+          return;
+        }
         setError(data.error || "Failed to resend verification code.");
       }
     } catch {
@@ -295,15 +310,15 @@ export default function ForgotPasswordPage() {
       {/* ── STEP 2: 8-Digit Code ── */}
       {step === "code" && (
         <form onSubmit={handleVerifyCode} className="space-y-5">
-          {dispatchedCode && (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-4 text-center shadow-xs">
-              <span className="block text-xs font-bold uppercase tracking-wider text-emerald-800">8-Digit Security Code:</span>
-              <span className="mt-1 block font-mono text-2xl font-black tracking-[0.3em] text-[#1b4332]">
-                {dispatchedCode}
+          <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 p-4 text-left shadow-xs">
+            <Mail className="mt-0.5 h-5 w-5 shrink-0 text-emerald-800" />
+            <div>
+              <span className="block text-xs font-bold uppercase tracking-wider text-emerald-800">Check Your Email</span>
+              <span className="mt-1 block text-xs text-emerald-700">
+                An 8-digit verification code has been sent to <strong>{email}</strong>. Please check your inbox (or spam) and enter the code below.
               </span>
-              <span className="mt-1 block text-[11px] font-medium text-emerald-700">Enter these 8 digits into the inputs below to verify</span>
             </div>
-          )}
+          </div>
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-[#435449] mb-2">
